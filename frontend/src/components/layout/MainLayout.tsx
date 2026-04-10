@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Wallet, PieChart, MessageSquare, Award, LogOut, Menu, X, Sparkles, Target, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeSidebar from './ThemeSidebar';
+import authStore from '../../store/authStore';
 
 const NAV_ITEMS = [
   { path: '/app', label: 'Tổng quan', icon: LayoutDashboard },
@@ -19,6 +20,7 @@ export default function MainLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const user = authStore.getUser();
 
   const toggleMobileMenu = () => setIsMobileOpen(!isMobileOpen);
 
@@ -77,11 +79,11 @@ export default function MainLayout() {
       <div className="pt-6 border-t border-white/10 mt-auto">
         <Link to="/app/profile" className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-theme-text-primary font-bold border border-white/20">
-            A
+            {user?.full_name?.charAt(0) || 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-theme-text-primary truncate">Nguyễn Văn A</p>
-            <p className="text-xs text-theme-text-muted truncate">Pro Member</p>
+            <p className="text-sm font-semibold text-theme-text-primary truncate">{user?.full_name || 'Người dùng'}</p>
+            <p className="text-xs text-theme-text-muted truncate">{user?.email}</p>
           </div>
           <button 
             onClick={handleLogout}
