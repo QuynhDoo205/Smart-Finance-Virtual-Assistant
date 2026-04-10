@@ -216,9 +216,9 @@ export default function ExpenseTracker() {
           <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-400/20 flex items-center justify-center">
             <Scan className="w-5 h-5 text-cyan-400" />
           </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">Ghi nhận Chi tiêu</h1>
+          <h1 className="text-3xl font-extrabold text-theme-text-primary tracking-tight">Ghi nhận Chi tiêu</h1>
         </div>
-        <p className="text-gray-500 ml-[52px] text-sm">Quét AI · Nhắn tin tự nhiên · Nhập thủ công — đồng bộ tức thì.</p>
+        <p className="text-theme-text-muted ml-[52px] text-sm">Quét AI · Nhắn tin tự nhiên · Nhập thủ công — đồng bộ tức thì.</p>
       </div>
 
       {/* ── Tab Switcher ── */}
@@ -233,8 +233,8 @@ export default function ExpenseTracker() {
               whileTap={{ scale: 0.96 }}
               className={`relative flex items-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-semibold transition-colors duration-200 overflow-hidden ${
                 active
-                  ? `bg-gradient-to-r ${gradient} text-white`
-                  : 'bg-[#0a1120]/70 border border-white/[0.07] text-gray-400 hover:text-white hover:border-white/15'
+                  ? `bg-gradient-to-r ${gradient} text-theme-text-primary`
+                  : 'bg-[#0a1120]/70 border border-white/[0.07] text-theme-text-muted hover:text-theme-text-primary hover:border-white/15'
               }`}
               style={active ? { boxShadow: `0 0 28px -4px ${neon}` } : {}}
             >
@@ -272,8 +272,8 @@ export default function ExpenseTracker() {
                         <Receipt className="w-5 h-5 text-cyan-400" />
                       </div>
                       <div>
-                        <h2 className="text-base font-bold text-white">Quét Hóa Đơn AI</h2>
-                        <p className="text-xs text-gray-500">OCR tự động — không cần nhập tay</p>
+                        <h2 className="text-base font-bold text-theme-text-primary">Quét Hóa Đơn AI</h2>
+                        <p className="text-xs text-theme-text-muted">OCR tự động — không cần nhập tay</p>
                       </div>
                     </div>
 
@@ -297,11 +297,11 @@ export default function ExpenseTracker() {
                           transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                           className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-400/20 flex items-center justify-center"
                         >
-                          <Upload className={`w-7 h-7 transition-colors ${isDragging ? 'text-cyan-400' : 'text-gray-500'}`} />
+                          <Upload className={`w-7 h-7 transition-colors ${isDragging ? 'text-cyan-400' : 'text-theme-text-muted'}`} />
                         </motion.div>
                         <div className="text-center">
-                          <p className="text-white font-semibold">Kéo &amp; thả ảnh hóa đơn vào đây</p>
-                          <p className="text-gray-500 text-sm mt-1">
+                          <p className="text-theme-text-primary font-semibold">Kéo &amp; thả ảnh hóa đơn vào đây</p>
+                          <p className="text-theme-text-muted text-sm mt-1">
                             hoặc <span className="text-cyan-400 underline underline-offset-2 cursor-pointer">click để chọn file</span>
                           </p>
                         </div>
@@ -353,7 +353,7 @@ export default function ExpenseTracker() {
                           {scanPhase === 'scanning'
                             ? <Loader2 className="w-4 h-4 text-cyan-400 animate-spin flex-shrink-0" />
                             : <CheckCircle className="w-4 h-4 text-cyan-400 flex-shrink-0" />}
-                          <span className="text-sm font-medium text-gray-300">{scanText}</span>
+                          <span className="text-sm font-medium text-theme-text-muted">{scanText}</span>
                         </div>
 
                         {/* Pre-filled result */}
@@ -369,8 +369,8 @@ export default function ExpenseTracker() {
                                 { label: 'Danh mục', value: `${CATEGORY_INFO[scannedData.category].emoji} ${CATEGORY_INFO[scannedData.category].label}` },
                               ].map(item => (
                                 <div key={item.label} className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.06]">
-                                  <p className="text-[11px] text-gray-500">{item.label}</p>
-                                  <p className="text-sm text-white font-semibold mt-0.5">{item.value}</p>
+                                  <p className="text-[11px] text-theme-text-muted">{item.label}</p>
+                                  <p className="text-sm text-theme-text-primary font-semibold mt-0.5">{item.value}</p>
                                 </div>
                               ))}
                             </div>
@@ -378,7 +378,7 @@ export default function ExpenseTracker() {
                               className="p-4 rounded-xl text-center"
                               style={{ background: 'linear-gradient(135deg,rgba(34,211,238,0.07),rgba(20,184,166,0.07))', border: '1px solid rgba(34,211,238,0.2)', boxShadow: '0 0 20px -8px rgba(34,211,238,0.5)' }}
                             >
-                              <p className="text-xs text-gray-400">Tổng tiền hóa đơn</p>
+                              <p className="text-xs text-theme-text-muted">Tổng tiền hóa đơn</p>
                               <p className="text-3xl font-extrabold text-cyan-400 mt-1">
                                 {fmt(scannedData.amount)}<span className="text-base font-normal text-cyan-600">đ</span>
                               </p>
@@ -387,14 +387,14 @@ export default function ExpenseTracker() {
                               <motion.button
                                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                                 onClick={resetScanner}
-                                className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                className="flex-1 py-3 rounded-xl border border-white/10 text-theme-text-muted hover:text-theme-text-primary hover:border-white/20 transition-colors text-sm font-medium flex items-center justify-center gap-2"
                               >
                                 <X className="w-4 h-4" /> Thử lại
                               </motion.button>
                               <motion.button
                                 whileHover={{ scale: 1.02, boxShadow: '0 0 30px rgba(34,211,238,0.6)' }} whileTap={{ scale: 0.97 }}
                                 onClick={confirmScan}
-                                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 text-white font-bold text-sm flex items-center justify-center gap-2"
+                                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 text-theme-text-primary font-bold text-sm flex items-center justify-center gap-2"
                                 style={{ boxShadow: '0 0 22px rgba(34,211,238,0.4)' }}
                               >
                                 <CheckCircle className="w-4 h-4" /> Xác nhận lưu
@@ -424,12 +424,12 @@ export default function ExpenseTracker() {
                         className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 flex items-center justify-center"
                         style={{ boxShadow: '0 0 14px rgba(56,189,248,0.55)' }}
                       >
-                        <Sparkles className="w-5 h-5 text-white" />
+                        <Sparkles className="w-5 h-5 text-theme-text-primary" />
                       </div>
                       <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-cyan-400 rounded-full border-2 border-[#050d1a]" style={{ boxShadow: '0 0 8px rgba(34,211,238,0.9)' }} />
                     </div>
                     <div>
-                      <p className="text-white font-bold text-sm">Nova AI</p>
+                      <p className="text-theme-text-primary font-bold text-sm">Nova AI</p>
                       <p className="text-xs font-medium" style={{ color: 'rgba(34,211,238,0.8)' }}>Đang theo dõi chi tiêu của bạn</p>
                     </div>
                   </div>
@@ -463,7 +463,7 @@ export default function ExpenseTracker() {
                             <div
                               className={`max-w-[82%] px-4 py-3.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
                                 msg.role === 'user'
-                                  ? 'rounded-tr-sm text-white'
+                                  ? 'rounded-tr-sm text-theme-text-primary'
                                   : 'rounded-tl-sm text-cyan-50'
                               }`}
                               style={
@@ -489,7 +489,7 @@ export default function ExpenseTracker() {
                         whileHover={{ scale: 1.05, borderColor: 'rgba(34,211,238,0.45)' }}
                         whileTap={{ scale: 0.94 }}
                         onClick={() => setChatInput(s)}
-                        className="px-3 py-1.5 rounded-xl text-gray-400 text-xs hover:text-cyan-300 transition-colors whitespace-nowrap flex-shrink-0"
+                        className="px-3 py-1.5 rounded-xl text-theme-text-muted text-xs hover:text-cyan-300 transition-colors whitespace-nowrap flex-shrink-0"
                         style={{ background: 'rgba(6,20,40,0.8)', border: '1px solid rgba(255,255,255,0.07)' }}
                       >
                         {s}
@@ -505,7 +505,7 @@ export default function ExpenseTracker() {
                         onChange={e => setChatInput(e.target.value)}
                         placeholder="VD: Hôm nay ăn phở hết 40k…"
                         disabled={chatLoading}
-                        className="flex-1 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 outline-none transition-all disabled:opacity-50"
+                        className="flex-1 rounded-xl px-4 py-3 text-sm text-theme-text-primary placeholder-gray-600 outline-none transition-all disabled:opacity-50"
                         style={{
                           background: 'rgba(6,20,40,0.8)',
                           border: '1px solid rgba(255,255,255,0.08)',
@@ -517,7 +517,7 @@ export default function ExpenseTracker() {
                         type="submit"
                         disabled={!chatInput.trim() || chatLoading}
                         whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
-                        className="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 flex items-center justify-center text-white disabled:opacity-35 flex-shrink-0 transition-opacity"
+                        className="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 flex items-center justify-center text-theme-text-primary disabled:opacity-35 flex-shrink-0 transition-opacity"
                         style={{ boxShadow: '0 0 18px rgba(56,189,248,0.45)' }}
                       >
                         <Send className="w-4 h-4" />
@@ -543,22 +543,22 @@ export default function ExpenseTracker() {
                         <PenLine className="w-5 h-5 text-fuchsia-400" />
                       </div>
                       <div>
-                        <h2 className="text-base font-bold text-white">Nhập thủ công</h2>
-                        <p className="text-xs text-gray-500">Cho các khoản không có hóa đơn</p>
+                        <h2 className="text-base font-bold text-theme-text-primary">Nhập thủ công</h2>
+                        <p className="text-xs text-theme-text-muted">Cho các khoản không có hóa đơn</p>
                       </div>
                     </div>
 
                     <form onSubmit={submitManual} className="space-y-5">
                       {/* Amount */}
                       <div>
-                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Số tiền</label>
+                        <label className="text-[11px] font-bold text-theme-text-muted uppercase tracking-widest block mb-2">Số tiền</label>
                         <div className="relative">
                           <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-fuchsia-400 pointer-events-none" />
                           <input
                             type="text" required placeholder="0"
                             value={manualAmount}
                             onChange={e => { const n = e.target.value.replace(/\D/g, ''); setManualAmount(n === '' ? '' : new Intl.NumberFormat('vi-VN').format(Number(n))); }}
-                            className="w-full pl-11 pr-4 py-4 rounded-xl text-2xl font-extrabold text-white placeholder-gray-700 outline-none transition-all"
+                            className="w-full pl-11 pr-4 py-4 rounded-xl text-2xl font-extrabold text-theme-text-primary placeholder-gray-700 outline-none transition-all"
                             style={{ background: 'rgba(6,20,40,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}
                             onFocus={e => { e.target.style.borderColor = 'rgba(232,121,249,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(232,121,249,0.08)'; }}
                             onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
@@ -568,7 +568,7 @@ export default function ExpenseTracker() {
 
                       {/* Category grid */}
                       <div>
-                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-3">Danh mục</label>
+                        <label className="text-[11px] font-bold text-theme-text-muted uppercase tracking-widest block mb-3">Danh mục</label>
                         <div className="grid grid-cols-4 gap-2">
                           {(Object.entries(CATEGORY_INFO) as [ExpenseCategory, typeof CATEGORY_INFO[ExpenseCategory]][]).map(([key, info]) => {
                             const active = manualCat === key;
@@ -578,7 +578,7 @@ export default function ExpenseTracker() {
                                 whileHover={{ scale: 1.06, y: -2 }} whileTap={{ scale: 0.93 }}
                                 onClick={() => setManualCat(key)}
                                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-all ${
-                                  active ? `${info.bg} ${info.color}` : 'text-gray-600 hover:text-gray-400'
+                                  active ? `${info.bg} ${info.color}` : 'text-gray-600 hover:text-theme-text-muted'
                                 }`}
                                 style={{
                                   background: active ? undefined : 'rgba(6,20,40,0.7)',
@@ -597,13 +597,13 @@ export default function ExpenseTracker() {
                       {/* Date + Note row */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Ngày</label>
+                          <label className="text-[11px] font-bold text-theme-text-muted uppercase tracking-widest block mb-2">Ngày</label>
                           <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-text-muted pointer-events-none" />
                             <input
                               type="date" required value={manualDate}
                               onChange={e => setManualDate(e.target.value)}
-                              className="w-full pl-9 pr-3 py-3 rounded-xl text-gray-300 text-sm outline-none transition-all"
+                              className="w-full pl-9 pr-3 py-3 rounded-xl text-theme-text-muted text-sm outline-none transition-all"
                               style={{ background: 'rgba(6,20,40,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}
                               onFocus={e => { e.target.style.borderColor = 'rgba(232,121,249,0.45)'; e.target.style.boxShadow = '0 0 0 3px rgba(232,121,249,0.07)'; }}
                               onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
@@ -611,13 +611,13 @@ export default function ExpenseTracker() {
                           </div>
                         </div>
                         <div>
-                          <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Ghi chú</label>
+                          <label className="text-[11px] font-bold text-theme-text-muted uppercase tracking-widest block mb-2">Ghi chú</label>
                           <div className="relative">
-                            <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                            <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-text-muted pointer-events-none" />
                             <input
                               type="text" placeholder="Mô tả ngắn…" value={manualNote}
                               onChange={e => setManualNote(e.target.value)}
-                              className="w-full pl-9 pr-3 py-3 rounded-xl text-gray-300 text-sm placeholder-gray-700 outline-none transition-all"
+                              className="w-full pl-9 pr-3 py-3 rounded-xl text-theme-text-muted text-sm placeholder-gray-700 outline-none transition-all"
                               style={{ background: 'rgba(6,20,40,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}
                               onFocus={e => { e.target.style.borderColor = 'rgba(232,121,249,0.45)'; e.target.style.boxShadow = '0 0 0 3px rgba(232,121,249,0.07)'; }}
                               onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
@@ -631,7 +631,7 @@ export default function ExpenseTracker() {
                         type="submit"
                         whileHover={{ scale: 1.02, boxShadow: '0 0 32px rgba(232,121,249,0.55)' }}
                         whileTap={{ scale: 0.97 }}
-                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all"
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-500 text-theme-text-primary font-bold text-sm flex items-center justify-center gap-2 transition-all"
                         style={{ boxShadow: '0 0 22px rgba(232,121,249,0.38)' }}
                       >
                         <AnimatePresence mode="wait" initial={false}>
@@ -665,8 +665,8 @@ export default function ExpenseTracker() {
             <div className="p-5">
               {/* Feed Header */}
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-white">Giao dịch hôm nay</h3>
-                <span className="text-xs text-gray-500 px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <h3 className="text-sm font-bold text-theme-text-primary">Giao dịch hôm nay</h3>
+                <span className="text-xs text-theme-text-muted px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   {expenses.length} khoản
                 </span>
               </div>
@@ -676,7 +676,7 @@ export default function ExpenseTracker() {
                 className="mb-4 p-4 rounded-xl text-center"
                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
               >
-                <p className="text-xs text-gray-500">Tổng đã chi</p>
+                <p className="text-xs text-theme-text-muted">Tổng đã chi</p>
                 <motion.p
                   key={totalSpent}
                   initial={{ scale: 1.08, color: '#f87171' }}
@@ -684,7 +684,7 @@ export default function ExpenseTracker() {
                   transition={{ duration: 0.5 }}
                   className="text-2xl font-extrabold mt-1"
                 >
-                  {fmt(totalSpent)}<span className="text-sm font-normal text-gray-500">đ</span>
+                  {fmt(totalSpent)}<span className="text-sm font-normal text-theme-text-muted">đ</span>
                 </motion.p>
               </div>
 
@@ -719,7 +719,7 @@ export default function ExpenseTracker() {
                             {info.emoji}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-white truncate">{exp.store ?? exp.description}</p>
+                            <p className="text-sm font-semibold text-theme-text-primary truncate">{exp.store ?? exp.description}</p>
                             <p className="text-xs text-gray-600">{info.label} · {srcEmoji}</p>
                           </div>
                           <span className="text-sm font-bold text-red-400 flex-shrink-0">-{fmt(exp.amount)}</span>

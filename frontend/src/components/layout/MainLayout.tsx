@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Wallet, PieChart, MessageSquare, Award, LogOut, Menu, X, Sparkles, Target, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeSidebar from './ThemeSidebar';
@@ -18,17 +18,28 @@ const NAV_ITEMS = [
 export default function MainLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const toggleMobileMenu = () => setIsMobileOpen(!isMobileOpen);
+
+  const handleLogout = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Clear tokens securely
+    localStorage.clear();
+    sessionStorage.clear();
+    // Navigate safely back to login
+    navigate('/login');
+  };
 
   const SidebarContent = () => (
     <div className="h-full flex flex-col py-6 px-4">
       {/* Brand */}
       <div className="flex items-center gap-3 px-2 mb-10">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary-500 to-accent-400 flex items-center justify-center shadow-[0_0_20px_rgba(56,189,248,0.5)]">
-          <Sparkles className="text-white w-6 h-6" />
+          <Sparkles className="text-theme-text-primary w-6 h-6" />
         </div>
-        <span className="text-2xl font-bold tracking-tight text-white drop-shadow-md">
+        <span className="text-2xl font-bold tracking-tight text-theme-text-primary drop-shadow-md">
           Nova<span className="text-primary-400">Finance</span>
         </span>
       </div>
@@ -46,10 +57,10 @@ export default function MainLayout() {
               className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 group ${
                 isActive 
                   ? 'bg-primary-500/10 text-primary-400 border border-primary-500/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  : 'text-theme-text-muted hover:text-theme-text-primary hover:bg-white/5'
               }`}
             >
-              <Icon className={`w-5 h-5 ${isActive ? 'text-primary-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+              <Icon className={`w-5 h-5 ${isActive ? 'text-primary-400' : 'text-theme-text-muted group-hover:text-theme-text-muted'}`} />
               <span className="font-semibold">{item.label}</span>
               {isActive && (
                 <motion.div 
@@ -65,14 +76,20 @@ export default function MainLayout() {
       {/* User Profile Footer */}
       <div className="pt-6 border-t border-white/10 mt-auto">
         <Link to="/app/profile" className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold border border-white/20">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-theme-text-primary font-bold border border-white/20">
             A
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">Nguyễn Văn A</p>
-            <p className="text-xs text-gray-500 truncate">Pro Member</p>
+            <p className="text-sm font-semibold text-theme-text-primary truncate">Nguyễn Văn A</p>
+            <p className="text-xs text-theme-text-muted truncate">Pro Member</p>
           </div>
-          <LogOut className="w-5 h-5 text-gray-600 hover:text-danger cursor-pointer transition-colors" />
+          <button 
+            onClick={handleLogout}
+            className="p-2 rounded-lg hover:bg-red-500/10 group/logout transition-all"
+            title="Đăng xuất"
+          >
+            <LogOut className="w-5 h-5 text-theme-text-muted group-hover/logout:text-red-500 transition-colors" />
+          </button>
         </Link>
       </div>
     </div>
@@ -91,9 +108,9 @@ export default function MainLayout() {
       <div className="lg:hidden fixed top-0 inset-x-0 h-16 glass-panel rounded-none border-x-0 border-t-0 z-30 flex items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <Sparkles className="text-primary-400 w-6 h-6" />
-          <span className="text-xl font-bold text-white">Nova<span className="text-primary-400">Finance</span></span>
+          <span className="text-xl font-bold text-theme-text-primary">Nova<span className="text-primary-400">Finance</span></span>
         </div>
-        <button onClick={toggleMobileMenu} className="p-2 text-gray-300 hover:text-white">
+        <button onClick={toggleMobileMenu} className="p-2 text-theme-text-muted hover:text-theme-text-primary">
           {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>

@@ -13,17 +13,17 @@ const FIXED = [
 
 /* ── Initial jars (% of availableBudget, must sum to 100) ── */
 const INIT_JARS: Jar[] = [
-  { id:'1', name:'Thiết yếu',  emoji:'🛒', percentage:40, locked:false, color:'#0EA5E9', neonColor:'#00f5ff', description:'Ăn uống, đi lại' },
-  { id:'2', name:'Tiết kiệm',  emoji:'🏦', percentage:30, locked:false, color:'#10B981', neonColor:'#00ffaa', description:'Quỹ khẩn cấp & tương lai' },
-  { id:'3', name:'Phát triển', emoji:'📚', percentage:15, locked:false, color:'#8B5CF6', neonColor:'#a855f7', description:'Học tập, sách, kỹ năng' },
+  { id:'1', name:'Thiết yếu',  emoji:'🛒', percentage:40, locked:false, color:'#0EA5E9', neonColor:'#22d3ee', description:'Ăn uống, đi lại' },
+  { id:'2', name:'Tiết kiệm',  emoji:'🏦', percentage:30, locked:false, color:'#10B981', neonColor:'#10b981', description:'Quỹ khẩn cấp & tương lai' },
+  { id:'3', name:'Phát triển', emoji:'📚', percentage:10, locked:false, color:'#8B5CF6', neonColor:'#a855f7', description:'Học tập, sách, kỹ năng' },
   { id:'4', name:'Hưởng thụ',  emoji:'🎮', percentage:10, locked:false, color:'#F59E0B', neonColor:'#fbbf24', description:'Giải trí, cà phê' },
-  { id:'5', name:'Đầu tư',     emoji:'📈', percentage: 5, locked:false, color:'#EC4899', neonColor:'#ff00c8', description:'Cổ phiếu, crypto' },
+  { id:'5', name:'Đầu tư',     emoji:'📈', percentage:10, locked:false, color:'#EC4899', neonColor:'#ff00c8', description:'Cổ phiếu, crypto' },
 ];
 
 const AI_PRESETS = [
-  [{id:'1',p:45},{id:'2',p:25},{id:'3',p:15},{id:'4',p:10},{id:'5',p:5}],
+  [{id:'1',p:50},{id:'2',p:20},{id:'3',p:10},{id:'4',p:10},{id:'5',p:10}],
   [{id:'1',p:40},{id:'2',p:30},{id:'3',p:10},{id:'4',p:10},{id:'5',p:10}],
-  [{id:'1',p:50},{id:'2',p:20},{id:'3',p:15},{id:'4',p:10},{id:'5',p:5}],
+  [{id:'1',p:60},{id:'2',p:20},{id:'3',p:0},{id:'4',p:10},{id:'5',p:10}],
 ];
 
 const fmtVND = (v: number) =>
@@ -195,12 +195,12 @@ export default function BudgetManager() {
           </div>
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="text-4xl font-extrabold tabular-nums leading-none"
+          <p className="text-4xl font-extrabold tabular-nums leading-none transition-colors duration-300"
             style={{ color: poolColor, textShadow: isBalanced ? '0 0 20px var(--theme-neon-primary)' : undefined }}>
-            {isOver ? '+' : ''}{Math.abs(unallocated)}%
+            {allocated}%
           </p>
           <p className="text-xs mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
-            {isBalanced ? '= 100% ✓' : isOver ? 'vượt mức' : 'còn dư'}
+            {isBalanced ? '= 100% ✓' : `/ 100% (còn thiếu ${unallocated}%)`}
           </p>
         </div>
       </motion.div>

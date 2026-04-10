@@ -36,8 +36,8 @@ export default function Dashboard() {
       {/* Header section */}
       <motion.div variants={itemVars} className="flex justify-between items-end mb-6">
         <div>
-          <h1 className="text-3xl font-extrabold text-white mb-2">Tổng quan Tài chính</h1>
-          <p className="text-gray-400">Tháng này bạn đang làm rất tốt! Tiếp tục phát huy nhé. 🚀</p>
+          <h1 className="text-3xl font-extrabold text-theme-text-primary mb-2">Tổng quan Tài chính</h1>
+          <p className="text-theme-text-muted">Tháng này bạn đang làm rất tốt! Tiếp tục phát huy nhé. 🚀</p>
         </div>
       </motion.div>
 
@@ -49,9 +49,9 @@ export default function Dashboard() {
             <div className="w-12 h-12 rounded-2xl bg-primary-500/20 flex items-center justify-center">
               <Wallet className="text-primary-400 w-6 h-6" />
             </div>
-            <h3 className="text-gray-400 font-medium">Tổng Số Dư</h3>
+            <h3 className="text-theme-text-muted font-medium">Tổng Số Dư</h3>
           </div>
-          <p className="text-4xl font-bold tracking-tight text-white">{formatCurrency(12500000)}</p>
+          <p className="text-4xl font-bold tracking-tight text-theme-text-primary">{formatCurrency(12500000)}</p>
           <div className="mt-4 flex items-center text-sm font-medium text-success">
             <TrendingUp className="w-4 h-4 mr-1" />
             <span>+15% so với tháng trước</span>
@@ -64,9 +64,9 @@ export default function Dashboard() {
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
               <ArrowDownRight className="text-emerald-400 w-6 h-6" />
             </div>
-            <h3 className="text-gray-400 font-medium">Tổng Thu (Tháng)</h3>
+            <h3 className="text-theme-text-muted font-medium">Tổng Thu (Tháng)</h3>
           </div>
-          <p className="text-4xl font-bold tracking-tight text-white">{formatCurrency(15000000)}</p>
+          <p className="text-4xl font-bold tracking-tight text-theme-text-primary">{formatCurrency(15000000)}</p>
         </div>
 
         <div className="glass-panel p-6 rounded-3xl relative overflow-hidden group border-t-rose-500/30">
@@ -75,9 +75,9 @@ export default function Dashboard() {
             <div className="w-12 h-12 rounded-2xl bg-rose-500/20 flex items-center justify-center">
               <ArrowUpRight className="text-rose-400 w-6 h-6" />
             </div>
-            <h3 className="text-gray-400 font-medium">Tổng Chi (Tháng)</h3>
+            <h3 className="text-theme-text-muted font-medium">Tổng Chi (Tháng)</h3>
           </div>
-          <p className="text-4xl font-bold tracking-tight text-white">{formatCurrency(4650000)}</p>
+          <p className="text-4xl font-bold tracking-tight text-theme-text-primary">{formatCurrency(4650000)}</p>
         </div>
       </motion.div>
 
@@ -86,7 +86,7 @@ export default function Dashboard() {
         
         {/* Pie Chart */}
         <motion.div variants={itemVars} className="glass-panel p-6 rounded-3xl lg:col-span-1 border border-white/5 shadow-2xl flex flex-col">
-          <h3 className="text-lg font-bold text-white mb-6">Cơ cấu Ngân sách</h3>
+          <h3 className="text-lg font-bold text-theme-text-primary mb-6">Cơ cấu Ngân sách</h3>
           <div className="flex-1 min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -117,9 +117,9 @@ export default function Dashboard() {
               <div key={item.name} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-gray-300 text-sm">{item.name}</span>
+                  <span className="text-theme-text-muted text-sm">{item.name}</span>
                 </div>
-                <span className="text-white font-medium text-sm">{formatCurrency(item.value)}</span>
+                <span className="text-theme-text-primary font-medium text-sm">{formatCurrency(item.value)}</span>
               </div>
             ))}
           </div>
@@ -128,7 +128,7 @@ export default function Dashboard() {
         {/* Transactions List */}
         <motion.div variants={itemVars} className="glass-panel p-6 rounded-3xl lg:col-span-2 border border-white/5 flex flex-col">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="text-lg font-bold text-white">Giao dịch gần đây</h3>
+            <h3 className="text-lg font-bold text-theme-text-primary">Giao dịch gần đây</h3>
             <button className="text-sm text-primary-400 hover:text-primary-300 font-medium">Xem tất cả</button>
           </div>
           
@@ -137,16 +137,16 @@ export default function Dashboard() {
               <div key={tx.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] border border-transparent hover:border-white/5 transition-all group">
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center
-                    ${tx.type === 'income' ? 'bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20' : 'bg-[#111827] text-gray-400 group-hover:bg-[#1F2937]'}
+                    ${tx.type === 'income' ? 'bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20' : 'bg-[#111827] text-theme-text-muted group-hover:bg-[#1F2937]'}
                   `}>
                     <Activity className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-white font-semibold">{tx.title}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">{tx.date} • {tx.category}</p>
+                    <h4 className="text-theme-text-primary font-semibold">{tx.title}</h4>
+                    <p className="text-xs text-theme-text-muted mt-0.5">{tx.date} • {tx.category}</p>
                   </div>
                 </div>
-                <span className={`font-bold ${tx.type === 'income' ? 'text-emerald-400' : 'text-white'}`}>
+                <span className={`font-bold ${tx.type === 'income' ? 'text-emerald-400' : 'text-theme-text-primary'}`}>
                   {tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount)}
                 </span>
               </div>

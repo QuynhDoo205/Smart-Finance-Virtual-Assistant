@@ -33,6 +33,12 @@ export default {
         success: '#10B981',
         warning: '#F59E0B',
         danger:  '#EF4444',
+        theme: {
+          text: {
+            primary: 'var(--theme-text-primary)',
+            muted: 'var(--theme-text-muted)',
+          }
+        }
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

@@ -45,9 +45,9 @@ export default function Login() {
         
         <div className="relative z-20 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary-500 to-accent-400 flex items-center justify-center shadow-[0_0_20px_rgba(56,189,248,0.5)]">
-            <Sparkles className="text-white w-6 h-6" />
+            <Sparkles className="text-theme-text-primary w-6 h-6" />
           </div>
-          <span className="text-2xl font-bold tracking-tight text-white drop-shadow-md">
+          <span className="text-2xl font-bold tracking-tight text-theme-text-primary drop-shadow-md">
             Nova<span className="text-primary-400">Finance</span>
           </span>
         </div>
@@ -59,11 +59,11 @@ export default function Login() {
           className="relative z-20 max-w-lg"
         >
           <div className="p-8 rounded-[2rem] bg-white/5 backdrop-blur-md border border-white/10 shadow-2xl">
-            <h2 className="text-4xl font-extrabold text-white leading-tight mb-4 drop-shadow-lg">
+            <h2 className="text-4xl font-extrabold text-theme-text-primary leading-tight mb-4 drop-shadow-lg">
               Quản trị dòng tiền,<br/>
               Kiến tạo tương lai.
             </h2>
-            <p className="text-gray-300 text-lg">
+            <p className="text-theme-text-muted text-lg">
               Hệ sinh thái tài chính AI siêu thực giúp bạn tối ưu hóa từng đồng thu nhập. Trải nghiệm ngay báo cáo thông minh và tự động hóa chia ngân sách.
             </p>
           </div>
@@ -81,7 +81,7 @@ export default function Login() {
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-10 flex flex-col items-center">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary-500 to-accent-400 flex items-center justify-center shadow-[0_0_30px_rgba(56,189,248,0.5)] mb-4">
-              <Sparkles className="text-white w-7 h-7" />
+              <Sparkles className="text-theme-text-primary w-7 h-7" />
             </div>
             <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
               Nova<span className="text-primary-400">Finance</span>
@@ -89,16 +89,16 @@ export default function Login() {
           </div>
 
           <motion.div variants={itemVariants} className="mb-8 text-center lg:text-left">
-            <h2 className="text-3xl font-bold text-white mb-2">Đăng nhập</h2>
-            <p className="text-gray-400">Chào mừng bạn quay lại hệ thống</p>
+            <h2 className="text-3xl font-bold text-theme-text-primary mb-2">Đăng nhập</h2>
+            <p className="text-theme-text-muted">Chào mừng bạn quay lại hệ thống</p>
           </motion.div>
           
           <motion.div variants={itemVariants} className="glass-panel p-8 sm:p-10">
             <form onSubmit={handleLogin} className="space-y-6">
               <div className="space-y-1.5">
-                <label className="text-sm text-gray-300 font-medium ml-1">Email</label>
+                <label className="text-sm text-theme-text-muted font-medium ml-1">Email</label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-gray-500">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
                     <Mail className="h-5 w-5" />
                   </div>
                   <input
@@ -114,11 +114,11 @@ export default function Login() {
 
               <div className="space-y-1.5">
                 <label className="flex justify-between items-center text-sm ml-1">
-                  <span className="text-gray-300 font-medium">Mật khẩu</span>
+                  <span className="text-theme-text-muted font-medium">Mật khẩu</span>
                   <a href="#" className="text-primary-400 hover:text-primary-300 transition-colors font-medium">Quên mật khẩu?</a>
                 </label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-gray-500">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
                     <Lock className="h-5 w-5" />
                   </div>
                   <input
@@ -149,7 +149,7 @@ export default function Login() {
                   <div className="w-full border-t border-white/10"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-3 bg-[#111827] text-gray-500 rounded-full border border-white/5">Hoặc tiếp tục với</span>
+                  <span className="px-3 bg-[#111827] text-theme-text-muted rounded-full border border-white/5">Hoặc tiếp tục với</span>
                 </div>
               </div>
 
@@ -169,7 +169,7 @@ export default function Login() {
               </div>
             </div>
             
-            <p className="mt-8 text-center text-gray-400">
+            <p className="mt-8 text-center text-theme-text-muted">
               Chưa có tài khoản?{' '}
               <Link to="/register" className="text-primary-400 hover:text-primary-300 font-bold transition-colors">
                 Đăng ký ngay

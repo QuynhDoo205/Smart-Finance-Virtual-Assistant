@@ -41,7 +41,7 @@ function CustomTooltip({ active, payload }: any) {
   }
   const jar = d as Jar & { amount: number };
   return (
-    <div className="glass-panel px-4 py-3 rounded-xl text-sm pointer-events-none" style={{ borderColor: jar.neonColor + '60', minWidth: 180 }}>
+    <div className="glass-panel px-4 py-3 rounded-xl text-sm pointer-events-none relative z-50" style={{ borderColor: jar.neonColor + '60', minWidth: 180 }}>
       <div className="flex items-center gap-2 mb-1">
         <span>{jar.emoji}</span>
         <span className="font-bold" style={{ color: jar.neonColor }}>{jar.name}</span>
@@ -53,25 +53,7 @@ function CustomTooltip({ active, payload }: any) {
   );
 }
 
-/* Center label rendered via Recharts <Customized> to get real pixel cx/cy */
-function DonutCenter({ cx, cy, allocatedTotal }: {
-  cx: number; cy: number; allocatedTotal: number;
-}) {
-  const isExact = allocatedTotal === 100;
-  const isOver  = allocatedTotal > 100;
-  const color   = isExact ? '#00f5ff' : isOver ? '#ef4444' : '#f59e0b';
-
-  return (
-    <text textAnchor="middle">
-      <tspan x={cx} y={cy} dy="-10" fontSize={13} fontWeight="800" fill={color}>
-        {allocatedTotal}%
-      </tspan>
-      <tspan x={cx} dy="20" fontSize={10} fill="rgba(180,220,255,0.55)">
-        {isExact ? 'Hoàn hảo ✓' : isOver ? 'Vượt mức!' : `còn ${100 - allocatedTotal}% dư`}
-      </tspan>
-    </text>
-  );
-}
+/* Removed DonutCenter as we use absolute HTML overlay instead */
 
 export default function NeonPieChart({ jars, totalBudget, formatCurrency }: NeonPieChartProps) {
   /* Compute chart data — add gray "unallocated" slice when total < 100 */
@@ -103,7 +85,7 @@ export default function NeonPieChart({ jars, totalBudget, formatCurrency }: Neon
 
   return (
     <motion.div
-      className="glass-panel p-6 rounded-2xl flex flex-col items-center"
+      className="glass-panel p-6 rounded-2xl flex flex-col items-center relative z-10"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.45 }}
@@ -112,7 +94,23 @@ export default function NeonPieChart({ jars, totalBudget, formatCurrency }: Neon
         Biểu đồ phân bổ
       </p>
 
-      <div className="w-full" style={{ height: 280 }}>
+      <div className="w-full relative z-0 flex items-center justify-center" style={{ height: 280 }}>
+        
+        {/* Absolute center text over the donut */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 w-full h-full">
+          <span className="text-3xl font-extrabold tabular-nums transition-colors duration-300" 
+            style={{ 
+              color: allocatedTotal === 100 ? '#00f5ff' : allocatedTotal > 100 ? '#ef4444' : '#f59e0b', 
+              textShadow: `0 0 16px ${allocatedTotal === 100 ? '#00f5ff50' : 'transparent'}` 
+            }}>
+            {allocatedTotal}%
+          </span>
+          <span className="text-[10px] mt-0.5 font-medium transition-colors" 
+            style={{ color: allocatedTotal === 100 ? 'rgba(0,245,255,0.7)' : 'var(--theme-text-muted)' }}>
+            {allocatedTotal === 100 ? 'Hoàn hảo ✓' : allocatedTotal > 100 ? 'Vượt mức!' : `còn ${100 - allocatedTotal}% dư`}
+          </span>
+        </div>
+
         <ResponsiveContainer width="100%" height="100%">
           <PieChart key={chartKey}>
             <defs>
@@ -152,16 +150,6 @@ export default function NeonPieChart({ jars, totalBudget, formatCurrency }: Neon
             </Pie>
 
             <RechartsTooltip content={<CustomTooltip />} />
-
-            {/* Center label — uses Recharts Customized to get real pixel cx/cy */}
-            <Customized
-              component={({ cx, cy }: any) => (
-                <DonutCenter
-                  cx={cx} cy={cy}
-                  allocatedTotal={allocatedTotal}
-                />
-              )}
-            />
           </PieChart>
         </ResponsiveContainer>
       </div>

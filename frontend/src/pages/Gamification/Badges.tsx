@@ -34,24 +34,24 @@ export default function Badges() {
             </div>
           </div>
           <div className="absolute -bottom-2 -right-2 bg-gradient-to-br from-rose-500 to-pink-600 w-12 h-12 rounded-full border-4 border-[#0F172A] flex items-center justify-center shadow-lg">
-            <span className="font-extrabold text-white text-sm">Lv.5</span>
+            <span className="font-extrabold text-theme-text-primary text-sm">Lv.5</span>
           </div>
         </div>
 
         <div className="flex-1 text-center md:text-left z-10">
-          <h1 className="text-4xl font-extrabold text-white mb-2 flex flex-col md:flex-row items-center gap-3">
+          <h1 className="text-4xl font-extrabold text-theme-text-primary mb-2 flex flex-col md:flex-row items-center gap-3">
             Hành Trình Gamification
             <span className="px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-1">
               <Star className="w-3 h-3" /> Hạng Vàng
             </span>
           </h1>
-          <p className="text-lg text-gray-400 mb-6 max-w-2xl">
+          <p className="text-lg text-theme-text-muted mb-6 max-w-2xl">
             Biến việc quản lý tài chính thành một chuyến phiêu lưu! Sưu tầm huy hiệu, nâng cấp độ và mở khóa những phần thưởng đặc biệt.
           </p>
 
           <div className="space-y-2 max-w-xl">
             <div className="flex justify-between items-end text-sm">
-              <span className="font-semibold text-gray-300">Tiến trình Level 6</span>
+              <span className="font-semibold text-theme-text-muted">Tiến trình Level 6</span>
               <span className="font-bold text-amber-500">2400 / 5000 XP</span>
             </div>
             <div className="h-3 w-full bg-gray-800 rounded-full overflow-hidden shadow-inner">
@@ -71,8 +71,8 @@ export default function Badges() {
       {/* Badges Grid */}
       <div>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white">Tủ Huy Hiệu Tâm Huyết</h2>
-          <span className="text-gray-400 font-medium">Đã mở khóa: 4/6</span>
+          <h2 className="text-2xl font-bold text-theme-text-primary">Tủ Huy Hiệu Tâm Huyết</h2>
+          <span className="text-theme-text-muted font-medium">Đã mở khóa: 4/6</span>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -100,8 +100,8 @@ export default function Badges() {
                     ? `bg-gradient-to-br ${badge.color} shadow-lg rotate-3 group-hover:rotate-0 transition-transform duration-300` 
                     : 'bg-gray-800 border border-white/5 grayscale'
                 }`}>
-                  <div className="text-white">
-                    {badge.unlocked ? badge.icon : <Lock className="w-8 h-8 text-gray-500" />}
+                  <div className="text-theme-text-primary">
+                    {badge.unlocked ? badge.icon : <Lock className="w-8 h-8 text-theme-text-muted" />}
                   </div>
                   
                   {/* Subtle shine effect on unlocked icons */}
@@ -112,14 +112,14 @@ export default function Badges() {
 
                 <div className="space-y-2 relative z-10 w-full">
                   <span className={`text-[10px] uppercase font-black tracking-widest px-3 py-1 rounded-full ${
-                    badge.unlocked ? 'bg-white/10 text-white' : 'bg-gray-800 text-gray-500'
+                    badge.unlocked ? 'bg-white/10 text-theme-text-primary' : 'bg-gray-800 text-theme-text-muted'
                   }`}>
                     {badge.rarity}
                   </span>
-                  <h3 className={`text-xl font-bold mt-3 ${badge.unlocked ? 'text-white' : 'text-gray-400'}`}>
+                  <h3 className={`text-xl font-bold mt-3 ${badge.unlocked ? 'text-theme-text-primary' : 'text-theme-text-muted'}`}>
                     {badge.name}
                   </h3>
-                  <p className={`text-sm leading-relaxed ${badge.unlocked ? 'text-gray-300' : 'text-gray-600'}`}>
+                  <p className={`text-sm leading-relaxed ${badge.unlocked ? 'text-theme-text-muted' : 'text-gray-600'}`}>
                     {badge.description}
                   </p>
                 </div>

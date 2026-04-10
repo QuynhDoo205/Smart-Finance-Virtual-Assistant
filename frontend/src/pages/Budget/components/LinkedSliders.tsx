@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Pencil, Check, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Pencil, Check, X, AlertTriangle } from 'lucide-react';
 
 export interface Jar {
   id: string;
@@ -27,6 +27,10 @@ export default function LinkedSliders({ jars, totalBudget, onJarsChange, formatC
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  /* ── UX State for Zero-Sum Constraint ───────────────────────────── */
+  const [shakingId, setShakingId] = useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+
   useEffect(() => {
     if (editingId && editInputRef.current) {
       editInputRef.current.focus();
@@ -42,14 +46,37 @@ export default function LinkedSliders({ jars, totalBudget, onJarsChange, formatC
     cancelEdit();
   };
 
-  /* ── Free / independent slider  ────────────────────────────────────
-   *  Each jar updates ONLY its own percentage.
-   *  No auto-compensation. The "Quỹ chưa phân bổ" counter in
-   *  BudgetManager tracks whether total === 100%.
+  /* ── Zero-Sum Stepper Logic ────────────────────────────────────────
+   *  Slider steps by 10%. User must manually decrease before increasing.
+   *  If increasing breaks the 100% total, block it, shake, show toast.
    * ───────────────────────────────────────────────────────────────── */
   const handleSliderChange = (targetId: string, rawValue: number) => {
-    const pct = Math.max(0, Math.min(100, Math.round(rawValue)));
-    onJarsChange(jars.map(j => j.id === targetId ? { ...j, percentage: pct } : j));
+    const newPct = Math.max(0, Math.min(100, Math.round(rawValue)));
+    const targetJar = jars.find(j => j.id === targetId);
+    
+    if (!targetJar || targetJar.percentage === newPct) return;
+    
+    const delta = newPct - targetJar.percentage;
+    const currentTotal = jars.reduce((s, j) => s + j.percentage, 0);
+
+    // If decreasing, always allow
+    if (delta < 0) {
+      onJarsChange(jars.map(j => j.id === targetId ? { ...j, percentage: newPct } : j));
+      return;
+    }
+
+    // If increasing
+    if (currentTotal + delta <= 100) {
+      onJarsChange(jars.map(j => j.id === targetId ? { ...j, percentage: newPct } : j));
+    } else {
+      // OVER LIMIT! Trigger Shake & Toast
+      setShakingId(targetId);
+      setToastVisible(true);
+      
+      // Cleanup after animation
+      setTimeout(() => setShakingId(null), 500);
+      setTimeout(() => setToastVisible(false), 3000); // Hide toast after 3s
+    }
   };
 
   return (
@@ -64,8 +91,16 @@ export default function LinkedSliders({ jars, totalBudget, onJarsChange, formatC
           <motion.div
             key={jar.id}
             initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05, type: 'spring', stiffness: 320, damping: 26 }}
+            animate={{ 
+              opacity: 1, 
+              x: shakingId === jar.id ? [0, -8, 8, -6, 6, -4, 4, 0] : 0 
+            }}
+            transition={{ 
+              opacity: { delay: index * 0.05 },
+              x: shakingId === jar.id 
+                ? { duration: 0.4 } 
+                : { type: 'spring', stiffness: 320, damping: 26, delay: index * 0.05 } 
+            }}
             className="neon-jar-card p-5 group"
             style={{ borderColor: 'var(--theme-border)', boxShadow: 'var(--theme-border-glow)' }}
           >
@@ -161,21 +196,62 @@ export default function LinkedSliders({ jars, totalBudget, onJarsChange, formatC
                 />
                 <input
                   type="range"
-                  min={0} max={100} step={1}
+                  min={0} max={100} step={10}
                   value={jar.percentage}
                   onChange={e => handleSliderChange(jar.id, parseInt(e.target.value))}
                   className="neon-slider relative z-10"
                   style={{ background: 'transparent' } as React.CSSProperties}
                 />
               </div>
-              <div className="flex justify-between text-xs mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
-                <span>0%</span>
-                <span>100%</span>
+              {/* Discrete Ticks underneath */}
+              <div className="flex justify-between mt-1 px-1 relative -top-1 pointer-events-none">
+                {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(tick => (
+                  <div key={tick} className="flex flex-col items-center">
+                    <div 
+                      className="w-0.5 h-1.5 rounded-full transition-colors duration-300" 
+                      style={{ 
+                        background: jar.percentage >= tick ? jar.neonColor : 'rgba(255,255,255,0.1)',
+                        boxShadow: jar.percentage >= tick ? `0 0 6px ${jar.neonColor}` : 'none'
+                      }} 
+                    />
+                    {tick % 20 === 0 && (
+                      <span className="text-[10px] mt-0.5 opacity-50 font-bold" style={{ color: jar.percentage >= tick ? jar.neonColor : 'var(--theme-text-muted)' }}>
+                        {tick}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </motion.div>
         );
       })}
+
+      {/* Warning Toast Notification */}
+      <AnimatePresence>
+        {toastVisible && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl"
+            style={{ 
+              background: 'var(--theme-glass-bg)', 
+              border: '1px solid #ef444450', 
+              backdropFilter: 'blur(20px)', 
+              boxShadow: '0 0 20px rgba(239, 68, 68, 0.2)' 
+            }}
+          >
+            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: '#ef4444', boxShadow: '0 0 12px #ef4444' }}>
+              <AlertTriangle className="w-4 h-4 text-theme-text-primary" />
+            </div>
+            <div>
+              <p className="font-bold text-sm" style={{ color: '#ef4444' }}>Không thể tăng thêm!</p>
+              <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Vui lòng giảm hũ khác trước khi tăng hũ này.</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

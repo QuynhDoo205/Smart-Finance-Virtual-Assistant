@@ -89,19 +89,19 @@ export default function Chatbot() {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
                 
                 <div className="flex justify-between border-b border-white/5 pb-3 mb-3 text-sm relative z-10">
-                  <span className="text-gray-400">Đơn vị thanh toán</span>
-                  <strong className="text-white text-right">Lotte Mart Vietnam</strong>
+                  <span className="text-theme-text-muted">Đơn vị thanh toán</span>
+                  <strong className="text-theme-text-primary text-right">Lotte Mart Vietnam</strong>
                 </div>
                 <div className="flex justify-between border-b border-white/5 pb-3 mb-3 text-sm relative z-10">
-                  <span className="text-gray-400">Danh mục AI Map</span>
+                  <span className="text-theme-text-muted">Danh mục AI Map</span>
                   <strong className="text-sky-400 text-right bg-sky-500/10 px-2 py-0.5 rounded">🛒 Siêu thị / Đồ dùng</strong>
                 </div>
                 <div className="flex justify-between items-center text-sm relative z-10 pt-1">
-                  <span className="text-gray-400 font-medium">Tổng thanh toán</span>
+                  <span className="text-theme-text-muted font-medium">Tổng thanh toán</span>
                   <strong className="text-emerald-400 text-2xl font-black drop-shadow-[0_0_10px_rgba(52,211,153,0.3)]">345.000đ</strong>
                 </div>
               </div>
-              <p className="text-xs text-gray-400 leading-relaxed italic">Khoản chi này đã được tự động lưu vào hệ thống và trừ vào quỹ.</p>
+              <p className="text-xs text-theme-text-muted leading-relaxed italic">Khoản chi này đã được tự động lưu vào hệ thống và trừ vào quỹ.</p>
             </div>
           ) 
         }]);
@@ -126,11 +126,11 @@ export default function Chatbot() {
       content: (
         <div className="flex items-center gap-3">
            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
-              <FileText className="w-5 h-5 text-white" />
+              <FileText className="w-5 h-5 text-theme-text-primary" />
            </div>
            <div>
-              <p className="text-white font-bold">{formattedAmount}đ <span className="text-gray-300 font-normal">cho</span> {manualDesc}</p>
-              <p className="text-xs text-gray-400 bg-black/20 inline-block px-2 py-0.5 mt-1 rounded">{manualCategory}</p>
+              <p className="text-theme-text-primary font-bold">{formattedAmount}đ <span className="text-theme-text-muted font-normal">cho</span> {manualDesc}</p>
+              <p className="text-xs text-theme-text-muted bg-black/20 inline-block px-2 py-0.5 mt-1 rounded">{manualCategory}</p>
            </div>
         </div>
       )
@@ -192,12 +192,12 @@ export default function Chatbot() {
                   msg.role === 'user' ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-gradient-to-br from-primary-500 to-emerald-500'
                 }`}>
                   {msg.role === 'assistant' && <div className="absolute inset-0 bg-white/20 blur-md rounded-2xl" />}
-                  {msg.role === 'user' ? <UserIcon className="w-5 h-5 text-white relative z-10" /> : <Bot className="w-6 h-6 text-white relative z-10" />}
+                  {msg.role === 'user' ? <UserIcon className="w-5 h-5 text-theme-text-primary relative z-10" /> : <Bot className="w-6 h-6 text-theme-text-primary relative z-10" />}
                 </div>
                 
                 <div className={`max-w-[85%] md:max-w-[75%] p-5 rounded-[2rem] relative shadow-2xl ${
                   msg.role === 'user' 
-                    ? 'bg-gradient-to-r from-indigo-500/90 to-purple-600/90 text-white rounded-tr-sm border border-white/10 backdrop-blur-md' 
+                    ? 'bg-gradient-to-r from-indigo-500/90 to-purple-600/90 text-theme-text-primary rounded-tr-sm border border-white/10 backdrop-blur-md' 
                     : 'bg-[#1F2937]/60 backdrop-blur-xl border border-white/10 text-gray-100 rounded-tl-sm'
                 }`}>
                   {typeof msg.content === 'string' ? <p className="leading-relaxed whitespace-pre-wrap text-[15px]">{msg.content}</p> : msg.content}
@@ -209,7 +209,7 @@ export default function Chatbot() {
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-primary-500 to-emerald-500 shadow-2xl relative">
                    <div className="absolute inset-0 bg-white/20 blur-md rounded-2xl" />
-                  <Bot className="w-6 h-6 text-white relative z-10" />
+                  <Bot className="w-6 h-6 text-theme-text-primary relative z-10" />
                 </div>
                 <div className="bg-[#1F2937]/60 backdrop-blur-xl p-5 rounded-[2rem] rounded-tl-sm border border-white/10 flex items-center gap-2 h-[60px]">
                   <div className="w-2.5 h-2.5 bg-primary-400 rounded-full animate-bounce shadow-[0_0_8px_rgba(56,189,248,0.8)]" style={{ animationDelay: '0ms' }} />
@@ -244,7 +244,7 @@ export default function Chatbot() {
                   <p className="text-base font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-sky-300 flex items-center gap-2">
                     <Scan className="w-4 h-4 animate-[spin_3s_linear_infinite] text-primary-400" /> AI Đang xử lý biên lai...
                   </p>
-                  <p className="text-xs text-gray-400 mt-1 font-medium">Việc bóc tách dữ liệu đang diễn ra.</p>
+                  <p className="text-xs text-theme-text-muted mt-1 font-medium">Việc bóc tách dữ liệu đang diễn ra.</p>
                 </div>
               </motion.div>
             )}
@@ -257,7 +257,7 @@ export default function Chatbot() {
             <motion.button 
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
               onClick={() => fileInputRef.current?.click()}
-              className="w-14 h-14 flex items-center justify-center rounded-[1.25rem] bg-[#1F2937] hover:bg-gradient-to-br hover:from-primary-500/20 hover:to-indigo-500/20 border border-white/5 hover:border-primary-500/30 text-gray-400 hover:text-primary-300 transition-all relative group shadow-lg"
+              className="w-14 h-14 flex items-center justify-center rounded-[1.25rem] bg-[#1F2937] hover:bg-gradient-to-br hover:from-primary-500/20 hover:to-indigo-500/20 border border-white/5 hover:border-primary-500/30 text-theme-text-muted hover:text-primary-300 transition-all relative group shadow-lg"
             >
               <Camera className="w-6 h-6" />
               <span className="absolute -top-12 left-1/2 -translate-x-1/2 bg-[#111827] text-xs px-3 py-1.5 flex items-center gap-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/10 shadow-xl font-medium"><Sparkles className="w-3 h-3 text-primary-400"/> Quét Hóa đơn AI</span>
@@ -266,7 +266,7 @@ export default function Chatbot() {
             <motion.button 
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
               onClick={() => setShowManualForm(true)}
-              className="w-14 h-14 flex items-center justify-center rounded-[1.25rem] bg-[#1F2937] hover:bg-gradient-to-br hover:from-emerald-500/20 hover:to-teal-500/20 border border-white/5 hover:border-emerald-500/30 text-gray-400 hover:text-emerald-400 transition-all group relative shadow-lg"
+              className="w-14 h-14 flex items-center justify-center rounded-[1.25rem] bg-[#1F2937] hover:bg-gradient-to-br hover:from-emerald-500/20 hover:to-teal-500/20 border border-white/5 hover:border-emerald-500/30 text-theme-text-muted hover:text-emerald-400 transition-all group relative shadow-lg"
             >
               <FileText className="w-6 h-6" />
               <span className="absolute -top-12 left-1/2 -translate-x-1/2 bg-[#111827] text-xs px-3 py-1.5 flex items-center gap-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/10 shadow-xl font-medium">Nhập thủ công</span>
@@ -279,14 +279,14 @@ export default function Chatbot() {
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSendText()}
                   placeholder="Gõ lệnh: 'Nay đi dạo hết 100k'..."
-                  className="w-full bg-[#1F2937]/50 backdrop-blur-md border border-white/10 group-hover:border-white/20 rounded-[1.25rem] pl-6 pr-16 py-4 md:py-4 h-14 text-white placeholder-gray-500 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500 transition-all text-sm md:text-base font-medium shadow-inner"
+                  className="w-full bg-[#1F2937]/50 backdrop-blur-md border border-white/10 group-hover:border-white/20 rounded-[1.25rem] pl-6 pr-16 py-4 md:py-4 h-14 text-theme-text-primary placeholder-gray-500 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500 transition-all text-sm md:text-base font-medium shadow-inner"
                 />
                 
                 <motion.button 
                   whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                   onClick={handleSendText}
                   disabled={!input.trim()}
-                  className="absolute right-2 top-2 bottom-2 w-10 flex items-center justify-center rounded-xl bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-400 hover:to-accent-400 text-white disabled:opacity-0 disabled:scale-50 transition-all font-bold shadow-[0_0_15px_rgba(56,189,248,0.4)]"
+                  className="absolute right-2 top-2 bottom-2 w-10 flex items-center justify-center rounded-xl bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-400 hover:to-accent-400 text-theme-text-primary disabled:opacity-0 disabled:scale-50 transition-all font-bold shadow-[0_0_15px_rgba(56,189,248,0.4)]"
                 >
                   <Send className="w-4 h-4 ml-0.5" />
                 </motion.button>
@@ -317,7 +317,7 @@ export default function Chatbot() {
 
               <button 
                 onClick={() => setShowManualForm(false)}
-                className="absolute top-6 right-6 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-2 transition-colors z-10"
+                className="absolute top-6 right-6 text-theme-text-muted hover:text-theme-text-primary bg-white/5 hover:bg-white/10 rounded-full p-2 transition-colors z-10"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -327,19 +327,19 @@ export default function Chatbot() {
                       <FileText className="w-7 h-7 text-emerald-400" />
                   </div>
                   
-                  <h2 className="text-2xl font-extrabold text-white mb-2 tracking-tight">
+                  <h2 className="text-2xl font-extrabold text-theme-text-primary mb-2 tracking-tight">
                     Ghi Chép Giao Dịch
                   </h2>
-                  <p className="text-gray-400 text-sm mb-8">Điền thông tin khoản chi để Nova AI phân tích lưu trữ.</p>
+                  <p className="text-theme-text-muted text-sm mb-8">Điền thông tin khoản chi để Nova AI phân tích lưu trữ.</p>
                   
                   <form onSubmit={handleManualSubmit} className="space-y-5">
                     <div className="group">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2 group-focus-within:text-emerald-400 transition-colors">Số tiền (VNĐ)</label>
+                      <label className="text-xs font-bold text-theme-text-muted uppercase tracking-widest block mb-2 group-focus-within:text-emerald-400 transition-colors">Số tiền (VNĐ)</label>
                       <input
                         type="text"
                         required
                         autoFocus
-                        className="w-full bg-black/20 border-b-2 border-white/10 focus:border-emerald-500 outline-none text-3xl font-black text-white py-2 transition-colors placeholder-gray-700"
+                        className="w-full bg-black/20 border-b-2 border-white/10 focus:border-emerald-500 outline-none text-3xl font-black text-theme-text-primary py-2 transition-colors placeholder-gray-700"
                         placeholder="0"
                         value={manualAmount}
                         onChange={(e) => {
@@ -350,11 +350,11 @@ export default function Chatbot() {
                     </div>
 
                     <div className="group">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2 group-focus-within:text-emerald-400 transition-colors">Chi tiết</label>
+                      <label className="text-xs font-bold text-theme-text-muted uppercase tracking-widest block mb-2 group-focus-within:text-emerald-400 transition-colors">Chi tiết</label>
                       <input
                         type="text"
                         required
-                        className="w-full bg-black/20 border border-white/10 focus:border-emerald-500/50 rounded-xl outline-none text-white px-4 py-3 transition-colors placeholder-gray-600 focus:bg-emerald-500/5"
+                        className="w-full bg-black/20 border border-white/10 focus:border-emerald-500/50 rounded-xl outline-none text-theme-text-primary px-4 py-3 transition-colors placeholder-gray-600 focus:bg-emerald-500/5"
                         placeholder="VD: Cà phê Highland..."
                         value={manualDesc}
                         onChange={e => setManualDesc(e.target.value)}
@@ -362,17 +362,17 @@ export default function Chatbot() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Phân loại</label>
+                      <label className="text-xs font-bold text-theme-text-muted uppercase tracking-widest block mb-2">Phân loại</label>
                       <select 
-                        className="w-full bg-black/20 border border-white/10 focus:border-emerald-500/50 rounded-xl outline-none text-white px-4 py-3 transition-colors appearance-none cursor-pointer focus:bg-emerald-500/5"
+                        className="w-full bg-black/20 border border-white/10 focus:border-emerald-500/50 rounded-xl outline-none text-theme-text-primary px-4 py-3 transition-colors appearance-none cursor-pointer focus:bg-emerald-500/5"
                         value={manualCategory}
                         onChange={e => setManualCategory(e.target.value)}
                       >
-                        <option value="Ăn uống" className="bg-gray-900 text-white">🍔 Ăn uống</option>
-                        <option value="Mua sắm" className="bg-gray-900 text-white">🛍️ Mua sắm</option>
-                        <option value="Di chuyển" className="bg-gray-900 text-white">🚗 Di chuyển</option>
-                        <option value="Sinh hoạt" className="bg-gray-900 text-white">🏠 Sinh hoạt</option>
-                        <option value="Khác" className="bg-gray-900 text-white">📌 Giới tuyến Khác</option>
+                        <option value="Ăn uống" className="bg-gray-900 text-theme-text-primary">🍔 Ăn uống</option>
+                        <option value="Mua sắm" className="bg-gray-900 text-theme-text-primary">🛍️ Mua sắm</option>
+                        <option value="Di chuyển" className="bg-gray-900 text-theme-text-primary">🚗 Di chuyển</option>
+                        <option value="Sinh hoạt" className="bg-gray-900 text-theme-text-primary">🏠 Sinh hoạt</option>
+                        <option value="Khác" className="bg-gray-900 text-theme-text-primary">📌 Giới tuyến Khác</option>
                       </select>
                     </div>
 

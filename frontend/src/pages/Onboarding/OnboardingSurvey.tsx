@@ -66,8 +66,8 @@ export default function OnboardingSurvey() {
           <div className="w-20 h-20 rounded-3xl bg-[#1F2937]/50 border border-white/10 flex items-center justify-center mb-8 shadow-[0_0_50px_rgba(56,189,248,0.2)] backdrop-blur-xl">
             <PieChartIcon className="w-10 h-10 text-primary-400" />
           </div>
-          <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Phân tích Real-time</h2>
-          <p className="text-gray-400 text-center mb-12">Hệ thống đang mô phỏng dòng tiền cố định của bạn.</p>
+          <h2 className="text-3xl font-bold text-theme-text-primary mb-2 tracking-tight">Phân tích Real-time</h2>
+          <p className="text-theme-text-muted text-center mb-12">Hệ thống đang mô phỏng dòng tiền cố định của bạn.</p>
 
           {/* Dynamic Stacked Bar */}
           <div className="w-full h-8 rounded-full bg-[#111827] border border-white/5 overflow-hidden flex shadow-inner">
@@ -90,9 +90,9 @@ export default function OnboardingSurvey() {
           </div>
 
           <div className="mt-8 p-6 w-full glass-panel flex flex-col items-center border-[0.5px] border-primary-500/20 shadow-[0_0_30px_rgba(56,189,248,0.1)]">
-            <span className="text-gray-400 text-sm uppercase tracking-widest font-semibold mb-2">Tổng khóa ngân sách</span>
+            <span className="text-theme-text-muted text-sm uppercase tracking-widest font-semibold mb-2">Tổng khóa ngân sách</span>
             <span className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tabular-nums tracking-tight">
-              {new Intl.NumberFormat('vi-VN').format(totalFixed)}<span className="text-xl ml-2 text-gray-500">đ</span>
+              {new Intl.NumberFormat('vi-VN').format(totalFixed)}<span className="text-xl ml-2 text-theme-text-muted">đ</span>
             </span>
           </div>
         </motion.div>
@@ -120,10 +120,10 @@ export default function OnboardingSurvey() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.4 }}
               >
-                <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight">
+                <h1 className="text-4xl sm:text-5xl font-extrabold text-theme-text-primary mb-4 tracking-tight">
                   Sinh tồn an toàn.
                 </h1>
-                <p className="text-gray-400 text-lg mb-10 leading-relaxed font-medium">
+                <p className="text-theme-text-muted text-lg mb-10 leading-relaxed font-medium">
                   Nhập các khoản chi phí mà bạn <strong>bắt buộc phải trả</strong> mỗi tháng. AI sẽ cách ly số tiền này khỏi quỹ tiêu vặt ngay khi nhận lương.
                 </p>
 
@@ -144,16 +144,16 @@ export default function OnboardingSurvey() {
                           {exp.icon}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <label className="text-xs sm:text-sm text-gray-400 font-semibold uppercase tracking-wider block mb-1">{exp.name}</label>
+                          <label className="text-xs sm:text-sm text-theme-text-muted font-semibold uppercase tracking-wider block mb-1">{exp.name}</label>
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
-                              className="bg-transparent text-2xl sm:text-3xl font-bold text-white focus:outline-none w-full placeholder-gray-700 transition-all font-sans"
+                              className="bg-transparent text-2xl sm:text-3xl font-bold text-theme-text-primary focus:outline-none w-full placeholder-gray-700 transition-all font-sans"
                               placeholder="0"
                               value={exp.amount}
                               onChange={(e) => handleAmountChange(exp.id, e.target.value)}
                             />
-                            <span className="text-gray-500 font-medium pr-4">đ</span>
+                            <span className="text-theme-text-muted font-medium pr-4">đ</span>
                           </div>
                         </div>
                       </div>
@@ -169,7 +169,7 @@ export default function OnboardingSurvey() {
                 >
                   <span className="font-bold">Nhập Dữ Liệu & Bắt Đầu Ngay</span>
                   <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md">
-                    <ChevronRight className="w-6 h-6 text-white" />
+                    <ChevronRight className="w-6 h-6 text-theme-text-primary" />
                   </div>
                 </motion.button>
               </motion.div>
@@ -197,7 +197,7 @@ export default function OnboardingSurvey() {
                   <div className="absolute inset-8 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(16,185,129,0.5)]">
                     {isFinishing ? (
                       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring' }}>
-                        <CheckCircle2 className="w-16 h-16 text-white" />
+                        <CheckCircle2 className="w-16 h-16 text-theme-text-primary" />
                       </motion.div>
                     ) : (
                       <motion.div 
@@ -212,7 +212,7 @@ export default function OnboardingSurvey() {
                 <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300 mb-6">
                   {isFinishing ? "Thiết lập hoàn tất!" : "AI đang kết nối..."}
                 </h2>
-                <p className="text-gray-400 text-lg leading-relaxed max-w-md mx-auto mb-10">
+                <p className="text-theme-text-muted text-lg leading-relaxed max-w-md mx-auto mb-10">
                   {isFinishing 
                     ? "Ngân sách an toàn của bạn đã được lá chắn AI kích hoạt. Mọi rủi ro cạn tiền giờ đã được lường trước." 
                     : "Hệ thống đang phân tích hành vi chi tiêu và khởi tạo các Lọ tài chính an toàn cho bạn."}
