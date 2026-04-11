@@ -1,10 +1,11 @@
 import { useState, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Key, Home, Zap, Wifi, Shield, Compass, Edit3, ArrowUpRight,
+  Key, Home, Shield, Compass, Edit3, ArrowUpRight,
   Plus, Pencil, Trash2, X, Check, AlertTriangle, DollarSign,
-  FileText, Tag, TrendingDown,
+  FileText, Tag, TrendingDown, Mail
 } from 'lucide-react';
+import authStore from '../../store/authStore';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface FixedExpense {
@@ -338,7 +339,11 @@ export default function Profile() {
   const [deleteTarget, setDeleteTarget] = useState<FixedExpense | null>(null);
 
   // Security features state
-  const [userAuth] = useState({ provider: 'google', email: 'nguyenvana.finance@nova.com' });
+  const user = authStore.getUser();
+  const [userAuth] = useState({ 
+    provider: user?.email.includes('gmail') ? 'google' : 'email', 
+    email: user?.email || '' 
+  });
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
 
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
@@ -385,7 +390,7 @@ export default function Profile() {
           <Compass className="absolute -bottom-10 -right-10 w-64 h-64 text-theme-text-primary/[0.02] -rotate-12 group-hover:rotate-12 transition-transform duration-[10s]" />
           <div className="relative">
             <div className="w-32 h-32 rounded-[2rem] bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 flex items-center justify-center text-5xl font-extrabold text-theme-text-primary shadow-[0_0_40px_rgba(99,102,241,0.4)] rotate-3 hover:rotate-0 transition-transform duration-300">
-              A
+              {user?.full_name?.charAt(0) || 'U'}
             </div>
             <button className="absolute -bottom-3 -right-3 w-10 h-10 bg-[#1E293B] border-[3px] border-[#0F172A] rounded-full flex items-center justify-center text-theme-text-muted hover:text-theme-text-primary hover:bg-indigo-500 transition-colors">
               <Edit3 className="w-4 h-4" />
@@ -393,12 +398,12 @@ export default function Profile() {
           </div>
           <div className="text-center md:text-left flex-1 relative z-10 pt-2">
             <div className="flex items-center gap-3 justify-center md:justify-start mb-2">
-              <h1 className="text-4xl font-extrabold text-theme-text-primary tracking-tight">Nguyễn Văn A</h1>
+              <h1 className="text-4xl font-extrabold text-theme-text-primary tracking-tight">{user?.full_name || 'Người dùng'}</h1>
               <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-1">
                 <Shield className="w-3 h-3" /> Pro
               </span>
             </div>
-            <p className="text-lg text-theme-text-muted mb-6 font-medium">nguyenvana.finance@nova.com</p>
+            <p className="text-lg text-theme-text-muted mb-6 font-medium">{user?.email}</p>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-6">
               {[
                 { label: 'Tài khoản từ', value: '04/2026' },

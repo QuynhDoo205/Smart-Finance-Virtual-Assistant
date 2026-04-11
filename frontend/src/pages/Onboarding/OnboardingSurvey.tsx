@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Wifi, Zap, CheckCircle2, ChevronRight, Activity, PieChart as PieChartIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { userApi } from '../../utils/api';
+import authStore from '../../store/authStore';
 
 type ExpenseItem = {
   id: string;
@@ -38,11 +40,32 @@ export default function OnboardingSurvey() {
 
 
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     setIsFinishing(true);
-    setTimeout(() => {
-      navigate('/app');
-    }, 2000);
+    try {
+      // Prepare data for API
+      const monthlyIncome = 0; // The UI currently doesn't ask for total income, I'll default to 0 or we could add an input
+      const data = expenses.map(exp => ({
+        categoryName: exp.name,
+        amount: Number(exp.amount.replace(/\D/g, '')) || 0
+      }));
+
+      await userApi.updateOnboarding(monthlyIncome, data);
+      
+      // Update local storage user state to reflect onboarding completed
+      const user = authStore.getUser();
+      if (user) {
+        authStore.setAuth(authStore.getToken() || '', { ...user, onboarding_completed: true });
+      }
+
+      setTimeout(() => {
+        navigate('/app');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to save onboarding data:', err);
+      setIsFinishing(false);
+      alert('Có lỗi xảy ra khi lưu dữ liệu. Vui lòng thử lại.');
+    }
   };
 
   return (
@@ -54,7 +77,7 @@ export default function OnboardingSurvey() {
         <div className="absolute inset-0">
           <div className="absolute top-[20%] left-[20%] w-96 h-96 bg-primary-600/10 rounded-full blur-[100px] animate-pulse" />
           <div className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-fuchsia-600/10 rounded-full blur-[100px] animate-pulse delay-1000" />
-          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03]" />
+          <div className="absolute inset-0 opacity-[0.03] bg-white mix-blend-overlay" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '4px 4px' }} />
         </div>
 
         <motion.div 

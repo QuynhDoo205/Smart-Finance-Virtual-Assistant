@@ -1,68 +1,95 @@
 import express from 'express';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { Pool } from 'pg';
+import pool from './db.js';
+import authRouter from './routes/auth.js';
+import dashboardRouter from './routes/dashboard.js';
+import userRouter from './routes/user.js';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env['PORT'] || 5000;
 
+// ============================================================
 // Middleware
-app.use(cors());
+// ============================================================
+app.use(cors({
+  origin: true, // Allow all origins for local development (reflects request origin)
+  credentials: true,
+}));
+
+// Fix Google Auth popup cross-origin issues
+app.use((_req, res, next) => {
+  res.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  // res.header('Cross-Origin-Embedder-Policy', 'require-corp'); // Only if needed, can break some CDN images
+  next();
+});
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Basic Route
-app.get('/', (req: Request, res: Response) => {
-  res.json({ message: 'Welcome to NovaFinance Virtual Assistant API v2 (PostgreSQL Enabled)' });
-});
-
-// Health check endpoint
-app.get('/api/health', async (req: Request, res: Response) => {
-  try {
-    const dbStat = await pool.query('SELECT NOW()');
-    res.json({ status: 'OK', database: 'Connected', time: dbStat.rows[0].now });
-  } catch (err) {
-    res.status(500).json({ status: 'ERROR', database: 'Disconnected' });
-  }
-});
-
-// Example route for future expansion
-app.get('/api/test', (req: Request, res: Response) => {
+// ============================================================
+// Routes
+// ============================================================
+app.get('/', (_req: Request, res: Response) => {
   res.json({
-    success: true,
-    data: {
-      items: [
-        { id: 1, name: 'Sample Item' },
-        { id: 2, name: 'Another Item' }
-      ]
+    message: '🚀 Smart Finance Virtual Assistant API v2',
+    version: '2.0.0',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth/*',
+      dashboard: '/api/dashboard/*',
     }
   });
 });
 
-// Error handling middleware
-app.use((err: Error, req: Request, res: Response, next: express.NextFunction) => {
+app.get('/api/health', async (_req: Request, res: Response) => {
+  try {
+    const dbResult = await pool.query('SELECT NOW() as time, version() as db_version');
+    res.json({
+      status: 'OK',
+      database: 'Connected',
+      time: dbResult.rows[0]?.time,
+      db_version: (dbResult.rows[0]?.db_version as string)?.split(' ').slice(0, 2).join(' '),
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'ERROR', database: 'Disconnected', error: String(err) });
+  }
+});
+
+// Mount routers
+app.use('/api/auth', authRouter);
+app.use('/api/dashboard', dashboardRouter);
+app.use('/api/user', userRouter);
+
+// ============================================================
+// 404 Handler
+// ============================================================
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({ success: false, message: 'Route không tồn tại' });
+});
+
+// ============================================================
+// Error Handler
+// ============================================================
+app.use((err: Error, _req: Request, res: Response) => {
   console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  res.status(500).json({ success: false, message: 'Internal Server Error', error: err.message });
 });
 
-// PostgreSQL Database Connection Config
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/smart_finance';
-
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-});
-
-if (process.env.NODE_ENV !== 'test') {
-  pool.connect()
-    .then((client) => {
-      console.log('✅ Connected to PostgreSQL');
-      client.release();
-    })
-    .catch((err) => console.warn('⚠️ PostgreSQL connection warning:', err.message));
-}
-
+// ============================================================
+// Start Server
+// ============================================================
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`📦 Environment: ${process.env['NODE_ENV'] || 'development'}`);
+  
+  // Test DB connection on startup
+  pool.query('SELECT NOW()')
+    .then(() => console.log('✅ PostgreSQL connected successfully'))
+    .catch((err) => console.warn('⚠️  PostgreSQL connection failed:', (err as Error).message));
 });
+
+export default app;

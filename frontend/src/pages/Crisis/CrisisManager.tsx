@@ -17,7 +17,7 @@ export default function CrisisManager() {
       
       {/* Red Hero Banner */}
       <motion.div variants={itemVars} className="relative rounded-[2rem] overflow-hidden p-[2px] shadow-[0_0_50px_rgba(239,68,68,0.15)] bg-gradient-to-r from-red-500/50 to-orange-500/50">
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay"></div>
+        <div className="absolute inset-0 opacity-[0.03] bg-white mix-blend-overlay" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '4px 4px' }}></div>
         <div className="relative bg-[#0F172A]/90 backdrop-blur-3xl rounded-[1.9rem] p-8 md:p-10 flex flex-col md:flex-row items-center gap-8">
           <div className="w-24 h-24 shrink-0 rounded-full bg-red-500/20 flex items-center justify-center border-2 border-red-500/50 relative">
             <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-20 animate-ping"></span>
