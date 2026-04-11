@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { motion } from 'framer-motion';
 import './store/themeStore'; // initialize theme on load
 import Login from './pages/Auth/Login';
@@ -14,10 +15,15 @@ import Badges from './pages/Gamification/Badges';
 import InsightsGoals from './pages/Insights/InsightsGoals';
 import CrisisManager from './pages/Crisis/CrisisManager';
 import ExpenseTracker from './pages/Expense/ExpenseTracker';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
+  // Demo placeholder Client ID. The user will need to configure their real one.
+  const GOOGLE_CLIENT_ID = '97914893984-ucfpo0bs0ggn0vtvlgg1l0l7o1eifaja.apps.googleusercontent.com';
+
   return (
-    <BrowserRouter>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <BrowserRouter>
       <div className="min-h-screen relative overflow-hidden" style={{ background: 'var(--theme-bg-deep)', transition: 'background 0.4s ease' }}>
         {/* Dynamic Deep Space / Cyberpunk Background */}
         <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none mix-blend-screen">
@@ -49,8 +55,8 @@ function App() {
             style={{ background: 'var(--theme-ai-color)', opacity: 0.1 }}
           />
           
-          {/* Subtle noise texture overlay for realism */}
-          <div className="absolute inset-0 opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+          {/* Subtle noise texture overlay for realism (using local CSS instead of external SVG to prevent 403) */}
+          <div className="absolute inset-0 opacity-[0.03] bg-white mix-blend-overlay" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '4px 4px' }} />
         </div>
         
         <div className="relative z-10 min-h-screen flex flex-col">
@@ -60,8 +66,12 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/onboarding" element={<OnboardingSurvey />} />
             
-            {/* Main App Routes */}
-            <Route path="/app" element={<MainLayout />}>
+            {/* Protected Main App Routes */}
+            <Route path="/app" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
               <Route index element={<Dashboard />} />
               <Route path="income" element={<IncomeManager />} />
               <Route path="budget" element={<BudgetManager />} />
@@ -76,6 +86,7 @@ function App() {
         </div>
       </div>
     </BrowserRouter>
+    </GoogleOAuthProvider>
   );
 }
 
