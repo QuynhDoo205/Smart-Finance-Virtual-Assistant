@@ -1,353 +1,237 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Lock, BrainCircuit, RefreshCw, Save, Plus, Sparkles, ChevronRight } from 'lucide-react';
+import { BrainCircuit, RefreshCw, Sparkles, Info, HelpCircle, Target, X, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import LinkedSliders, { type Jar } from './components/LinkedSliders';
-import NeonPieChart from './components/NeonPieChart';
+import { dashboardApi, authApi, transactionsApi } from '../../utils/api';
 
-/* ── Mock fixed expenses (LOCKED – cannot be touched by sliders) ── */
-const FIXED = [
-  { id: 'rent',  name: 'Tiền nhà trọ', emoji: '🏠', amount: 2_000_000 },
-  { id: 'elec',  name: 'Điện nước',    emoji: '⚡', amount: 450_000  },
-  { id: 'phone', name: 'Điện thoại',   emoji: '📱', amount: 200_000  },
-];
-
-/* ── Initial jars (% of availableBudget, must sum to 100) ── */
 const INIT_JARS: Jar[] = [
-  { id:'1', name:'Thiết yếu',  emoji:'🛒', percentage:40, locked:false, color:'#0EA5E9', neonColor:'#22d3ee', description:'Ăn uống, đi lại' },
-  { id:'2', name:'Tiết kiệm',  emoji:'🏦', percentage:30, locked:false, color:'#10B981', neonColor:'#10b981', description:'Quỹ khẩn cấp & tương lai' },
+  { id:'1', name:'Thiết yếu',  emoji:'🛒', percentage:40, locked:false, color:'#0EA5E9', neonColor:'#22d3ee', description:'Ăn uống, đi lại, hóa đơn' },
+  { id:'2', name:'Tiết kiệm',  emoji:'🏦', percentage:30, locked:false, color:'#10B981', neonColor:'#10b981', description:'Quỹ khẩn cấp & tích lũy' },
   { id:'3', name:'Phát triển', emoji:'📚', percentage:10, locked:false, color:'#8B5CF6', neonColor:'#a855f7', description:'Học tập, sách, kỹ năng' },
-  { id:'4', name:'Hưởng thụ',  emoji:'🎮', percentage:10, locked:false, color:'#F59E0B', neonColor:'#fbbf24', description:'Giải trí, cà phê' },
-  { id:'5', name:'Đầu tư',     emoji:'📈', percentage:10, locked:false, color:'#EC4899', neonColor:'#ff00c8', description:'Cổ phiếu, crypto' },
+  { id:'4', name:'Hưởng thụ',  emoji:'🎮', percentage:10, locked:false, color:'#F59E0B', neonColor:'#fbbf24', description:'Giải trí, sở thích' },
+  { id:'5', name:'Đầu tư',     emoji:'📈', percentage:10, locked:false, color:'#EC4899', neonColor:'#ff00c8', description:'Tài sản, kinh doanh' },
 ];
 
-const AI_PRESETS = [
-  [{id:'1',p:50},{id:'2',p:20},{id:'3',p:10},{id:'4',p:10},{id:'5',p:10}],
-  [{id:'1',p:40},{id:'2',p:30},{id:'3',p:10},{id:'4',p:10},{id:'5',p:10}],
-  [{id:'1',p:60},{id:'2',p:20},{id:'3',p:0},{id:'4',p:10},{id:'5',p:10}],
-];
-
-const fmtVND = (v: number) =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v);
-
-const CHARS = '01アイウエオカキク'.split('');
-const rChar = () => CHARS[Math.floor(Math.random() * CHARS.length)];
+const fmtVND = (v: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v);
 
 export default function BudgetManager() {
-  const [income, setIncome]           = useState(10_000_000);
-  const [editingIncome, setEditIncome]= useState(false);
-  const [incomeInput, setIncomeInput] = useState('10000000');
-  const [jars, setJars]               = useState<Jar[]>(INIT_JARS);
-  const [aiLoading, setAiLoading]     = useState(false);
-  const [aiIdx, setAiIdx]             = useState(0);
-  const [saved, setSaved]             = useState(false);
+  const [income, setIncome] = useState(0);
+  const [jars, setJars] = useState<Jar[]>(INIT_JARS);
+  const [fixedExpenses, setFixedExpenses] = useState<{name: string, emoji: string, amount: number}[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
 
-  /* Zone 1 derived */
-  const totalFixed     = FIXED.reduce((s, e) => s + e.amount, 0);
-  const available      = Math.max(0, income - totalFixed);
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [profileRes, transRes, dashRes, dashBudgetRes] = await Promise.all([
+          authApi.me(),
+          transactionsApi.list(50),
+          dashboardApi.getSummary(),
+          dashboardApi.getBudget()
+        ]);
+        
+        let detectedIncome = profileRes.success ? (profileRes.data.user.monthly_income || 0) : 0;
+        
+        if (detectedIncome === 0 && dashRes.success) {
+          detectedIncome = dashRes.data.totalIncome;
+        }
 
-  /* Zone 3 derived */
-  const allocated      = jars.reduce((s, j) => s + j.percentage, 0);
-  const unallocated    = 100 - allocated;
-  const isBalanced     = unallocated === 0;
-  const isOver         = unallocated < 0;
+        if (detectedIncome === 0 && transRes.success) {
+          const incomes = transRes.data.transactions.filter((t: any) => t.type === 'income' || t.loai_giao_dich === 'thu_nhap');
+          if (incomes.length > 0) detectedIncome = Number(incomes[0].amount);
+        }
+        
+        setIncome(detectedIncome);
 
-  /* Pool display helpers */
-  const poolColor  = isBalanced ? 'var(--theme-neon-primary)' : isOver ? '#ef4444' : '#f59e0b';
-  const poolBg     = isBalanced ? 'rgba(0,245,255,0.07)' : isOver ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.08)';
-  const poolBorder = isBalanced ? 'rgba(0,245,255,0.25)' : isOver ? 'rgba(239,68,68,0.35)' : 'rgba(245,158,11,0.22)';
+        if (dashBudgetRes.success) {
+          const actualBudgets = dashBudgetRes.data.budgets;
+          const mappedFixed = actualBudgets
+            .filter((b: any) => b.limit_amount > 0)
+            .map((b: any) => ({
+              name: b.category_name,
+              emoji: b.category_icon || '💰',
+              amount: parseFloat(b.limit_amount)
+            }));
+          
+          setFixedExpenses(mappedFixed);
+        }
+      } catch (err) {
+        console.error('Failed to load budget data:', err);
+      }
+    };
+    loadData();
+  }, []);
 
-  /* AI suggestion */
-  const handleAI = useCallback(() => {
+  const totalFixed = fixedExpenses.reduce((s, e) => s + e.amount, 0);
+  const available = Math.max(0, income - totalFixed);
+  const unallocated = 100 - jars.reduce((s, j) => s + j.percentage, 0);
+
+  const handleAI = async () => {
     setAiLoading(true);
-    const next = (aiIdx + 1) % AI_PRESETS.length;
-    setTimeout(() => {
-      const preset = AI_PRESETS[next];
-      setJars(prev => prev.map(j => { const p = preset.find(x => x.id === j.id); return p ? { ...j, percentage: p.p } : j; }));
-      setAiIdx(next);
+    try {
+      const res = await dashboardApi.suggestJars();
+      if (res.success) {
+        setJars(res.data.jars.map((s: any, i: number) => ({ ...jars[i], percentage: s.percentage })));
+      }
+    } catch {
+      // Fallback if AI fails
+    } finally {
       setAiLoading(false);
-    }, 1800);
-  }, [aiIdx]);
-
-  /* Save */
-  const handleSave = () => {
-    if (!isBalanced) return;
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    }
   };
 
-  /* Income commit */
-  const commitIncome = () => {
-    const v = parseInt(incomeInput.replace(/\D/g, ''), 10);
-    if (!isNaN(v) && v > 0) setIncome(v);
-    setEditIncome(false);
-  };
+  const handleSave = async () => {
+    const categoryMapping: Record<string, number> = { '1': 4, '2': 3, '3': 9, '4': 7, '5': 8 };
+    const budgetsToSave = jars
+      .filter(j => categoryMapping[j.id])
+      .map(j => ({
+        categoryId: categoryMapping[j.id],
+        limit: Math.round(available * (j.percentage / 100))
+      }));
 
-  const container = { hidden: { opacity:0 }, show: { opacity:1, transition: { staggerChildren: 0.07 } } };
-  const card      = { hidden: { opacity:0, y:16 }, show: { opacity:1, y:0, transition: { type:'spring' as const, stiffness:280, damping:24 } } };
+    try {
+      const res = await dashboardApi.setupBudget(budgetsToSave);
+      if (res.success) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch {
+      // Error handling
+    }
+  };
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-5 max-w-7xl mx-auto pb-20">
-
-      {/* ════════════════════════════════════════════════════════
-          ZONE 1 – Thu nhập & Phí cố định (Story 3)
-      ════════════════════════════════════════════════════════ */}
-      <motion.section variants={card} className="glass-panel rounded-2xl overflow-hidden">
-        {/* Section label */}
-        <div className="px-5 py-2.5 flex items-center gap-2"
-          style={{ borderBottom: '1px solid var(--theme-border)', background: 'var(--theme-neon-primary)08' }}>
-          <Wallet className="w-4 h-4" style={{ color: 'var(--theme-neon-primary)' }} />
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--theme-neon-primary)' }}>
-            Khu vực 1 · Thu nhập & Phí cố định
-          </span>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6 pb-20">
+      
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-theme-text-primary tracking-tight">Thiết lập Ngân sách</h1>
+          <p className="text-xs text-theme-text-muted mt-1 font-medium">Lên kế hoạch chi tiêu thông minh theo quy tắc 6 lọ.</p>
         </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowGuide(!showGuide)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-theme-text-muted hover:bg-white/10 transition-all">
+            <HelpCircle className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={handleAI} 
+            disabled={aiLoading} 
+            className="px-4 py-2 rounded-xl bg-primary-500/10 text-primary-400 text-xs font-black uppercase tracking-widest hover:bg-primary-500/20 transition-all flex items-center gap-2"
+          >
+            {aiLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <BrainCircuit className="w-3.5 h-3.5" />}
+            AI Gợi ý
+          </button>
+        </div>
+      </div>
 
-        <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Total income (editable) */}
-          <div>
-            <p className="text-xs uppercase tracking-widest font-semibold mb-2" style={{ color: 'var(--theme-text-muted)' }}>
-              Tổng thu nhập / tháng
-            </p>
-            {editingIncome ? (
-              <input type="number" autoFocus
-                className="glass-input px-3 py-2 text-xl font-extrabold rounded-xl w-full"
-                style={{ color: 'var(--theme-neon-primary)' }}
-                value={incomeInput}
-                onChange={e => setIncomeInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && commitIncome()}
-                onBlur={commitIncome}
-              />
-            ) : (
-              <button onClick={() => { setIncomeInput(String(income)); setEditIncome(true); }} className="group flex items-start gap-2 text-left">
-                <span className="text-2xl font-extrabold neon-text">{fmtVND(income)}</span>
-                <span className="mt-1 text-xs px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ background: 'var(--theme-neon-primary)20', color: 'var(--theme-neon-primary)' }}>✎ Sửa</span>
-              </button>
-            )}
+      <AnimatePresence>
+        {showGuide && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="p-6 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 shadow-xl mb-6 relative group">
+              <div className="absolute -top-10 -left-10 w-40 h-40 bg-indigo-500/10 blur-[50px] rounded-full pointer-events-none" />
+              <div className="flex items-start gap-4 relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
+                  <Info className="w-6 h-6 text-white" />
+                </div>
+                <div className="space-y-4">
+                  <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                    Chào bạn, hãy để Nova giúp bạn lập kế hoạch!
+                    <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-1">
+                      <div className="text-indigo-400 font-black text-[9px] uppercase tracking-widest">Bước 1: Thu nhập</div>
+                      <p className="text-[11px] text-theme-text-muted leading-relaxed">Nova lấy thu nhập thực tế của bạn và trừ đi các chi phí cố định (nhà, điện...).</p>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-indigo-400 font-black text-[9px] uppercase tracking-widest">Bước 2: Chia lọ</div>
+                      <p className="text-[11px] text-theme-text-muted leading-relaxed">Dùng thanh trượt bên phải để chia % cho từng mục tiêu (Ăn uống, Tiết kiệm...).</p>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-indigo-400 font-black text-[9px] uppercase tracking-widest">Bước 3: Lưu lại</div>
+                      <p className="text-[11px] text-theme-text-muted leading-relaxed">Nhấn <span className="text-white font-bold">Lưu</span> để hệ thống theo dõi giúp bạn trên Dashboard.</p>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setShowGuide(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X className="w-5 h-5 text-theme-text-muted" /></button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="lg:col-span-4 space-y-4">
+          <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-emerald-500/5 to-transparent relative overflow-hidden">
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-theme-text-muted mb-1">Ngân sách khả dụng</p>
+            <h2 className="text-3xl font-black text-emerald-400 tracking-tighter">{fmtVND(available)}</h2>
+            <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
+              <div className="flex justify-between text-[11px] font-medium">
+                <span className="text-theme-text-muted">Tổng thu nhập:</span>
+                <span className="text-theme-text-primary">{fmtVND(income)}</span>
+              </div>
+              <div className="flex justify-between text-[11px] font-medium">
+                <span className="text-theme-text-muted">Phí cố định:</span>
+                <span className="text-rose-400">-{fmtVND(totalFixed)}</span>
+              </div>
+            </div>
           </div>
 
-          {/* Fixed expenses – LOCKED */}
-          <div>
-            <div className="flex items-center gap-1.5 mb-2">
-              <Lock className="w-3.5 h-3.5" style={{ color: '#ef4444' }} />
-              <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: '#ef4444' }}>Phí cố định (đã khóa)</p>
+          <div className="glass-panel p-6 rounded-3xl border border-white/5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-theme-text-primary flex items-center gap-2">
+                <Target className="w-3.5 h-3.5 text-primary-400" /> Chi tiết cố định
+              </h3>
+              <Link to="/app/profile?tab=expenses" className="text-[9px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 uppercase">
+                Chỉnh sửa <ExternalLink className="w-3 h-3" />
+              </Link>
             </div>
-            <div className="space-y-1.5">
-              {FIXED.map(e => (
-                <div key={e.id} className="flex justify-between items-center px-3 py-1.5 rounded-lg"
-                  style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                  <span className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>{e.emoji} {e.name}</span>
-                  <span className="text-sm font-bold tabular-nums" style={{ color: '#ef4444' }}>-{fmtVND(e.amount)}</span>
+            <div className="space-y-2">
+              {fixedExpenses.map((exp, i) => (
+                <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.03] text-xs">
+                  <span className="font-bold text-theme-text-muted">{exp.emoji} {exp.name}</span>
+                  <span className="font-black text-theme-text-primary">{fmtVND(exp.amount)}</span>
                 </div>
               ))}
             </div>
-            <div className="flex justify-between mt-1.5 px-1">
-              <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Tổng phí cố định</span>
-              <span className="text-xs font-extrabold" style={{ color: '#ef4444' }}>-{fmtVND(totalFixed)}</span>
+          </div>
+        </div>
+
+        {/* Sliders - Compact and Balanced */}
+        <div className="lg:col-span-8 glass-panel p-8 rounded-[2.5rem] border border-white/5 shadow-2xl relative">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-lg font-black text-theme-text-primary tracking-tight">Phân bổ dòng tiền</h2>
+            <div className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${unallocated === 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10' : 'bg-amber-500/10 text-amber-400 border border-amber-500/10'}`}>
+              {unallocated === 0 ? 'Hoàn tất' : `Còn ${unallocated}%`}
             </div>
           </div>
-
-          {/* Available budget highlight */}
-          <div className="flex flex-col justify-center items-center rounded-2xl p-5 text-center"
-            style={{ background: 'linear-gradient(135deg,var(--theme-neon-primary)12,var(--theme-neon-accent)08)', border: '1px solid var(--theme-neon-primary)30' }}>
-            <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--theme-text-muted)' }}>
-              💰 Số tiền khả dụng để chia lọ
-            </p>
-            <p className="text-3xl font-extrabold neon-text">{fmtVND(available)}</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
-              = {fmtVND(income)} − {fmtVND(totalFixed)}
-            </p>
-          </div>
-        </div>
-      </motion.section>
-
-      {/* ════════════════════════════════════════════════════════
-          QUỸ CHƯA PHÂN BỔ – Real-time counter
-      ════════════════════════════════════════════════════════ */}
-      <motion.div
-        variants={card}
-        animate={isOver ? { x: [0,-4,4,-4,4,0] } : {}}
-        transition={isOver ? { duration:0.5, repeat:Infinity, repeatDelay:2 } : {}}
-        className="rounded-2xl px-5 py-4 flex items-center justify-between gap-4"
-        style={{ background: poolBg, border: `1px solid ${poolBorder}`, boxShadow: isBalanced ? '0 0 20px rgba(0,245,255,0.1)' : undefined }}
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-            style={{ background: isBalanced ? 'rgba(0,245,255,0.15)' : isOver ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.12)' }}>
-            {isBalanced ? '✅' : isOver ? '🚨' : '💡'}
-          </div>
-          <div>
-            <p className="font-bold text-sm" style={{ color: poolColor, textShadow: isBalanced ? '0 0 8px var(--theme-neon-primary)' : undefined }}>
-              {isBalanced
-                ? 'Phân bổ hoàn hảo! Kế hoạch sẵn sàng để lưu.'
-                : isOver
-                  ? `Vượt ngân sách ${Math.abs(unallocated)}% — Hãy giảm bớt một số lọ.`
-                  : `Quỹ chưa phân bổ: còn ${unallocated}%`
-              }
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
-              {isBalanced
-                ? `Toàn bộ ${fmtVND(available)} đã được phân bổ`
-                : isOver
-                  ? 'Tổng % đang vượt quá 100%'
-                  : `≈ ${fmtVND(Math.round(available * Math.abs(unallocated) / 100))} chưa được dùng`
-              }
-            </p>
-          </div>
-        </div>
-        <div className="text-right flex-shrink-0">
-          <p className="text-4xl font-extrabold tabular-nums leading-none transition-colors duration-300"
-            style={{ color: poolColor, textShadow: isBalanced ? '0 0 20px var(--theme-neon-primary)' : undefined }}>
-            {allocated}%
-          </p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
-            {isBalanced ? '= 100% ✓' : `/ 100% (còn thiếu ${unallocated}%)`}
-          </p>
-        </div>
-      </motion.div>
-
-      {/* ════════════════════════════════════════════════════════
-          ZONE 2 + 3 – AI & Sliders  (Story 1 + Story 2)
-      ════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-
-        {/* Left: Zone 3 – Sliders */}
-        <motion.div variants={card} className="xl:col-span-7">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-base font-extrabold" style={{ color: 'var(--theme-text-primary)' }}>
-                🫙 Khu vực 3 · Điều chỉnh Lọ Chi Tiêu
-              </h2>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
-                Kéo tự do · Quỹ dư theo dõi phía trên
-              </p>
-            </div>
-            <motion.button onClick={() => setJars(prev => [...prev, {
-              id: Date.now().toString(), name:'Lọ mới', emoji:'🫙',
-              percentage:0, locked:false, color:'#64748b', neonColor:'#94a3b8', description:'Chưa đặt tên'
-            }])}
-              whileHover={{ scale:1.05 }} whileTap={{ scale:0.95 }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-              style={{ background:'var(--theme-glass-bg)', border:'1px solid var(--theme-border)', color:'var(--theme-text-muted)' }}>
-              <Plus className="w-3.5 h-3.5" /> Thêm lọ
-            </motion.button>
-          </div>
-
-          {/* AI loading overlay */}
-          <AnimatePresence>
-            {aiLoading && (
-              <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-                className="mb-3 rounded-2xl p-6 flex flex-col items-center gap-3 relative overflow-hidden"
-                style={{ background:'var(--theme-glass-bg)', border:'1px solid var(--theme-ai-color)40', minHeight:120 }}>
-                <div className="matrix-scan-line" />
-                <motion.div animate={{ rotate:360 }} transition={{ duration:1.5, repeat:Infinity, ease:'linear' }}
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{ background:`conic-gradient(var(--theme-ai-color),var(--theme-neon-accent),var(--theme-ai-color))`, padding:2 }}>
-                  <div className="w-full h-full rounded-full flex items-center justify-center" style={{ background:'var(--theme-bg-deep)' }}>
-                    <BrainCircuit className="w-5 h-5" style={{ color:'var(--theme-ai-color)' }} />
-                  </div>
-                </motion.div>
-                <p className="font-bold text-sm" style={{ color:'var(--theme-ai-color)' }}>AI đang phân tích thói quen chi tiêu…</p>
-                <div className="flex gap-2 font-mono text-xs" style={{ color:'var(--theme-ai-color)80' }}>
-                  {Array.from({length:7}).map((_,i) => (
-                    <motion.span key={i} animate={{ opacity:[0,1,0] }} transition={{ duration:0.4, delay:i*0.07, repeat:Infinity }}>
-                      {rChar()}
-                    </motion.span>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
+          
           <LinkedSliders jars={jars} totalBudget={available} onJarsChange={setJars} formatCurrency={fmtVND} />
-        </motion.div>
-
-        {/* Right: Zone 2 – AI + Pie */}
-        <motion.div variants={card} className="xl:col-span-5 space-y-4">
-          {/* Zone 2 – AI suggestion */}
-          <div className="glass-panel p-4 rounded-2xl">
-            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color:'var(--theme-text-muted)' }}>
-              Khu vực 2 · AI Gợi ý Phân bổ
-            </p>
-            <motion.button onClick={handleAI} disabled={aiLoading}
-              whileHover={!aiLoading ? { scale:1.02 } : {}} whileTap={!aiLoading ? { scale:0.97 } : {}}
-              className="w-full flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-bold text-sm"
-              style={{
-                background: aiLoading ? 'var(--theme-glass-bg)' : 'linear-gradient(135deg,var(--theme-ai-color),var(--theme-neon-accent))',
-                border:`1px solid var(--theme-ai-color)50`,
-                color: aiLoading ? 'var(--theme-ai-color)' : '#000',
-                cursor: aiLoading ? 'not-allowed' : 'pointer',
-              }}>
-              {aiLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
-              {aiLoading ? 'AI đang tính...' : 'AI Gợi ý Phân bổ'}
-              {!aiLoading && <Sparkles className="w-3.5 h-3.5" />}
-            </motion.button>
-            <p className="text-xs text-center mt-2" style={{ color:'var(--theme-text-muted)' }}>
-              Phân bổ tối ưu trên {fmtVND(available)} khả dụng
-            </p>
+          
+          <div className="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-[10px] text-theme-text-muted font-medium max-w-[300px]">Thiết lập sẽ được áp dụng ngay lập tức cho trang Tổng quan.</p>
+            <button 
+              onClick={handleSave} 
+              disabled={unallocated !== 0} 
+              className={`px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all ${
+                unallocated === 0 
+                  ? 'bg-gradient-to-r from-primary-500 to-indigo-600 text-white shadow-lg shadow-primary-500/20 hover:scale-105 active:scale-95' 
+                  : 'bg-white/5 text-white/10 cursor-not-allowed'
+              }`}
+            >
+              Lưu Ngân Sách
+            </button>
           </div>
-
-          <NeonPieChart jars={jars} totalBudget={available} formatCurrency={fmtVND} />
-
-          {/* Compact jar amounts */}
-          <div className="space-y-1.5">
-            {jars.map(jar => {
-              const amount = Math.round(available * jar.percentage / 100);
-              return (
-                <motion.div key={jar.id} layout
-                  className="neon-jar-card px-4 py-2.5 flex items-center justify-between gap-3"
-                  style={{ borderColor: jar.neonColor + '28' }} whileHover={{ scale:1.01 }}>
-                  <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-full" style={{ background: jar.neonColor }} />
-                  <div className="flex items-center gap-2 pl-1.5">
-                    <span className="text-sm">{jar.emoji}</span>
-                    <span className="text-sm font-semibold truncate" style={{ color:'var(--theme-text-primary)' }}>{jar.name}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-right flex-shrink-0">
-                    <span className="text-xs tabular-nums" style={{ color:'var(--theme-text-muted)' }}>{fmtVND(amount)}</span>
-                    <span className="text-sm font-extrabold w-9 tabular-nums" style={{ color:jar.neonColor, textShadow:`0 0 8px ${jar.neonColor}60` }}>
-                      {jar.percentage}%
-                    </span>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </motion.div>
+        </div>
       </div>
 
-      {/* ════════════════════════════════════════════════════════
-          LƯU NGÂN SÁCH – locked until unallocated === 0
-      ════════════════════════════════════════════════════════ */}
-      <motion.div variants={card} className="flex justify-end">
-        <motion.button onClick={handleSave} disabled={!isBalanced}
-          whileHover={isBalanced ? { scale:1.04 } : {}} whileTap={isBalanced ? { scale:0.96 } : {}}
-          className="flex items-center gap-3 px-8 py-3.5 rounded-2xl font-bold text-sm transition-all duration-300"
-          style={{
-            background: isBalanced ? 'linear-gradient(135deg,var(--theme-neon-primary),var(--theme-neon-accent))' : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${isBalanced ? 'var(--theme-neon-primary)60' : 'rgba(255,255,255,0.08)'}`,
-            color: isBalanced ? '#000' : 'rgba(255,255,255,0.2)',
-            cursor: isBalanced ? 'pointer' : 'not-allowed',
-            boxShadow: isBalanced ? '0 0 28px var(--theme-neon-primary)50' : 'none',
-          }}
-          title={isBalanced ? 'Lưu ngân sách' : `Cần đủ 100% (còn ${unallocated > 0 ? unallocated + '% dư' : Math.abs(unallocated) + '% vượt'})`}
-        >
-          <Save className="w-4 h-4" />
-          <span>{isBalanced ? 'Lưu Ngân Sách' : `Chờ đủ 100% (đang ${allocated}%)`}</span>
-          {isBalanced && <ChevronRight className="w-4 h-4" />}
-        </motion.button>
-      </motion.div>
-
-      {/* Save Toast */}
       <AnimatePresence>
         {saved && (
-          <motion.div initial={{ opacity:0,y:24,scale:0.9 }} animate={{ opacity:1,y:0,scale:1 }} exit={{ opacity:0,y:24,scale:0.9 }}
-            className="fixed bottom-24 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl"
-            style={{ background:'var(--theme-glass-bg)', border:'1px solid var(--theme-neon-primary)50', backdropFilter:'blur(20px)', boxShadow:'0 0 20px var(--theme-neon-primary)30' }}>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background:'var(--theme-neon-primary)', boxShadow:'0 0 12px var(--theme-neon-primary)' }}>
-              <Save className="w-4 h-4 text-black" />
-            </div>
-            <div>
-              <p className="font-bold text-sm" style={{ color:'var(--theme-text-primary)' }}>Ngân sách đã được lưu!</p>
-              <p className="text-xs" style={{ color:'var(--theme-text-muted)' }}>Tháng 4/2026 · {fmtVND(available)}</p>
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50">
+            <div className="bg-emerald-500 text-white px-8 py-3 rounded-xl shadow-2xl flex items-center gap-3 font-black uppercase tracking-widest text-xs">
+               <Sparkles className="w-4 h-4" /> Thiết lập thành công!
             </div>
           </motion.div>
         )}

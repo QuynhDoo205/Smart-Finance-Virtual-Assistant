@@ -1,16 +1,17 @@
+import 'dotenv/config';
 import express from 'express';
 import type { Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import pool from './db.js';
 import authRouter from './routes/auth.js';
 import dashboardRouter from './routes/dashboard.js';
 import userRouter from './routes/user.js';
-
-dotenv.config();
+import transactionsRouter from './routes/transactions.js';
+import aiRouter from './routes/ai.js';
+import incomeRouter from './routes/income.js';
 
 const app = express();
-const PORT = process.env['PORT'] || 5000;
+const PORT = process.env.PORT || 5001; // Force 5001 as primary fallback
 
 // ============================================================
 // Middleware
@@ -29,6 +30,7 @@ app.use((_req, res, next) => {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 // ============================================================
 // Routes
@@ -63,6 +65,9 @@ app.get('/api/health', async (_req: Request, res: Response) => {
 app.use('/api/auth', authRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/user', userRouter);
+app.use('/api/transactions', transactionsRouter);
+app.use('/api/ai', aiRouter);
+app.use('/api/income', incomeRouter);
 
 // ============================================================
 // 404 Handler

@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:5000/api';
+const BASE_URL = 'http://localhost:5001/api';
 
 function getToken(): string | null {
   return localStorage.getItem('nova_token');
@@ -10,8 +10,10 @@ async function apiFetch<T>(
 ): Promise<T> {
   const token = getToken();
   
+  const isFormData = options.body instanceof FormData;
+  
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string> || {}),
   };
   
@@ -19,19 +21,28 @@ async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  console.log(`🌐 Calling API: ${BASE_URL}${endpoint}`, options.method || 'GET');
+  
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,
     headers,
   });
 
-  const data = await response.json() as T;
+  const contentType = response.headers.get('content-type');
+  let data: any;
   
-  if (!response.ok) {
-    const errData = data as { message?: string };
-    throw new Error(errData.message || `Lỗi HTTP ${response.status}`);
+  if (contentType && contentType.includes('application/json')) {
+    data = await response.json();
+  } else {
+    data = await response.text();
   }
   
-  return data;
+  if (!response.ok) {
+    const errorMessage = (typeof data === 'object' ? data.message : data) || `Lỗi HTTP ${response.status}`;
+    throw new Error(errorMessage);
+  }
+  
+  return data as T;
 }
 
 // Auth API
@@ -68,6 +79,18 @@ export const authApi = {
 
   me: () =>
     apiFetch<{ success: boolean; data: { user: UserProfile } }>('/auth/me'),
+
+  forgotPassword: (email: string) =>
+    apiFetch<{ success: boolean; message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    apiFetch<{ success: boolean; message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
 };
 
 // Dashboard API
@@ -88,6 +111,15 @@ export const dashboardApi = {
   
   getChartData: () =>
     apiFetch<{ success: boolean; data: { chartData: ChartDataPoint[] } }>('/dashboard/chart-data'),
+    
+  suggestJars: () =>
+    apiFetch<{ success: boolean; data: { jars: { name: string; percentage: number }[] } }>('/dashboard/suggest-jars'),
+    
+  setupBudget: (budgets: { categoryId: number; limit: number }[]) =>
+    apiFetch<{ success: boolean; message: string }>('/dashboard/setup-budget', {
+      method: 'POST',
+      body: JSON.stringify({ budgets }),
+    }),
 };
 
 // User API
@@ -100,7 +132,123 @@ export const userApi = {
   
   getProfile: () =>
     apiFetch<{ success: boolean; data: UserProfile }>('/user/profile'),
+
+  uploadAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return apiFetch<{ success: boolean; message: string; avatarUrl: string }>('/user/avatar', {
+      method: 'POST',
+      body: formData,
+    });
+  },
 };
+
+// Transactions API
+export const transactionsApi = {
+  create: (data: {
+    title: string;
+    amount: number;
+    type: 'income' | 'expense' | 'thu_nhap' | 'chi_phi';
+    categoryId?: number;
+    note?: string;
+    date?: string;
+  }) =>
+    apiFetch<{ success: boolean; data: { transaction: Transaction } }>('/transactions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  list: (limit = 50) =>
+    apiFetch<{ success: boolean; data: { transactions: Transaction[] } }>(
+      `/transactions?limit=${limit}`
+    ),
+
+  delete: (id: number) =>
+    apiFetch<{ success: boolean; message: string }>(`/transactions/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// AI API
+export const aiApi = {
+  scan: (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    return apiFetch<{ success: boolean; data: ParsedAIResult }>('/ai/scan', {
+      method: 'POST',
+      body: formData, // apiFetch will need adjustment to NOT set Content-Type if body is FormData
+      headers: {
+        'Accept': 'application/json',
+      }
+    });
+  },
+
+  chat: (message: string, sessionId?: number) =>
+    apiFetch<{ success: boolean; reply: string; data: ParsedAIResult | null; sessionId: number }>('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, sessionId }),
+    }),
+
+  getSessions: () =>
+    apiFetch<{ success: boolean; data: { id: number; tieu_de: string; ngay_cap_nhat: string }[] }>('/ai/sessions'),
+
+  createSession: (title?: string) =>
+    apiFetch<{ success: boolean; data: { id: number; tieu_de: string } }>('/ai/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    }),
+
+  deleteSession: (id: number) =>
+    apiFetch<{ success: boolean; message: string }>(`/ai/sessions/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getHistory: (sessionId: number) =>
+    apiFetch<{ success: boolean; data: { role: 'user' | 'assistant'; content: string; type: string; data: any; timestamp: string }[] }>(`/ai/history/${sessionId}`),
+};
+
+// Income API
+export const incomeApi = {
+  getSources: () =>
+    apiFetch<{ success: boolean; data: { sources: IncomeSourceRecord[] } }>('/income/sources'),
+  
+  createSource: (data: {
+    name: string;
+    type: 'fixed' | 'variable' | 'scheduled';
+    category: 'salary' | 'allowance' | 'other';
+    expectedAmount?: number;
+    hourlyRate?: number;
+    schedule?: number[];
+  }) =>
+    apiFetch<{ success: boolean; data: { source: IncomeSourceRecord } }>('/income/sources', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deleteSource: (id: number) =>
+    apiFetch<{ success: boolean; message: string }>(`/income/sources/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+export interface IncomeSourceRecord {
+  id: number;
+  ten_nguon: string;
+  loai_nguon: 'fixed' | 'variable' | 'scheduled';
+  loai_danh_muc: 'salary' | 'allowance' | 'other';
+  so_tien_du_kien?: number;
+  luong_theo_gio?: number;
+  lich_lam_viec?: number[];
+}
+
+export interface ParsedAIResult {
+  store?: string;
+  amount: number;
+  category: 'food' | 'transport' | 'shopping' | 'entertainment' | 'health' | 'education' | 'other';
+  description: string;
+  date: string;
+}
 
 // Types
 export interface UserProfile {
@@ -119,6 +267,8 @@ export interface DashboardSummary {
   totalExpense: number;
   netSavings: number;
   incomeChangePercent: number;
+  isSurvivalMode: boolean;
+  categoryDistribution?: { name: string; value: number; color: string }[];
   month: number;
   year: number;
 }
@@ -127,7 +277,7 @@ export interface Transaction {
   id: number;
   title: string;
   amount: number;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'thu_nhap' | 'chi_phi';
   note?: string;
   transaction_date: string;
   category_name: string;
@@ -160,6 +310,6 @@ export interface SavingsGoal {
 export interface ChartDataPoint {
   month: number;
   year: number;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'thu_nhap' | 'chi_phi';
   total: number;
 }

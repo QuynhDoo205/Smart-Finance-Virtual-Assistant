@@ -1,17 +1,49 @@
 import { motion } from 'framer-motion';
-import { Target, Lightbulb, TrendingUp, Sparkles, CheckCircle2, Crosshair, ShieldAlert } from 'lucide-react';
+import { Target, Lightbulb, TrendingUp, Sparkles, CheckCircle2, Crosshair, Plus, Loader2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useState, useEffect } from 'react';
+import { dashboardApi } from '../../utils/api';
 
-const data = [
-  { month: 'T1', savings: 4000000 },
-  { month: 'T2', savings: 5500000 },
-  { month: 'T3', savings: 8000000 },
-  { month: 'T4', savings: 9500000 },
-  { month: 'T5', savings: 12000000, projected: true },
-  { month: 'T6', savings: 15000000, projected: true },
+const MOCK_TREND = [
+  { month: 'T1', savings: 0 },
+  { month: 'T2', savings: 0 },
+  { month: 'T3', savings: 0 },
+  { month: 'T4', savings: 0 },
+  { month: 'T5', savings: 0 },
+  { month: 'T6', savings: 0 },
 ];
 
 export default function InsightsGoals() {
+  const [goals, setGoals] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [goalsRes, summaryRes] = await Promise.all([
+          dashboardApi.getSavingsGoals(),
+          dashboardApi.getSummary()
+        ]);
+        if (goalsRes.success) setGoals(goalsRes.data.goals);
+        if (summaryRes.success) setSummary(summaryRes.data);
+      } catch (err) {
+        console.error("Failed to load insights:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
   const containerVars = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.1 } }
@@ -41,7 +73,7 @@ export default function InsightsGoals() {
         
         {/* AI Insights Sidebar */}
         <motion.div variants={itemVars} className="lg:col-span-4 space-y-6">
-          <div className="glass-panel p-6 rounded-[2rem] border-indigo-500/20 relative overflow-hidden group">
+          <div className="glass-panel p-6 rounded-[2rem] border-indigo-500/20 relative overflow-hidden group h-full">
             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
             <h3 className="text-xl font-bold text-theme-text-primary mb-6 flex items-center gap-2">
               <Lightbulb className="w-5 h-5 text-indigo-400" />
@@ -49,16 +81,21 @@ export default function InsightsGoals() {
             </h3>
             
             <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
-                <p className="text-sm text-indigo-100 leading-relaxed">
-                  Bạn đang tiết kiệm <strong>tốt hơn 25%</strong> so với tháng trước. Nếu duy trì, bạn sẽ đạt mục tiêu "Mua xe" sớm hơn 2 tháng! 🚀
-                </p>
-              </div>
+              {goals.length > 0 ? (
+                <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
+                  <p className="text-sm text-indigo-100 leading-relaxed">
+                    Bạn đang tiến gần đến mục tiêu <strong>{goals[0].name}</strong>. Với tốc độ hiện tại, bạn sẽ hoàn thành trong khoảng {(goals[0].target_amount - goals[0].current_amount) / (summary?.netSavings || 1000000) > 0 ? Math.ceil((goals[0].target_amount - goals[0].current_amount) / (summary?.netSavings || 1000000)) : 1} tháng tới! 🚀
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
+                  <p className="text-sm text-indigo-100 leading-relaxed">
+                    Bạn chưa có mục tiêu tiết kiệm nào. AI gợi ý bạn nên bắt đầu với một <strong>Quỹ dự phòng khẩn cấp</strong> (thường bằng 3-6 tháng chi tiêu).
+                  </p>
+                </div>
+              )}
               <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-theme-text-muted text-sm leading-relaxed">
-                Thói quen mua sắm trực tuyến vào cuối tuần chiếm <strong>15%</strong> tổng chi. Cân nhắc chờ 24h trước khi bấm "Thanh toán" để giảm chi phí bốc đồng.
-              </div>
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-theme-text-muted text-sm leading-relaxed">
-                Khoản thu nhập từ "Freelance" đang ổn định. AI đề xuất tự động trích <strong>30%</strong> khoản này thẳng vào Tiết kiệm phòng ngừa rủi ro.
+                Hệ thống đang phân tích thói quen của bạn. Càng nhập nhiều giao dịch, AI sẽ càng đưa ra các lời khuyên chính xác hơn.
               </div>
             </div>
             
@@ -75,7 +112,7 @@ export default function InsightsGoals() {
             </h3>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                <AreaChart data={MOCK_TREND} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorSavings" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4}/>
@@ -97,58 +134,47 @@ export default function InsightsGoals() {
 
           {/* Active Goals list */}
           <div className="space-y-4">
-            <h3 className="text-xl font-bold text-theme-text-primary mb-2 flex items-center gap-2">
-              <Target className="w-5 h-5 text-rose-400" /> Tiến độ Mục tiêu
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-theme-text-primary flex items-center gap-2">
+                <Target className="w-5 h-5 text-rose-400" /> Tiến độ Mục tiêu
+              </h3>
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-theme-text-primary transition-all">
+                <Plus className="w-4 h-4" /> Thêm mục tiêu
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Goal 1 */}
-              <div className="glass-panel p-6 rounded-2xl border-white/5 group hover:border-indigo-500/30 transition-colors">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
-                      <Crosshair className="w-5 h-5" />
+              {goals.length === 0 ? (
+                <div className="col-span-full py-12 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-3xl text-center">
+                  <Target className="w-12 h-12 text-theme-text-muted mb-4 opacity-20" />
+                  <p className="text-theme-text-muted font-bold">Chưa có mục tiêu nào được thiết lập</p>
+                  <p className="text-xs text-theme-text-muted/60 mt-1 max-w-xs">Đặt mục tiêu cho những dự định lớn của bạn để Nova AI giúp bạn theo dõi.</p>
+                </div>
+              ) : (
+                goals.map((goal) => (
+                  <div key={goal.id} className="glass-panel p-6 rounded-2xl border-white/5 group hover:border-indigo-500/30 transition-colors">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
+                          {goal.icon || '🎯'}
+                        </div>
+                        <h4 className="font-bold text-theme-text-primary group-hover:text-indigo-400 transition-colors">{goal.name}</h4>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-1 bg-white/10 text-theme-text-primary rounded-lg uppercase tracking-wider">{goal.status}</span>
                     </div>
-                    <h4 className="font-bold text-theme-text-primary group-hover:text-indigo-400 transition-colors">Mua xe máy mới</h4>
-                  </div>
-                  <span className="text-xs font-bold px-2 py-1 bg-white/10 text-theme-text-primary rounded-lg">Mục tiêu ngắn hạn</span>
-                </div>
-                <div className="flex justify-between items-end mb-2 text-sm">
-                  <span className="font-bold text-theme-text-primary">{formatCurrency(15000000)} đ</span>
-                  <span className="text-theme-text-muted">/ 50.000.000 đ</span>
-                </div>
-                <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: '30%' }} transition={{ duration: 1 }} className="h-full bg-indigo-500 rounded-full" />
-                </div>
-                <p className="text-xs text-theme-text-muted mt-3 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Đi đúng tiến độ (Dự kiến Đạt: T8/2026)
-                </p>
-              </div>
-
-              {/* Goal 2 */}
-              <div className="glass-panel p-6 rounded-2xl border-white/5 group hover:border-emerald-500/30 transition-colors">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                      <ShieldAlert className="w-5 h-5 hidden" /> {/* Dummy hidden for layout */}
-                      <Target className="w-5 h-5" />
+                    <div className="flex justify-between items-end mb-2 text-sm">
+                      <span className="font-bold text-theme-text-primary">{formatCurrency(goal.current_amount)} đ</span>
+                      <span className="text-theme-text-muted">/ {formatCurrency(goal.target_amount)} đ</span>
                     </div>
-                    <h4 className="font-bold text-theme-text-primary group-hover:text-emerald-400 transition-colors">Quỹ Dự phòng Khẩn cấp</h4>
+                    <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${goal.progress_percent}%` }} transition={{ duration: 1 }} className="h-full bg-indigo-500 rounded-full" />
+                    </div>
+                    <p className="text-[10px] text-theme-text-muted mt-3 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Deadline: {new Date(goal.deadline).toLocaleDateString('vi-VN')}
+                    </p>
                   </div>
-                  <span className="text-xs font-bold px-2 py-1 bg-white/10 text-theme-text-primary rounded-lg">An toàn</span>
-                </div>
-                <div className="flex justify-between items-end mb-2 text-sm">
-                  <span className="font-bold text-theme-text-primary">{formatCurrency(45000000)} đ</span>
-                  <span className="text-theme-text-muted">/ 60.000.000 đ</span>
-                </div>
-                <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: '75%' }} transition={{ duration: 1.2 }} className="h-full bg-emerald-400 rounded-full" />
-                </div>
-                <p className="text-xs text-theme-text-muted mt-3 flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3 text-emerald-400" /> Gần đạt mục tiêu!
-                </p>
-              </div>
-
+                ))
+              )}
             </div>
           </div>
 

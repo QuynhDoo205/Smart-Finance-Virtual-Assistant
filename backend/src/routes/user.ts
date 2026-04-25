@@ -3,11 +3,74 @@ import type { Response } from 'express';
 import pool from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthRequest } from '../middleware/auth.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 const router = Router();
 
+// Cấu hình multer để lưu file
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = 'uploads/avatars';
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req: AuthRequest, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `avatar-${req.user?.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // Giới hạn 5MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      return cb(null, true);
+    }
+    cb(new Error('Chỉ cho phép định dạng ảnh (jpg, jpeg, png, webp)'));
+  }
+});
+
 // Tất cả routes yêu cầu authentication
 router.use(authMiddleware);
+
+// ============================================================
+// POST /api/user/avatar – Tải ảnh đại diện
+// ============================================================
+router.post('/avatar', upload.single('avatar'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ success: false, message: 'Không có file nào được tải lên' });
+      return;
+    }
+
+    const userId = req.user?.id;
+    // URL để truy cập ảnh (đã cấu hình express.static trong index.ts)
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+    // Cập nhật đường dẫn ảnh vào database
+    await pool.query(
+      'UPDATE nguoi_dung SET hinh_anh = $1, ngay_cap_nhat = NOW() WHERE id = $2',
+      [avatarUrl, userId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Tải ảnh đại diện thành công',
+      avatarUrl
+    });
+  } catch (err) {
+    console.error('Avatar upload error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ khi tải ảnh' });
+  }
+});
 
 // ============================================================
 // PUT /api/user/onboarding – Cập nhật dữ liệu khảo sát ban đầu

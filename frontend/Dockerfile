@@ -4,10 +4,10 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Copy dependency files
-COPY package*.json ./
+COPY package.json pnpm-lock.yaml ./
 
-# Install dependencies
-RUN npm install
+# Install pnpm and dependencies
+RUN npm install -g pnpm && pnpm install
 
 # Copy source maps and resources
 COPY . .

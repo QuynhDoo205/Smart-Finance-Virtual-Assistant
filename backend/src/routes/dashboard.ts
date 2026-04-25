@@ -3,8 +3,10 @@ import type { Response } from 'express';
 import pool from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthRequest } from '../middleware/auth.js';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const router = Router();
+const genAI = new GoogleGenerativeAI((process.env.GOOGLE_AI_KEY || "").trim());
 
 // Tất cả routes dashboard yêu cầu authentication
 router.use(authMiddleware);
@@ -19,21 +21,21 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
 
-    // Thu nhập tháng này
+    // Thu nhập tháng này (Chấp nhận cả 'thu_nhap' và 'income')
     const incomeResult = await pool.query(
       `SELECT COALESCE(SUM(so_tien), 0) as total
        FROM giao_dich 
-       WHERE nguoi_dung_id = $1 AND loai_giao_dich = 'thu_nhap' 
+       WHERE nguoi_dung_id = $1 AND loai_giao_dich IN ('thu_nhap', 'income') 
        AND EXTRACT(MONTH FROM ngay_giao_dich) = $2 
        AND EXTRACT(YEAR FROM ngay_giao_dich) = $3`,
       [userId, month, year]
     );
 
-    // Chi tiêu tháng này
+    // Chi tiêu tháng này (Chấp nhận cả 'chi_phi' và 'expense')
     const expenseResult = await pool.query(
       `SELECT COALESCE(SUM(so_tien), 0) as total
        FROM giao_dich 
-       WHERE nguoi_dung_id = $1 AND loai_giao_dich = 'chi_phi' 
+       WHERE nguoi_dung_id = $1 AND loai_giao_dich IN ('chi_phi', 'expense') 
        AND EXTRACT(MONTH FROM ngay_giao_dich) = $2 
        AND EXTRACT(YEAR FROM ngay_giao_dich) = $3`,
       [userId, month, year]
@@ -45,7 +47,7 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
     const prevIncomeResult = await pool.query(
       `SELECT COALESCE(SUM(so_tien), 0) as total
        FROM giao_dich 
-       WHERE nguoi_dung_id = $1 AND loai_giao_dich = 'thu_nhap' 
+       WHERE nguoi_dung_id = $1 AND loai_giao_dich IN ('thu_nhap', 'income') 
        AND EXTRACT(MONTH FROM ngay_giao_dich) = $2 
        AND EXTRACT(YEAR FROM ngay_giao_dich) = $3`,
       [userId, prevMonth, prevYear]
@@ -54,7 +56,7 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
     // Tổng số dư = tất cả thu nhập - tất cả chi tiêu
     const balanceResult = await pool.query(
       `SELECT 
-         COALESCE(SUM(CASE WHEN loai_giao_dich = 'thu_nhap' THEN so_tien ELSE -so_tien END), 0) as balance
+         COALESCE(SUM(CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN so_tien ELSE -so_tien END), 0) as balance
        FROM giao_dich 
        WHERE nguoi_dung_id = $1`,
       [userId]
@@ -69,6 +71,22 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
       ? Math.round(((totalIncome - prevIncome) / prevIncome) * 100) 
       : 0;
 
+    // Chế độ sinh tồn: Nếu chi tiêu > 90% thu nhập
+    const isSurvivalMode = totalIncome > 0 && (totalExpense / totalIncome) > 0.9;
+
+    // Phân bổ chi tiêu theo danh mục tháng này (Dành cho biểu đồ)
+    const categoryDistResult = await pool.query(
+      `SELECT c.ten_danh_muc as name, SUM(t.so_tien) as value, c.mau_sac as color
+       FROM giao_dich t
+       JOIN danh_muc c ON t.danh_muc_id = c.id
+       WHERE t.nguoi_dung_id = $1 AND t.loai_giao_dich IN ('chi_phi', 'expense')
+       AND EXTRACT(MONTH FROM t.ngay_giao_dich) = $2
+       AND EXTRACT(YEAR FROM t.ngay_giao_dich) = $3
+       GROUP BY c.ten_danh_muc, c.mau_sac
+       ORDER BY value DESC`,
+      [userId, month, year]
+    );
+
     res.json({
       success: true,
       data: {
@@ -77,6 +95,8 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
         totalExpense,
         netSavings: totalIncome - totalExpense,
         incomeChangePercent: incomeChange,
+        isSurvivalMode,
+        categoryDistribution: categoryDistResult.rows,
         month,
         year,
       }
@@ -97,7 +117,7 @@ router.get('/transactions', async (req: AuthRequest, res: Response): Promise<voi
 
     const result = await pool.query(
       `SELECT t.id, t.tieu_de AS title, t.so_tien AS amount, 
-              CASE WHEN t.loai_giao_dich = 'thu_nhap' THEN 'income' ELSE 'expense' END AS type, 
+              CASE WHEN t.loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END AS type, 
               t.ghi_chu AS note, t.ngay_giao_dich AS transaction_date,
               c.ten_danh_muc as category_name, c.bieu_tuong as category_icon, c.mau_sac as category_color
        FROM giao_dich t
@@ -126,13 +146,31 @@ router.get('/budget', async (req: AuthRequest, res: Response): Promise<void> => 
     const year = now.getFullYear();
 
     const result = await pool.query(
-      `SELECT b.id, b.gioi_han_chi_tieu AS limit_amount, b.da_chi_tieu AS spent_amount,
-              c.ten_danh_muc as category_name, c.bieu_tuong as category_icon, c.mau_sac as category_color,
-              ROUND((b.da_chi_tieu / NULLIF(b.gioi_han_chi_tieu, 0) * 100)::numeric, 1) as usage_percent
-       FROM ngan_sach b
-       LEFT JOIN danh_muc c ON b.danh_muc_id = c.id
-       WHERE b.nguoi_dung_id = $1 AND b.thang = $2 AND b.nam = $3
-       ORDER BY b.da_chi_tieu DESC`,
+      `WITH actual_spending AS (
+         SELECT danh_muc_id, SUM(so_tien) as total_spent
+         FROM giao_dich
+         WHERE nguoi_dung_id = $1 AND loai_giao_dich IN ('chi_phi', 'expense')
+         AND EXTRACT(MONTH FROM ngay_giao_dich) = $2
+         AND EXTRACT(YEAR FROM ngay_giao_dich) = $3
+         GROUP BY danh_muc_id
+       )
+       SELECT 
+         COALESCE(b.id, 0) as id,
+         COALESCE(b.gioi_han_chi_tieu, 0) as limit_amount,
+         COALESCE(s.total_spent, b.da_chi_tieu, 0) as spent_amount,
+         c.ten_danh_muc as category_name,
+         c.bieu_tuong as category_icon,
+         c.mau_sac as category_color,
+         CASE 
+           WHEN COALESCE(b.gioi_han_chi_tieu, 0) > 0 
+           THEN ROUND((COALESCE(s.total_spent, b.da_chi_tieu, 0) / b.gioi_han_chi_tieu * 100)::numeric, 1)
+           ELSE 0 
+         END as usage_percent
+       FROM danh_muc c
+       LEFT JOIN ngan_sach b ON c.id = b.danh_muc_id AND b.nguoi_dung_id = $1 AND b.thang = $2 AND b.nam = $3
+       LEFT JOIN actual_spending s ON c.id = s.danh_muc_id
+       WHERE b.id IS NOT NULL OR s.total_spent > 0
+       ORDER BY spent_amount DESC`,
       [userId, month, year]
     );
 
@@ -178,7 +216,7 @@ router.get('/chart-data', async (req: AuthRequest, res: Response): Promise<void>
       `SELECT 
          EXTRACT(MONTH FROM ngay_giao_dich)::int as month,
          EXTRACT(YEAR FROM ngay_giao_dich)::int as year,
-         CASE WHEN loai_giao_dich = 'thu_nhap' THEN 'income' ELSE 'expense' END AS type,
+         CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END AS type,
          SUM(so_tien) as total
        FROM giao_dich
        WHERE nguoi_dung_id = $1 
@@ -192,6 +230,76 @@ router.get('/chart-data', async (req: AuthRequest, res: Response): Promise<void>
   } catch (err) {
     console.error('Chart data error:', err);
     res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
+  }
+});
+
+// ============================================================
+// GET /api/dashboard/suggest-jars – AI gợi ý chia lọ
+// ============================================================
+router.get('/suggest-jars', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    
+    // Lấy thông tin thu nhập và chi tiêu gần đây để AI phân tích
+    const profileRes = await pool.query('SELECT thu_nhap_hang_thang FROM nguoi_dung WHERE id = $1', [userId]);
+    const income = profileRes.rows[0]?.thu_nhap_hang_thang || 0;
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `Dựa trên thu nhập ${income} VNĐ/tháng của một sinh viên, hãy gợi ý tỷ lệ chia 5 lọ tài chính (Thiết yếu, Tiết kiệm, Phát triển, Hưởng thụ, Đầu tư). Trả về JSON: {"jars": [{"name": string, "percentage": number}]}. Tổng percentage phải bằng 100.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    
+    res.json({ 
+      success: true, 
+      data: jsonMatch ? JSON.parse(jsonMatch[0]) : { jars: [
+        { name: 'Thiết yếu', percentage: 50 },
+        { name: 'Tiết kiệm', percentage: 20 },
+        { name: 'Phát triển', percentage: 10 },
+        { name: 'Hưởng thụ', percentage: 10 },
+        { name: 'Đầu tư', percentage: 10 }
+      ]}
+    });
+  } catch (err) {
+    console.error('AI Suggest Jars error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi AI gợi ý' });
+  }
+});
+
+// ============================================================
+// POST /api/dashboard/setup-budget – Thiết lập ngân sách hàng loạt
+// ============================================================
+router.post('/setup-budget', async (req: AuthRequest, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    const userId = req.user?.id;
+    const { budgets } = req.body; // Array of { categoryId, limit }
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    await client.query('BEGIN');
+
+    for (const b of budgets) {
+      await client.query(
+        `INSERT INTO ngan_sach (nguoi_dung_id, danh_muc_id, gioi_han_chi_tieu, thang, nam)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (nguoi_dung_id, danh_muc_id, thang, nam) 
+         DO UPDATE SET gioi_han_chi_tieu = EXCLUDED.gioi_han_chi_tieu`,
+        [userId, b.categoryId, b.limit, month, year]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'Đã thiết lập ngân sách thành công' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Setup budget error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
+  } finally {
+    client.release();
   }
 });
 

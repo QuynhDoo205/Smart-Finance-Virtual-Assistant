@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Lock, UserPlus, Sparkles, AlertCircle, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
+import { User, Mail, Lock, UserPlus, Sparkles, AlertCircle, Loader2, CheckCircle2, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { authApi } from '../../utils/api';
 import type { UserProfile } from '../../utils/api';
@@ -27,6 +27,9 @@ export default function Register() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [successUser, setSuccessUser] = useState<UserProfile | null>(null);
@@ -36,6 +39,18 @@ export default function Register() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    if (password.length < 6) {
+      setError('Mật khẩu phải từ 6 ký tự trở lên');
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Mật khẩu xác nhận không trùng khớp');
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await authApi.register(fullName, email, password);
@@ -158,15 +173,53 @@ export default function Register() {
                         <Lock className="h-5 w-5" />
                       </div>
                       <input
-                        type="password"
-                        className="glass-input pl-11"
+                        type={showPassword ? "text" : "password"}
+                        className={`glass-input pl-11 pr-12 ${password.length > 0 && password.length < 6 ? 'border-rose-500/50 bg-rose-500/5' : ''}`}
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         disabled={loading}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-theme-text-muted hover:text-primary-400 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
                     </div>
+                    {password.length > 0 && password.length < 6 && (
+                      <p className="text-[10px] text-rose-400 font-bold ml-1">Mật khẩu tối thiểu 6 ký tự</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm text-theme-text-muted font-medium ml-1">Xác nhận mật khẩu</label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        className={`glass-input pl-11 pr-12 ${confirmPassword.length > 0 && confirmPassword !== password ? 'border-rose-500/50 bg-rose-500/5' : ''}`}
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        disabled={loading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-theme-text-muted hover:text-primary-400 transition-colors"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
+                    {confirmPassword.length > 0 && confirmPassword !== password && (
+                      <p className="text-[10px] text-rose-400 font-bold ml-1">Mật khẩu xác nhận không khớp</p>
+                    )}
                   </div>
 
                   <motion.button 

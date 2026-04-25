@@ -1,11 +1,13 @@
-import { useState, useId } from 'react';
+import { useState, useId, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Key, Home, Shield, Compass, Edit3, ArrowUpRight,
+  Key, Home, Shield, Compass, ArrowUpRight,
   Plus, Pencil, Trash2, X, Check, AlertTriangle, DollarSign,
-  FileText, Tag, TrendingDown, Mail
+  FileText, Tag, TrendingDown, Mail, Loader2
 } from 'lucide-react';
+import { userApi, dashboardApi } from '../../utils/api';
 import authStore from '../../store/authStore';
+import { useSearchParams } from 'react-router-dom';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface FixedExpense {
@@ -16,13 +18,7 @@ interface FixedExpense {
 }
 
 // ─── Initial Mock Data ─────────────────────────────────────────────────────────
-const INITIAL_EXPENSES: FixedExpense[] = [
-  { id: '1', name: 'Tiền thuê nhà',   amount: 2000000, category: 'Nhà ở' },
-  { id: '2', name: 'Tiền điện / nước', amount: 500000,  category: 'Tiện ích' },
-  { id: '3', name: 'Internet / 4G',   amount: 200000,  category: 'Tiện ích' },
-  { id: '4', name: 'Netflix',          amount: 99000,   category: 'Giải trí' },
-  { id: '5', name: 'Học phí tiếng Anh', amount: 800000, category: 'Học tập' },
-];
+const INITIAL_EXPENSES: FixedExpense[] = [];
 
 const CATEGORY_OPTIONS = ['Nhà ở', 'Tiện ích', 'Giải trí', 'Học tập', 'Bảo hiểm', 'Khác'];
 
@@ -331,15 +327,43 @@ function ConfirmDeleteAccountModal({ onConfirm, onCancel }: ConfirmDeleteAccount
 
 // ─── Main Profile Component ───────────────────────────────────────────────────
 export default function Profile() {
-  const [activeTab, setActiveTab] = useState<'expenses' | 'security'>('expenses');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'expenses' | 'security'>((searchParams.get('tab') as any) || 'expenses');
 
   // Fixed expenses state
   const [expenses, setExpenses] = useState<FixedExpense[]>(INITIAL_EXPENSES);
   const [modalData, setModalData] = useState<Partial<FixedExpense> | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FixedExpense | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Load real expenses on mount
+  useEffect(() => {
+    const loadRealData = async () => {
+      setIsLoading(true);
+      try {
+        const res = await dashboardApi.getBudget();
+        if (res.success) {
+          const mapped = res.data.budgets
+            .filter((b: any) => b.limit_amount > 0)
+            .map((b: any) => ({
+              id: b.id.toString(),
+              name: b.category_name,
+              amount: parseFloat(b.limit_amount),
+              category: b.category_name // Defaulting category to name for sync
+            }));
+          setExpenses(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to load profile budget:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadRealData();
+  }, []);
 
   // Security features state
-  const user = authStore.getUser();
+  const [user, setUser] = useState(authStore.getUser());
   const [userAuth] = useState({ 
     provider: user?.email.includes('gmail') ? 'google' : 'email', 
     email: user?.email || '' 
@@ -352,19 +376,72 @@ export default function Profile() {
   const openAddModal = () => setModalData({});
   const openEditModal = (exp: FixedExpense) => setModalData(exp);
 
-  const handleSave = (name: string, amount: number, category: string) => {
+  const handleSave = async (name: string, amount: number, category: string) => {
+    let updated: FixedExpense[];
     if (modalData?.id) {
-      setExpenses(prev => prev.map(e => e.id === modalData.id ? { ...e, name, amount, category } : e));
+      updated = expenses.map(e => e.id === modalData.id ? { ...e, name, amount, category } : e);
     } else {
-      setExpenses(prev => [...prev, { id: Math.random().toString(36).slice(2), name, amount, category }]);
+      updated = [...expenses, { id: Math.random().toString(36).slice(2), name, amount, category }];
     }
+    
+    setExpenses(updated);
     setModalData(null);
+
+    // Persist to Backend
+    try {
+      await userApi.updateOnboarding(
+        user?.monthly_income || 0,
+        updated.map(e => ({ categoryName: e.name, amount: e.amount }))
+      );
+    } catch (err) {
+      console.error("Failed to persist expenses:", err);
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
-    setExpenses(prev => prev.filter(e => e.id !== deleteTarget.id));
+    const updated = expenses.filter(e => e.id !== deleteTarget.id);
+    setExpenses(updated);
     setDeleteTarget(null);
+
+    // Persist to Backend
+    try {
+      await userApi.updateOnboarding(
+        user?.monthly_income || 0,
+        updated.map(e => ({ categoryName: e.name, amount: e.amount }))
+      );
+    } catch (err) {
+      console.error("Failed to delete expense in backend:", err);
+    }
+  };
+
+  const [avatarLoading, setAvatarLoading] = useState(false);
+
+
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAvatarLoading(true);
+
+
+    try {
+      const res = await userApi.uploadAvatar(file);
+      if (res.success) {
+        // Success - You could add a toast here later
+        if (user) {
+          const updatedUser = { ...user, avatar_url: res.avatarUrl };
+          setUser(updatedUser);
+          authStore.setUser(updatedUser);
+        }
+      }
+    } catch (err) {
+      console.error('Avatar upload error:', err);
+      // Error - You could add a toast here later
+    } finally {
+      setAvatarLoading(false);
+    }
   };
 
   const containerVars = {
@@ -388,13 +465,24 @@ export default function Profile() {
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl" />
         <div className="relative bg-[#0F172A]/90 backdrop-blur-3xl rounded-[2.3rem] p-8 md:p-12 border border-white/5 flex flex-col md:flex-row items-center md:items-start gap-8 overflow-hidden">
           <Compass className="absolute -bottom-10 -right-10 w-64 h-64 text-theme-text-primary/[0.02] -rotate-12 group-hover:rotate-12 transition-transform duration-[10s]" />
-          <div className="relative">
-            <div className="w-32 h-32 rounded-[2rem] bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 flex items-center justify-center text-5xl font-extrabold text-theme-text-primary shadow-[0_0_40px_rgba(99,102,241,0.4)] rotate-3 hover:rotate-0 transition-transform duration-300">
-              {user?.full_name?.charAt(0) || 'U'}
+          <div className="relative group/avatar">
+            <div className="w-24 h-24 rounded-[1.5rem] bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 flex items-center justify-center text-4xl font-extrabold text-theme-text-primary shadow-[0_0_30px_rgba(99,102,241,0.3)] transition-all duration-300 group-hover/avatar:scale-105 overflow-hidden">
+              {avatarLoading ? (
+                <Loader2 className="w-8 h-8 animate-spin text-white/50" />
+              ) : user?.avatar_url ? (
+                <img 
+                  src={user.avatar_url.startsWith('http') ? user.avatar_url : `http://localhost:5001${user.avatar_url}`} 
+                  alt={user.full_name} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                user?.full_name?.charAt(0) || 'U'
+              )}
             </div>
-            <button className="absolute -bottom-3 -right-3 w-10 h-10 bg-[#1E293B] border-[3px] border-[#0F172A] rounded-full flex items-center justify-center text-theme-text-muted hover:text-theme-text-primary hover:bg-indigo-500 transition-colors">
-              <Edit3 className="w-4 h-4" />
-            </button>
+            <label className={`absolute -bottom-2 -right-2 w-8 h-8 bg-[#1E293B] border-2 border-[#0F172A] rounded-full flex items-center justify-center text-theme-text-muted hover:text-theme-text-primary hover:bg-indigo-500 transition-colors cursor-pointer shadow-lg ${avatarLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+              <Pencil className="w-3.5 h-3.5" />
+              <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} disabled={avatarLoading} />
+            </label>
           </div>
           <div className="text-center md:text-left flex-1 relative z-10 pt-2">
             <div className="flex items-center gap-3 justify-center md:justify-start mb-2">
