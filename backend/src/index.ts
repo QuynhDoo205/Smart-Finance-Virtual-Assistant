@@ -16,15 +16,26 @@ const PORT = process.env.PORT || 5001; // Force 5001 as primary fallback
 // ============================================================
 // Middleware
 // ============================================================
+// Extreme permissive CORS for debugging tunnel issues
 app.use(cors({
-  origin: true, // Allow all origins for local development (reflects request origin)
+  origin: (origin, callback) => {
+    // Allow all origins
+    callback(null, true);
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning']
 }));
+
+// Request Logger
+app.use((req, _res, next) => {
+  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url} - Origin: ${req.headers.origin}`);
+  next();
+});
 
 // Fix Google Auth popup cross-origin issues
 app.use((_req, res, next) => {
   res.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-  // res.header('Cross-Origin-Embedder-Policy', 'require-corp'); // Only if needed, can break some CDN images
   next();
 });
 

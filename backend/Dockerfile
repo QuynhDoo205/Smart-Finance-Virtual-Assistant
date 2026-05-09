@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 
 # Install pnpm and dependencies
-RUN npm install -g pnpm && pnpm install
+RUN npm install -g pnpm && pnpm config set ignore-scripts true && pnpm install
 
 # Copy source code
 COPY . .
@@ -22,7 +22,7 @@ WORKDIR /app
 
 # Copy only production dependencies using pnpm
 COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm && pnpm install --prod
+RUN npm install -g pnpm && pnpm config set ignore-scripts true && pnpm install --prod
 
 # Copy built files from previous stage
 COPY --from=build /app/dist ./dist
