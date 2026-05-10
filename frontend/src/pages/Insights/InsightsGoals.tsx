@@ -112,7 +112,7 @@ export default function InsightsGoals() {
             </h3>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={MOCK_TREND} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                <AreaChart data={MOCK_TREND} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorSavings" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4}/>
@@ -121,7 +121,14 @@ export default function InsightsGoals() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis dataKey="month" stroke="#6b7280" tick={{fill: '#6b7280'}} axisLine={false} tickLine={false} />
-                  <YAxis stroke="#6b7280" tick={{fill: '#6b7280'}} axisLine={false} tickLine={false} tickFormatter={(value) => `${value / 1000000}M`} />
+                  <YAxis 
+                    width={50}
+                    stroke="#6b7280" 
+                    tick={{fill: '#6b7280', fontSize: 12}} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tickFormatter={(value) => `${value / 1000000}Tr`} 
+                  />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: 'var(--theme-bg-surface)', 
