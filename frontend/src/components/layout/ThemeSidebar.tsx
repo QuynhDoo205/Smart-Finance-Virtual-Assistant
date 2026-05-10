@@ -53,11 +53,11 @@ const THEMES: {
   },
   {
     id: 'sunset',
-    label: '🌅 Sunset Orange',
-    description: 'Cam cháy ấm áp, năng động và đầy cá tính.',
-    bg: 'linear-gradient(135deg, #1A0B02, #2D1305)',
-    accent: '#F97316',
-    preview: ['#F97316', '#EF4444', '#F59E0B'],
+    label: '✨ Midnight Amethyst',
+    description: 'Tím huyền bí, sang trọng và đầy quyền lực.',
+    bg: 'linear-gradient(135deg, #080510, #120B25)',
+    accent: '#A855F7',
+    preview: ['#A855F7', '#D8B4FE', '#C084FC'],
   },
 ];
 

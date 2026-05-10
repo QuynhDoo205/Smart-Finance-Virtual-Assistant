@@ -89,27 +89,43 @@ router.put('/onboarding', async (req: AuthRequest, res: Response): Promise<void>
       [monthlyIncome, userId]
     );
 
-    // 2. Tạo ngân sách (Budgets) cho các mục chi phí cố định
-    // expenses: [{ categoryName: string, amount: number }]
+    // 2. Tạo/Cập nhật ngân sách (Budgets) cho các mục chi phí cố định
     const now = new Date();
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
 
+    // Lấy tất cả danh mục có sẵn để fallback
+    const allCategoriesRes = await client.query('SELECT id, ten_danh_muc FROM danh_muc ORDER BY id');
+    const allCategories: { id: number; ten_danh_muc: string }[] = allCategoriesRes.rows;
+    
+    // Tìm danh mục "Khác" để dùng làm fallback
+    const khaCategory = allCategories.find(c => 
+      c.ten_danh_muc.toLowerCase().includes('khác') || 
+      c.ten_danh_muc.toLowerCase().includes('khac') ||
+      c.ten_danh_muc.toLowerCase().includes('other')
+    );
+    const fallbackCategoryId = khaCategory?.id || allCategories[0]?.id;
+
     for (const exp of expenses) {
-      // Tìm category ID theo tên (hoặc map cứng nếu cần)
-      const catRes = await client.query('SELECT id FROM danh_muc WHERE ten_danh_muc = $1', [exp.categoryName]);
-      if (catRes.rows.length > 0) {
-        const categoryId = catRes.rows[0].id;
-        
-        // Upsert budget
-        await client.query(
-          `INSERT INTO ngan_sach (nguoi_dung_id, danh_muc_id, gioi_han_chi_tieu, da_chi_tieu, thang, nam)
-           VALUES ($1, $2, $3, 0, $4, $5)
-           ON CONFLICT (nguoi_dung_id, danh_muc_id, thang, nam)
-           DO UPDATE SET gioi_han_chi_tieu = EXCLUDED.gioi_han_chi_tieu`,
-          [userId, categoryId, exp.amount, month, year]
-        );
-      }
+      // Thử tìm category ID theo tên (case-insensitive)
+      const catRes = await client.query(
+        'SELECT id FROM danh_muc WHERE LOWER(ten_danh_muc) = LOWER($1)',
+        [exp.categoryName]
+      );
+      
+      // Nếu không tìm thấy → dùng category "Khác" hoặc category đầu tiên
+      const categoryId = catRes.rows.length > 0 ? catRes.rows[0].id : fallbackCategoryId;
+      
+      if (!categoryId) continue; // Không có category nào → bỏ qua
+
+      // Upsert budget – tìm theo danh_muc_id + thang + nam
+      await client.query(
+        `INSERT INTO ngan_sach (nguoi_dung_id, danh_muc_id, gioi_han_chi_tieu, da_chi_tieu, thang, nam)
+         VALUES ($1, $2, $3, 0, $4, $5)
+         ON CONFLICT (nguoi_dung_id, danh_muc_id, thang, nam)
+         DO UPDATE SET gioi_han_chi_tieu = EXCLUDED.gioi_han_chi_tieu`,
+        [userId, categoryId, exp.amount, month, year]
+      );
     }
 
     await client.query('COMMIT');

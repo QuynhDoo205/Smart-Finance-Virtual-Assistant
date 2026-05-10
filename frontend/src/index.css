@@ -109,24 +109,24 @@
   --theme-ai-color:      #0284C7;
 }
 
-/* SUNSET ORANGE (Warm & Vibrant Theme) */
+/* MIDNIGHT AMETHYST (Elegant Purple Theme) */
 [data-theme="sunset"] {
-  --theme-bg-deep:       #1A0B02;
-  --theme-bg-surface:    #2D1305;
-  --theme-bg-panel:      rgba(45, 19, 5, 0.85);
-  --theme-neon-primary:  #F97316;
-  --theme-neon-accent:   #EF4444;
-  --theme-neon-green:    #F59E0B;
-  --theme-text-primary:  #FFF7ED;
-  --theme-text-muted:    #FDBA74;
-  --theme-border:        rgba(249, 115, 22, 0.15);
-  --theme-border-glow:   0 0 15px rgba(249, 115, 22, 0.15);
-  --theme-glass-bg:      rgba(45, 19, 5, 0.7);
+  --theme-bg-deep:       #080510;
+  --theme-bg-surface:    #120B25;
+  --theme-bg-panel:      rgba(18, 11, 37, 0.85);
+  --theme-neon-primary:  #A855F7;
+  --theme-neon-accent:   #D8B4FE;
+  --theme-neon-green:    #C084FC;
+  --theme-text-primary:  #FAF5FF;
+  --theme-text-muted:    #C4B5FD;
+  --theme-border:        rgba(168, 85, 247, 0.2);
+  --theme-border-glow:   0 0 15px rgba(168, 85, 247, 0.1);
+  --theme-glass-bg:      rgba(18, 11, 37, 0.7);
   --theme-glass-blur:    20px;
-  --theme-subtle-bg:     rgba(249, 115, 22, 0.05);
-  --theme-subtle-border: rgba(249, 115, 22, 0.1);
-  --theme-scrollbar:     rgba(249, 115, 22, 0.2);
-  --theme-ai-color:      #EA580C;
+  --theme-subtle-bg:     rgba(168, 85, 247, 0.05);
+  --theme-subtle-border: rgba(168, 85, 247, 0.1);
+  --theme-scrollbar:     rgba(168, 85, 247, 0.2);
+  --theme-ai-color:      #A855F7;
 }
 
 /* ============================================

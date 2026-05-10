@@ -77,6 +77,36 @@ router.post('/sources', async (req: AuthRequest, res: Response): Promise<void> =
 });
 
 // ============================================================
+// PUT /api/income/sources/:id – Cập nhật nguồn thu
+// ============================================================
+router.put('/sources/:id', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const { name, type, category, expectedAmount, hourlyRate, schedule } = req.body;
+
+    const result = await pool.query(
+      `UPDATE nguon_thu
+       SET ten_nguon = $1, loai_nguon = $2, loai_danh_muc = $3,
+           so_tien_du_kien = $4, luong_theo_gio = $5, lich_lam_viec = $6
+       WHERE id = $7 AND nguoi_dung_id = $8
+       RETURNING *`,
+      [name, type, category, expectedAmount || null, hourlyRate || null, schedule || null, id, userId]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Không tìm thấy nguồn thu' });
+      return;
+    }
+
+    res.json({ success: true, data: { source: result.rows[0] } });
+  } catch (err) {
+    console.error('Update income source error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
+  }
+});
+
+// ============================================================
 // DELETE /api/income/sources/:id – Xóa nguồn thu
 // ============================================================
 router.delete('/sources/:id', async (req: AuthRequest, res: Response): Promise<void> => {
