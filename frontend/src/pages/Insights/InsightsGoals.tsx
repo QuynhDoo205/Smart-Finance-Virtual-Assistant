@@ -5,12 +5,12 @@ import { useState, useEffect } from 'react';
 import { dashboardApi } from '../../utils/api';
 
 const MOCK_TREND = [
-  { month: 'T1', savings: 0 },
-  { month: 'T2', savings: 0 },
-  { month: 'T3', savings: 0 },
-  { month: 'T4', savings: 0 },
-  { month: 'T5', savings: 0 },
-  { month: 'T6', savings: 0 },
+  { month: 'Tháng 1', savings: 1200000 },
+  { month: 'Tháng 2', savings: 2800000 },
+  { month: 'Tháng 3', savings: 4500000 },
+  { month: 'Tháng 4', savings: 6100000 },
+  { month: 'Tháng 5', savings: 8500000 },
+  { month: 'Tháng 6', savings: 12000000 },
 ];
 
 export default function InsightsGoals() {
@@ -122,12 +122,12 @@ export default function InsightsGoals() {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis dataKey="month" stroke="#6b7280" tick={{fill: '#6b7280'}} axisLine={false} tickLine={false} />
                   <YAxis 
-                    width={50}
+                    width={60}
                     stroke="#6b7280" 
                     tick={{fill: '#6b7280', fontSize: 12}} 
                     axisLine={false} 
                     tickLine={false} 
-                    tickFormatter={(value) => `${value / 1000000}Tr`} 
+                    tickFormatter={(value) => `${Math.round(value / 1000000)}Tr`} 
                   />
                   <Tooltip 
                     contentStyle={{ 
