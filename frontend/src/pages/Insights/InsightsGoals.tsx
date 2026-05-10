@@ -82,19 +82,19 @@ export default function InsightsGoals() {
             
             <div className="space-y-4">
               {goals.length > 0 ? (
-                <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
-                  <p className="text-sm text-indigo-100 leading-relaxed">
+                <div className="p-4 rounded-2xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)]">
+                  <p className="text-sm text-theme-text-primary leading-relaxed">
                     Bạn đang tiến gần đến mục tiêu <strong>{goals[0].name}</strong>. Với tốc độ hiện tại, bạn sẽ hoàn thành trong khoảng {(goals[0].target_amount - goals[0].current_amount) / (summary?.netSavings || 1000000) > 0 ? Math.ceil((goals[0].target_amount - goals[0].current_amount) / (summary?.netSavings || 1000000)) : 1} tháng tới! 🚀
                   </p>
                 </div>
               ) : (
-                <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
-                  <p className="text-sm text-indigo-100 leading-relaxed">
+                <div className="p-4 rounded-2xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)]">
+                  <p className="text-sm text-theme-text-primary leading-relaxed">
                     Bạn chưa có mục tiêu tiết kiệm nào. AI gợi ý bạn nên bắt đầu với một <strong>Quỹ dự phòng khẩn cấp</strong> (thường bằng 3-6 tháng chi tiêu).
                   </p>
                 </div>
               )}
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-theme-text-muted text-sm leading-relaxed">
+              <div className="p-4 rounded-2xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] text-theme-text-muted text-sm leading-relaxed">
                 Hệ thống đang phân tích thói quen của bạn. Càng nhập nhiều giao dịch, AI sẽ càng đưa ra các lời khuyên chính xác hơn.
               </div>
             </div>
@@ -106,7 +106,7 @@ export default function InsightsGoals() {
         <motion.div variants={itemVars} className="lg:col-span-8 space-y-8">
           
           {/* Chart Card */}
-          <div className="glass-panel p-6 md:p-8 rounded-[2rem] border-white/5">
+          <div className="glass-panel p-6 md:p-8 rounded-[2rem] border-[var(--theme-subtle-border)]">
             <h3 className="text-lg font-bold text-theme-text-primary mb-6 flex items-center justify-between">
               <span className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-emerald-400" /> Dự báo Tăng trưởng Tài sản</span>
             </h3>
@@ -123,7 +123,12 @@ export default function InsightsGoals() {
                   <XAxis dataKey="month" stroke="#6b7280" tick={{fill: '#6b7280'}} axisLine={false} tickLine={false} />
                   <YAxis stroke="#6b7280" tick={{fill: '#6b7280'}} axisLine={false} tickLine={false} tickFormatter={(value) => `${value / 1000000}M`} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', borderRadius: '1rem', color: '#fff' }}
+                    contentStyle={{ 
+                      backgroundColor: 'var(--theme-bg-surface)', 
+                      borderColor: 'var(--theme-border)', 
+                      borderRadius: '1rem', 
+                      color: 'var(--theme-text-primary)' 
+                    }}
                     formatter={(value: any) => [`${formatCurrency(value)} đ`, 'Tài sản']}
                   />
                   <Area type="monotone" dataKey="savings" stroke="#818cf8" strokeWidth={3} fillOpacity={1} fill="url(#colorSavings)" />
@@ -138,21 +143,21 @@ export default function InsightsGoals() {
               <h3 className="text-xl font-bold text-theme-text-primary flex items-center gap-2">
                 <Target className="w-5 h-5 text-rose-400" /> Tiến độ Mục tiêu
               </h3>
-              <button className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-theme-text-primary transition-all">
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--theme-subtle-bg)] hover:bg-[var(--theme-bg-surface)] border border-[var(--theme-subtle-border)] text-xs font-bold text-theme-text-primary transition-all">
                 <Plus className="w-4 h-4" /> Thêm mục tiêu
               </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {goals.length === 0 ? (
-                <div className="col-span-full py-12 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-3xl text-center">
+                <div className="col-span-full py-12 flex flex-col items-center justify-center border-2 border-dashed border-[var(--theme-subtle-border)] rounded-3xl text-center">
                   <Target className="w-12 h-12 text-theme-text-muted mb-4 opacity-20" />
                   <p className="text-theme-text-muted font-bold">Chưa có mục tiêu nào được thiết lập</p>
                   <p className="text-xs text-theme-text-muted/60 mt-1 max-w-xs">Đặt mục tiêu cho những dự định lớn của bạn để Nova AI giúp bạn theo dõi.</p>
                 </div>
               ) : (
                 goals.map((goal) => (
-                  <div key={goal.id} className="glass-panel p-6 rounded-2xl border-white/5 group hover:border-indigo-500/30 transition-colors">
+                  <div key={goal.id} className="glass-panel p-6 rounded-2xl border-[var(--theme-subtle-border)] group hover:border-indigo-500/30 transition-colors">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
@@ -160,13 +165,13 @@ export default function InsightsGoals() {
                         </div>
                         <h4 className="font-bold text-theme-text-primary group-hover:text-indigo-400 transition-colors">{goal.name}</h4>
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-1 bg-white/10 text-theme-text-primary rounded-lg uppercase tracking-wider">{goal.status}</span>
+                      <span className="text-[10px] font-bold px-2 py-1 bg-[var(--theme-bg-surface)] text-theme-text-primary rounded-lg uppercase tracking-wider">{goal.status}</span>
                     </div>
                     <div className="flex justify-between items-end mb-2 text-sm">
                       <span className="font-bold text-theme-text-primary">{formatCurrency(goal.current_amount)} đ</span>
                       <span className="text-theme-text-muted">/ {formatCurrency(goal.target_amount)} đ</span>
                     </div>
-                    <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden">
                       <motion.div initial={{ width: 0 }} animate={{ width: `${goal.progress_percent}%` }} transition={{ duration: 1 }} className="h-full bg-indigo-500 rounded-full" />
                     </div>
                     <p className="text-[10px] text-theme-text-muted mt-3 flex items-center gap-1">

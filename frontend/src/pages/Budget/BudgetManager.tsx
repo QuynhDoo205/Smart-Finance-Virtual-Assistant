@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BrainCircuit, RefreshCw, Sparkles, Info, HelpCircle, Target, X, ExternalLink } from 'lucide-react';
+import * as Lucide from 'lucide-react';
+import { BrainCircuit, RefreshCw, Sparkles, Info, HelpCircle, Target, X, ExternalLink, Banknote, PieChart as PieIcon, CheckCircle2, AlertCircle, PlusCircle } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Link } from 'react-router-dom';
 import LinkedSliders, { type Jar } from './components/LinkedSliders';
 import { dashboardApi, authApi, transactionsApi } from '../../utils/api';
@@ -15,13 +17,32 @@ const INIT_JARS: Jar[] = [
 
 const fmtVND = (v: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v);
 
+const IconRenderer = ({ iconName, className }: { iconName: string, className?: string }) => {
+  if (!iconName) return <Lucide.HelpCircle className={className} />;
+  
+  // Check if it's an emoji
+  const isEmoji = /\p{Emoji}/u.test(iconName);
+  if (isEmoji) return <span className={className}>{iconName}</span>;
+
+  // Convert kebab-case to PascalCase
+  const pascalName = iconName
+    .split('-')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+
+  const IconComponent = (Lucide as any)[pascalName];
+  if (IconComponent) return <IconComponent className={className} />;
+  
+  return <Lucide.HelpCircle className={className} />;
+};
+
 export default function BudgetManager() {
   const [income, setIncome] = useState(0);
   const [jars, setJars] = useState<Jar[]>(INIT_JARS);
   const [fixedExpenses, setFixedExpenses] = useState<{name: string, emoji: string, amount: number}[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [showGuide, setShowGuide] = useState(true);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -48,8 +69,9 @@ export default function BudgetManager() {
 
         if (dashBudgetRes.success) {
           const actualBudgets = dashBudgetRes.data.budgets;
+          const jarNames = ['ăn uống', 'đầu tư', 'giáo dục', 'giải trí', 'sức khỏe'];
           const mappedFixed = actualBudgets
-            .filter((b: any) => b.limit_amount > 0)
+            .filter((b: any) => b.limit_amount > 0 && !jarNames.includes(b.category_name.toLowerCase()))
             .map((b: any) => ({
               name: b.category_name,
               emoji: b.category_icon || '💰',
@@ -112,117 +134,290 @@ export default function BudgetManager() {
           <p className="text-xs text-theme-text-muted mt-1 font-medium">Lên kế hoạch chi tiêu thông minh theo quy tắc 6 lọ.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowGuide(!showGuide)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-theme-text-muted hover:bg-white/10 transition-all">
+          <button onClick={() => setShowGuide(!showGuide)} className="p-2 rounded-xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] text-theme-text-muted hover:bg-[var(--theme-bg-surface)] transition-all">
             <HelpCircle className="w-5 h-5" />
-          </button>
-          <button 
-            onClick={handleAI} 
-            disabled={aiLoading} 
-            className="px-4 py-2 rounded-xl bg-primary-500/10 text-primary-400 text-xs font-black uppercase tracking-widest hover:bg-primary-500/20 transition-all flex items-center gap-2"
-          >
-            {aiLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <BrainCircuit className="w-3.5 h-3.5" />}
-            AI Gợi ý
           </button>
         </div>
       </div>
 
+
+      {/* --- STATUS BANNER --- */}
+      <AnimatePresence>
+        {unallocated === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="mb-8 p-6 rounded-[2rem] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between shadow-lg shadow-emerald-500/5"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+                <CheckCircle2 className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest">Phân bổ hoàn hảo!</h3>
+                <p className="text-xs text-theme-text-muted">Kế hoạch của bạn đã sẵn sàng để lưu lại.</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-black text-emerald-400">100%</p>
+              <p className="text-[10px] text-theme-text-muted uppercase tracking-widest">= 100% ✓</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- INSTRUCTIONS (Ghi chú/Hướng dẫn) --- */}
       <AnimatePresence>
         {showGuide && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-            <div className="p-6 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 shadow-xl mb-6 relative group">
-              <div className="absolute -top-10 -left-10 w-40 h-40 bg-indigo-500/10 blur-[50px] rounded-full pointer-events-none" />
-              <div className="flex items-start gap-4 relative z-10">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
-                  <Info className="w-6 h-6 text-white" />
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-8 overflow-hidden"
+          >
+            <div className="glass-panel p-8 rounded-[2.5rem] border border-primary-500/20 bg-primary-500/5 relative">
+              <button onClick={() => setShowGuide(false)} className="absolute top-6 right-6 p-2 text-theme-text-muted hover:text-theme-text-primary transition-all">
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-sm font-black text-primary-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                <HelpCircle className="w-5 h-5" /> Hướng dẫn thiết lập
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="space-y-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center text-primary-400 font-black">1</div>
+                  <p className="text-xs font-bold text-theme-text-primary">Kiểm tra thu nhập</p>
+                  <p className="text-[11px] text-theme-text-muted leading-relaxed">Đảm bảo thu nhập tháng của bạn đã chính xác để hệ thống tính toán khả dụng.</p>
                 </div>
-                <div className="space-y-4">
-                  <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
-                    Chào bạn, hãy để Nova giúp bạn lập kế hoạch!
-                    <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-1">
-                      <div className="text-indigo-400 font-black text-[9px] uppercase tracking-widest">Bước 1: Thu nhập</div>
-                      <p className="text-[11px] text-theme-text-muted leading-relaxed">Nova lấy thu nhập thực tế của bạn và trừ đi các chi phí cố định (nhà, điện...).</p>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-indigo-400 font-black text-[9px] uppercase tracking-widest">Bước 2: Chia lọ</div>
-                      <p className="text-[11px] text-theme-text-muted leading-relaxed">Dùng thanh trượt bên phải để chia % cho từng mục tiêu (Ăn uống, Tiết kiệm...).</p>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-indigo-400 font-black text-[9px] uppercase tracking-widest">Bước 3: Lưu lại</div>
-                      <p className="text-[11px] text-theme-text-muted leading-relaxed">Nhấn <span className="text-white font-bold">Lưu</span> để hệ thống theo dõi giúp bạn trên Dashboard.</p>
-                    </div>
-                  </div>
+                <div className="space-y-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center text-primary-400 font-black">2</div>
+                  <p className="text-xs font-bold text-theme-text-primary">Trừ phí cố định</p>
+                  <p className="text-[11px] text-theme-text-muted leading-relaxed">Hệ thống sẽ tự động trừ các khoản chi phí cứng (thuê nhà, điện nước...) trước khi chia lọ.</p>
                 </div>
-                <button onClick={() => setShowGuide(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X className="w-5 h-5 text-theme-text-muted" /></button>
+                <div className="space-y-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center text-primary-400 font-black">3</div>
+                  <p className="text-xs font-bold text-theme-text-primary">Chia lọ thông minh</p>
+                  <p className="text-[11px] text-theme-text-muted leading-relaxed">Kéo các thanh trượt bên dưới sao cho tổng phân bổ đạt đúng 100%.</p>
+                </div>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-4 space-y-4">
-          <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-emerald-500/5 to-transparent relative overflow-hidden">
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-theme-text-muted mb-1">Ngân sách khả dụng</p>
-            <h2 className="text-3xl font-black text-emerald-400 tracking-tighter">{fmtVND(available)}</h2>
-            <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-              <div className="flex justify-between text-[11px] font-medium">
-                <span className="text-theme-text-muted">Tổng thu nhập:</span>
-                <span className="text-theme-text-primary">{fmtVND(income)}</span>
-              </div>
-              <div className="flex justify-between text-[11px] font-medium">
-                <span className="text-theme-text-muted">Phí cố định:</span>
-                <span className="text-rose-400">-{fmtVND(totalFixed)}</span>
-              </div>
+      {/* --- SECTION 1: INCOME & FIXED (AREA 1) --- */}
+      <div className="glass-panel p-8 rounded-[2.5rem] border border-[var(--theme-subtle-border)]  relative overflow-hidden shadow-2xl">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500/0 via-cyan-500/50 to-cyan-500/0" />
+        
+        <div className="flex items-center gap-2 mb-8">
+          <div className="p-1.5 bg-cyan-500/20 rounded-lg">
+            <Banknote className="w-4 h-4 text-cyan-400" />
+          </div>
+          <h2 className="text-xs font-black text-theme-text-primary uppercase tracking-[0.2em]">KHU VỰC 1 - THU NHẬP & PHÍ CỐ ĐỊNH</h2>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          {/* Total Income */}
+          <div className="lg:col-span-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-theme-text-muted mb-2">Tổng thu nhập / tháng</p>
+            <h3 className="text-4xl font-black text-theme-text-primary tracking-tighter">
+              {fmtVND(income)}
+            </h3>
+          </div>
+
+          {/* Fixed Expenses List */}
+          <div className="lg:col-span-5 border-l border-r border-[var(--theme-subtle-border)] px-8">
+            <p className="text-[10px] font-black uppercase tracking-widest text-rose-400 flex items-center gap-2 mb-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" /> Phí cố định (Đã khóa)
+            </p>
+            <div className="space-y-2.5 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+              {fixedExpenses.length === 0 ? (
+                <p className="text-xs text-theme-text-muted italic">Chưa có khoản cố định nào</p>
+              ) : (
+                fixedExpenses.map((exp, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs py-0.5">
+                    <div className="flex items-center gap-3 text-theme-text-muted font-bold">
+                      <IconRenderer iconName={exp.emoji} className="w-4 h-4 text-theme-text-muted/70" /> 
+                      {exp.name}
+                    </div>
+                    <span className="font-black text-rose-400">-{fmtVND(exp.amount)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="mt-4 pt-3 border-t border-[var(--theme-subtle-border)] flex justify-between text-xs font-black">
+              <span className="text-theme-text-muted uppercase tracking-widest text-[9px]">Tổng phí cố định</span>
+              <span className="text-rose-400">-{fmtVND(totalFixed)}</span>
             </div>
           </div>
 
-          <div className="glass-panel p-6 rounded-3xl border border-white/5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-theme-text-primary flex items-center gap-2">
-                <Target className="w-3.5 h-3.5 text-primary-400" /> Chi tiết cố định
-              </h3>
-              <Link to="/app/profile?tab=expenses" className="text-[9px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 uppercase">
-                Chỉnh sửa <ExternalLink className="w-3 h-3" />
+          {/* Available Budget */}
+          <div className="lg:col-span-4 text-right flex flex-col justify-center">
+            <p className="text-[10px] font-black uppercase tracking-widest text-cyan-400 flex items-center justify-end gap-2 mb-2">
+               Số tiền khả dụng để chia lọ <Info className="w-3.5 h-3.5" />
+            </p>
+            <h3 className="text-4xl font-black text-cyan-400 tracking-tighter drop-shadow-[0_0_20px_rgba(34,211,238,0.4)]">
+              {fmtVND(available)}
+            </h3>
+            <p className="text-[10px] text-theme-text-muted font-bold tracking-tight mt-1">
+              ={fmtVND(income)} - {fmtVND(totalFixed)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* --- LEFT COLUMN: SLIDERS (AREA 3) --- */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="glass-panel p-8 rounded-[2.5rem] border border-[var(--theme-subtle-border)]  shadow-2xl relative">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-xs font-black text-theme-text-primary uppercase tracking-[0.2em] flex items-center gap-2">
+                  <div className="p-1.5 bg-primary-500/20 rounded-lg">
+                    <PieIcon className="w-4 h-4 text-primary-400" />
+                  </div>
+                  KHU VỰC 3 - Điều chỉnh Lọ Chi Tiêu
+                </h2>
+                <p className="text-[10px] text-theme-text-muted font-bold pl-9">Kéo tự do • Quỹ dự theo dõi phía trên</p>
+              </div>
+              <Link 
+                to="/app/profile?tab=expenses" 
+                className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-subtle-bg)] hover:bg-[var(--theme-bg-surface)] border border-[var(--theme-subtle-border)] rounded-xl text-[10px] font-black text-theme-text-muted transition-all uppercase tracking-widest"
+              >
+                <PlusCircle className="w-3.5 h-3.5" /> Thêm lọ
               </Link>
             </div>
-            <div className="space-y-2">
-              {fixedExpenses.map((exp, i) => (
-                <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.03] text-xs">
-                  <span className="font-bold text-theme-text-muted">{exp.emoji} {exp.name}</span>
-                  <span className="font-black text-theme-text-primary">{fmtVND(exp.amount)}</span>
-                </div>
-              ))}
-            </div>
+            
+            <LinkedSliders jars={jars} totalBudget={available} onJarsChange={setJars} formatCurrency={fmtVND} />
           </div>
         </div>
 
-        {/* Sliders - Compact and Balanced */}
-        <div className="lg:col-span-8 glass-panel p-8 rounded-[2.5rem] border border-white/5 shadow-2xl relative">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-lg font-black text-theme-text-primary tracking-tight">Phân bổ dòng tiền</h2>
-            <div className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${unallocated === 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10' : 'bg-amber-500/10 text-amber-400 border border-amber-500/10'}`}>
-              {unallocated === 0 ? 'Hoàn tất' : `Còn ${unallocated}%`}
+        {/* --- RIGHT COLUMN: VISUALIZATION & AI (AREA 2) --- */}
+        <div className="lg:col-span-5 space-y-6">
+          <div className="flex flex-col gap-6">
+            {/* AI Button - Large & Gradient (Matches Ref 2) */}
+            <div className="flex flex-col gap-4">
+              <h2 className="text-xs font-black text-theme-text-primary uppercase tracking-[0.2em] px-2">KHU VỰC 2 - AI Gợi ý & Phân bổ</h2>
+              <button 
+                onClick={handleAI} 
+                disabled={aiLoading} 
+                className="w-full py-5 rounded-[2rem] bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 text-white text-sm font-black uppercase tracking-[0.25em] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] active:scale-[0.98] transition-all flex items-center justify-center gap-4 shadow-xl relative group overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-[var(--theme-bg-surface)] translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                {aiLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <BrainCircuit className="w-5 h-5" />}
+                AI Gợi ý Phân bổ ✨
+              </button>
+              <p className="text-[10px] text-theme-text-muted font-bold text-center px-4 -mt-2 uppercase tracking-widest">Phân bổ tối ưu trên {fmtVND(available)} khả dụng</p>
             </div>
-          </div>
-          
-          <LinkedSliders jars={jars} totalBudget={available} onJarsChange={setJars} formatCurrency={fmtVND} />
-          
-          <div className="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-[10px] text-theme-text-muted font-medium max-w-[300px]">Thiết lập sẽ được áp dụng ngay lập tức cho trang Tổng quan.</p>
-            <button 
-              onClick={handleSave} 
-              disabled={unallocated !== 0} 
-              className={`px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all ${
-                unallocated === 0 
-                  ? 'bg-gradient-to-r from-primary-500 to-indigo-600 text-white shadow-lg shadow-primary-500/20 hover:scale-105 active:scale-95' 
-                  : 'bg-white/5 text-white/10 cursor-not-allowed'
-              }`}
-            >
-              Lưu Ngân Sách
-            </button>
+
+            {/* CARD 1: Pie Chart + Legend (Matches Ref 10 & 11) */}
+            <div className="glass-panel p-8 rounded-[3rem] border border-[var(--theme-subtle-border)]  relative shadow-2xl overflow-hidden">
+              <div className="absolute -right-10 -top-10 w-32 h-32 bg-cyan-500/10 blur-[50px] rounded-full" />
+              <h2 className="text-[10px] font-black text-theme-text-muted uppercase tracking-[0.4em] mb-10">BIỂU ĐỒ PHÂN BỔ</h2>
+              
+              <div className="h-[240px] relative mb-12">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={jars.map(j => ({ name: j.name, value: j.percentage, color: j.color, neonColor: j.neonColor }))}
+                      innerRadius={82}
+                      outerRadius={105}
+                      paddingAngle={2}
+                      dataKey="value"
+                      animationDuration={1500}
+                      stroke="none"
+                    >
+                      {jars.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.neonColor || entry.color} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-[var(--theme-bg-surface)] border border-[var(--theme-subtle-border)] p-3 rounded-2xl shadow-2xl backdrop-blur-xl">
+                              <p className="text-xs font-black text-theme-text-primary mb-1">{data.name}</p>
+                              <p className="text-[10px] text-theme-text-muted font-bold uppercase tracking-widest">
+                                {data.value}% = {fmtVND(Math.round(available * (data.value / 100)))}
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-5xl font-black text-theme-text-primary tracking-tighter">{100 - unallocated}%</span>
+                  <span className="text-[10px] font-black uppercase text-cyan-400 tracking-[0.4em] mt-2">
+                    {unallocated === 0 ? 'Hoàn hảo' : 'Chưa đủ'}
+                  </span>
+                </div>
+              </div>
+
+              {/* THE LEGEND (Ghi chú dưới biểu đồ - Matches Ref 10 & 11) */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-2">
+                {jars.map(j => (
+                  <div key={j.id} className="flex items-center gap-2.5 group">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all group-hover:scale-125" style={{ backgroundColor: j.neonColor || j.color, boxShadow: `0 0 12px ${j.neonColor || j.color}60` }} />
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <IconRenderer iconName={j.emoji} className="w-3.5 h-3.5 text-theme-text-muted/60 group-hover:text-theme-text-primary" />
+                      <span className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest truncate group-hover:text-theme-text-primary transition-colors">{j.name}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CARD 2: Detailed Summary List (Matches Ref 12) */}
+            <div className="glass-panel p-8 rounded-[3rem] border border-[var(--theme-subtle-border)]  shadow-xl">
+              <div className="space-y-5">
+                {jars.map(j => (
+                  <div key={j.id} className="flex items-center justify-between group py-0.5">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-2xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] flex items-center justify-center group-hover:bg-[var(--theme-bg-surface)] transition-all">
+                        <IconRenderer iconName={j.emoji} className="w-5 h-5 text-theme-text-muted" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] text-theme-text-primary font-black uppercase tracking-widest">{j.name}</span>
+                        <span className="text-[9px] text-theme-text-muted font-bold">{j.description}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-black text-theme-text-primary mr-4 tracking-tight">{fmtVND(Math.round(available * (j.percentage / 100)))}</span>
+                      <span className="text-[11px] font-black text-primary-400 bg-primary-500/10 px-2 py-1 rounded-xl border border-primary-500/10">{j.percentage}%</span>
+                    </div>
+                  </div>
+                ))}
+                
+                <div className="pt-10 mt-2 border-t border-[var(--theme-subtle-border)]">
+                  <div className="flex justify-between items-center px-2 mb-6">
+                    <div>
+                      <p className="text-[9px] text-theme-text-muted font-black uppercase tracking-[0.3em] mb-1">Tổng ngân sách chia lọ</p>
+                      <p className="text-3xl font-black text-theme-text-primary tracking-tighter drop-shadow-sm">{fmtVND(available)}</p>
+                    </div>
+                  </div>
+                  
+                  <p className="text-[10px] text-emerald-400/80 italic mb-4 px-2 text-center font-bold">
+                    💡 Lưu ý: Hệ thống sẽ lưu % các lọ này để AI theo dõi chi tiêu. (Sẽ không cộng vào Chi phí cố định)
+                  </p>
+                  
+                  <button 
+                    onClick={handleSave} 
+                    disabled={unallocated !== 0} 
+                    className={`w-full py-5 rounded-[2rem] flex items-center justify-center gap-3 text-[14px] font-black uppercase tracking-[0.3em] transition-all relative overflow-hidden group/save shadow-2xl ${
+                      unallocated === 0 
+                        ? 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 text-white hover:scale-[1.02] active:scale-[0.98]' 
+                        : 'bg-[var(--theme-subtle-bg)] text-white/10 cursor-not-allowed'
+                    }`}
+                  >
+                    Lưu Ngân Sách <Lucide.ChevronRight className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

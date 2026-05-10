@@ -7,7 +7,7 @@ import {
   Menu, ChevronLeft, User, Settings, HelpCircle, History, ExternalLink,
   ChevronDown, Search, Share2, Image as ImageIcon, AlertTriangle
 } from 'lucide-react';
-import { aiApi } from '../../utils/api';
+import { aiApi, API_ROOT } from '../../utils/api';
 import authStore from '../../store/authStore';
 import { useTheme } from '../../store/themeStore';
 
@@ -26,6 +26,30 @@ interface ChatSession {
   ngay_cap_nhat: string;
 }
 
+// ─── Voice Visualizer Animation ──────────────────────────────────────────────
+function VoiceVisualizer() {
+  return (
+    <div className="flex items-center gap-1 h-6 px-1">
+      {[0.4, 0.7, 0.5, 0.9, 0.6, 0.8, 0.5].map((scale, i) => (
+        <motion.div
+          key={i}
+          className="w-1 bg-primary-500 rounded-full"
+          animate={{
+            height: [10, 24, 10],
+            opacity: [0.5, 1, 0.5]
+          }}
+          transition={{
+            duration: 0.5 + Math.random() * 0.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: i * 0.1
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -33,13 +57,12 @@ export default function Chatbot() {
   const [isScanning, setIsScanning] = useState(false);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [isListening, setIsListening] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [appTheme, setAppTheme] = useTheme();
-  const activeTheme = appTheme === 'light-tech' ? 'light' : 'dark';
+  const activeTheme = ['light-tech', 'sakura', 'ocean'].includes(appTheme) ? 'light' : 'dark';
   const [primaryColor, setPrimaryColor] = useState(localStorage.getItem('nova_primary_color') || '#38bdf8');
   
   const user = authStore.getUser();
@@ -168,28 +191,13 @@ export default function Chatbot() {
 
   return (
     <div className={`flex h-full w-full overflow-hidden bg-transparent`}>
-      {/* Settings Modal */}
-      <AnimatePresence>
-        {showSettings && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSettings(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className={`relative w-full max-w-md p-8 rounded-[2rem] shadow-2xl ${activeTheme === 'dark' ? 'bg-[#1e1f20] border border-white/10' : 'bg-white border border-slate-200'}`}>
-               <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Settings className="w-5 h-5 text-primary-400" /> Cài đặt Nova</h3>
-               <button onClick={() => setAppTheme(activeTheme === 'dark' ? 'light-tech' : 'cyberpunk')} className="w-full py-4 rounded-xl bg-primary-500/10 border border-primary-500/20 text-primary-400 font-bold mb-4">
-                 Chuyển sang Chế độ {activeTheme === 'dark' ? 'Sáng' : 'Tối'}
-               </button>
-               <button onClick={() => setShowSettings(false)} className="w-full py-4 rounded-xl bg-primary-500 text-white font-bold">Lưu & Đóng</button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Sidebar - CỐ ĐỊNH CHIỀU CAO (h-full) */}
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.aside 
             initial={{ width: 0 }} animate={{ width: 320 }} exit={{ width: 0 }}
-            className={`h-full flex flex-col shrink-0 border-r border-white/5 relative z-20 ${activeTheme === 'dark' ? 'bg-theme-bg-panel/80' : 'bg-white shadow-xl'}`}
+            className={`h-full flex flex-col shrink-0 border-r border-[var(--theme-subtle-border)] relative z-20 ${activeTheme === 'dark' ? 'bg-theme-bg-panel/80' : 'bg-white shadow-xl'}`}
           >
             <div className="flex flex-col h-full w-[320px]">
               <div className="p-4 shrink-0">
@@ -200,18 +208,18 @@ export default function Chatbot() {
               
               <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-4">
                 {sessions.map(s => (
-                  <button key={s.id} onClick={() => loadSession(s.id)} className={`w-full text-left px-4 py-3 rounded-xl mb-1 text-sm transition-all ${currentSessionId === s.id ? 'bg-primary-500/20 text-primary-400 font-bold' : 'text-theme-text-muted hover:bg-white/5'}`}>
+                  <button key={s.id} onClick={() => loadSession(s.id)} className={`w-full text-left px-4 py-3 rounded-xl mb-1 text-sm transition-all ${currentSessionId === s.id ? 'bg-primary-500/20 text-primary-400 font-bold' : 'text-theme-text-muted hover:bg-[var(--theme-subtle-bg)]'}`}>
                     <div className="flex items-center gap-3"><MessageSquare className="w-4 h-4 opacity-40" /> <span className="truncate">{s.tieu_de}</span></div>
                   </button>
                 ))}
               </div>
 
-              {/* FOOTER SIDEBAR LUÔN Ở ĐÁY */}
-              <div className="p-4 shrink-0 border-t border-white/5">
-                <button onClick={() => setShowSettings(true)} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all group">
-                  <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center text-primary-400 group-hover:scale-110 transition-transform"><Settings className="w-5 h-5" /></div>
-                  <span className="font-bold text-sm text-theme-text-primary">Cài đặt Nova</span>
-                </button>
+              {/* FOOTER SIDEBAR - Cảnh báo hoặc trợ giúp nếu cần */}
+              <div className="p-4 shrink-0 border-t border-[var(--theme-subtle-border)]">
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10 text-[10px] text-orange-400 font-bold uppercase tracking-wider">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Lịch sử chat sẽ được lưu tự động
+                </div>
               </div>
             </div>
           </motion.aside>
@@ -220,8 +228,8 @@ export default function Chatbot() {
 
       {/* Chat Area - CỐ ĐỊNH CHIỀU CAO (h-full) */}
       <div className="flex-1 flex flex-col h-full relative overflow-hidden">
-        <header className="shrink-0 h-16 border-b border-white/5 flex items-center px-6 gap-4 bg-transparent backdrop-blur-md z-30">
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-white/5 rounded-full"><Menu className="w-6 h-6" /></button>
+        <header className="shrink-0 h-16 border-b border-[var(--theme-subtle-border)] flex items-center px-6 gap-4 bg-transparent backdrop-blur-md z-30">
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-[var(--theme-subtle-bg)] rounded-full"><Menu className="w-6 h-6" /></button>
           <span className="font-bold text-lg">Nova AI</span>
         </header>
 
@@ -229,8 +237,18 @@ export default function Chatbot() {
           <div className="max-w-3xl mx-auto space-y-8 py-4">
             {messages.map(m => (
               <div key={m.id} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center ${m.role === 'assistant' ? 'bg-primary-500 text-white' : 'bg-white/10'}`}>
-                  {m.role === 'assistant' ? <Bot className="w-6 h-6" /> : <User className="w-5 h-5" />}
+                <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center overflow-hidden ${m.role === 'assistant' ? 'bg-primary-500 text-white' : 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white font-bold border border-white/10'}`}>
+                  {m.role === 'assistant' ? (
+                    <Bot className="w-6 h-6" />
+                  ) : user?.avatar_url ? (
+                    <img 
+                      src={user.avatar_url.startsWith('http') ? user.avatar_url : `${API_ROOT}${user.avatar_url}`} 
+                      alt={user.full_name} 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <span className="text-sm">{user?.full_name?.charAt(0) || 'U'}</span>
+                  )}
                 </div>
                 <div className={`max-w-[80%] ${m.role === 'user' ? 'text-right' : ''}`}>
                   <div className={`inline-block px-5 py-3 rounded-2xl text-[15px] font-medium leading-relaxed ${m.role === 'user' ? 'bg-primary-500 text-white shadow-lg' : 'text-theme-text-primary'}`}>{m.content}</div>
@@ -245,16 +263,43 @@ export default function Chatbot() {
         {/* INPUT AREA LUÔN Ở ĐÁY CỦA VIEWPORT */}
         <div className="shrink-0 p-6 bg-gradient-to-t from-theme-bg-deep to-transparent">
           <div className="max-w-3xl mx-auto">
-            <div className={`flex items-end gap-2 p-2 rounded-[2rem] border transition-all shadow-2xl ${activeTheme === 'dark' ? 'bg-[#1e1f20] border-white/10 focus-within:border-primary-500/40' : 'bg-white border-slate-200'}`}>
-              <button onClick={() => fileInputRef.current?.click()} className="p-3.5 hover:bg-white/5 rounded-2xl transition-colors"><Camera className="w-6 h-6 text-theme-text-muted" /></button>
+            <div className={`flex items-end gap-2 p-2 rounded-[2rem] border transition-all shadow-2xl ${activeTheme === 'dark' ? 'bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] focus-within:border-primary-500/40' : 'bg-[var(--theme-bg-surface)] border-[var(--theme-border)]'}`}>
+              <button onClick={() => fileInputRef.current?.click()} className="p-3.5 hover:bg-[var(--theme-subtle-bg)] rounded-2xl transition-colors"><Camera className="w-6 h-6 text-theme-text-muted" /></button>
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-              <textarea
-                ref={textareaRef} rows={1} value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendText(); } }}
-                placeholder="Hỏi Nova về chi tiêu của bạn..."
-                className="flex-1 bg-transparent border-none outline-none py-3.5 px-2 text-[16px] font-medium text-theme-text-primary resize-none max-h-40"
-              />
+              <div className="flex-1 relative flex items-center min-h-[52px]">
+                <AnimatePresence mode="wait">
+                  {isListening ? (
+                    <motion.div 
+                      key="listening"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="flex items-center gap-4 px-4 w-full"
+                    >
+                      <VoiceVisualizer />
+                      <span className="text-sm font-bold text-primary-400 animate-pulse uppercase tracking-widest">Đang lắng nghe...</span>
+                    </motion.div>
+                  ) : (
+                    <motion.textarea
+                      key="input"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      ref={textareaRef} rows={1} value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendText(); } }}
+                      placeholder="Hỏi Nova về chi tiêu của bạn..."
+                      className="w-full bg-transparent border-none outline-none py-3.5 px-2 text-[16px] font-medium text-theme-text-primary resize-none max-h-40"
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
+              <button 
+                onClick={startVoiceRecognition} 
+                className={`p-3.5 rounded-2xl transition-all ${isListening ? 'bg-rose-500 text-white animate-pulse' : 'hover:bg-[var(--theme-subtle-bg)] text-theme-text-muted'}`}
+              >
+                <Mic className="w-6 h-6" />
+              </button>
               <button onClick={handleSendText} disabled={!input.trim()} className={`p-3.5 rounded-2xl transition-all ${input.trim() ? 'bg-primary-500 text-white shadow-lg' : 'opacity-20'}`}><Send className="w-6 h-6" /></button>
             </div>
           </div>

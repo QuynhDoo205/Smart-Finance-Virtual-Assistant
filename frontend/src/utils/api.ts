@@ -1,4 +1,14 @@
-const BASE_URL = 'http://localhost:5001/api';
+const getApiRoot = () => {
+  // Nếu đang chạy trên máy cá nhân (localhost)
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5001';
+  }
+  // Nếu đang chạy trên link Cloudflare hoặc link khác
+  return import.meta.env.VITE_API_URL || 'http://localhost:5001';
+};
+
+export const API_ROOT = getApiRoot();
+export const BASE_URL = `${API_ROOT}/api`;
 
 function getToken(): string | null {
   return localStorage.getItem('nova_token');
@@ -14,6 +24,7 @@ async function apiFetch<T>(
   
   const headers: Record<string, string> = {
     ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
+    'ngrok-skip-browser-warning': '69420',
     ...(options.headers as Record<string, string> || {}),
   };
   
@@ -229,6 +240,19 @@ export const incomeApi = {
   deleteSource: (id: number) =>
     apiFetch<{ success: boolean; message: string }>(`/income/sources/${id}`, {
       method: 'DELETE',
+    }),
+
+  updateSource: (id: number, data: {
+    name: string;
+    type: 'fixed' | 'variable' | 'scheduled';
+    category: 'salary' | 'allowance' | 'other';
+    expectedAmount?: number;
+    hourlyRate?: number;
+    schedule?: number[];
+  }) =>
+    apiFetch<{ success: boolean; data: { source: IncomeSourceRecord } }>(`/income/sources/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
 };
 

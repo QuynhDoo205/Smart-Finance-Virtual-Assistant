@@ -182,7 +182,7 @@ export default function Badges() {
               className={`relative overflow-hidden rounded-[2rem] p-1 transition-all duration-300 group ${
                 badge.unlocked 
                   ? 'bg-gradient-to-br border-transparent' 
-                  : 'bg-gray-800 border border-white/5 opacity-80 hover:opacity-100'
+                  : 'bg-gray-800 border border-[var(--theme-subtle-border)] opacity-80 hover:opacity-100'
               }`}
             >
               {badge.unlocked && (
@@ -190,14 +190,14 @@ export default function Badges() {
               )}
               
               <div className={`relative h-full flex flex-col items-center text-center p-8 rounded-[1.9rem] ${
-                badge.unlocked ? 'bg-[#0F172A]/90 backdrop-blur-xl border border-white/10' : 'bg-[#111827]'
+                badge.unlocked ? 'bg-[#0F172A]/90 backdrop-blur-xl border border-[var(--theme-subtle-border)]' : 'bg-[#111827]'
               }`}>
                 
                 {/* Icon Container */}
                 <div className={`w-24 h-24 mb-6 rounded-[2rem] flex items-center justify-center relative ${
                   badge.unlocked 
                     ? `bg-gradient-to-br ${badge.color} shadow-lg rotate-3 group-hover:rotate-0 transition-transform duration-300` 
-                    : 'bg-gray-800 border border-white/5 grayscale'
+                    : 'bg-gray-800 border border-[var(--theme-subtle-border)] grayscale'
                 }`}>
                   <div className="text-theme-text-primary">
                     {badge.unlocked ? badge.icon : <Lock className="w-8 h-8 text-theme-text-muted" />}
@@ -211,7 +211,7 @@ export default function Badges() {
 
                 <div className="space-y-2 relative z-10 w-full">
                   <span className={`text-[10px] uppercase font-black tracking-widest px-3 py-1 rounded-full ${
-                    badge.unlocked ? 'bg-white/10 text-theme-text-primary' : 'bg-gray-800 text-theme-text-muted'
+                    badge.unlocked ? 'bg-[var(--theme-bg-surface)] text-theme-text-primary' : 'bg-gray-800 text-theme-text-muted'
                   }`}>
                     {badge.rarity}
                   </span>
@@ -225,7 +225,7 @@ export default function Badges() {
 
                 {/* Status indicator */}
                 {!badge.unlocked && (
-                  <div className="mt-6 pt-4 border-t border-white/5 w-full">
+                  <div className="mt-6 pt-4 border-t border-[var(--theme-subtle-border)] w-full">
                     <p className="text-xs text-amber-500/80 font-medium flex items-center justify-center gap-1">
                       <Lock className="w-3 h-3" /> Yêu cầu chưa đạt
                     </p>

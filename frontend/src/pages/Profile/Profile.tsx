@@ -5,7 +5,7 @@ import {
   Plus, Pencil, Trash2, X, Check, AlertTriangle, DollarSign,
   FileText, Tag, TrendingDown, Mail, Loader2
 } from 'lucide-react';
-import { userApi, dashboardApi } from '../../utils/api';
+import { userApi, dashboardApi, incomeApi, API_ROOT } from '../../utils/api';
 import authStore from '../../store/authStore';
 import { useSearchParams } from 'react-router-dom';
 
@@ -29,6 +29,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Học tập':  'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
   'Bảo hiểm': 'text-rose-400 bg-rose-500/10 border-rose-500/20',
   'Khác':     'text-theme-text-muted bg-gray-500/10 border-gray-500/20',
+  '🔒 Nguồn thu cố định': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
 };
 
 // ─── ExpenseModal (Add / Edit) ────────────────────────────────────────────────
@@ -71,7 +72,7 @@ function ExpenseModal({ initial, onSave, onClose }: ModalProps) {
         animate={{ scale: 1, y: 0, opacity: 1 }}
         exit={{ scale: 0.93, y: 20, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 340, damping: 28 }}
-        className="w-full max-w-md relative rounded-2xl overflow-hidden"
+        className="w-full max-w-md relative rounded-2xl overflow-hidden max-h-[90vh] flex flex-col"
         style={{
           background: 'rgba(5,13,26,0.95)',
           border: '1px solid rgba(255,255,255,0.08)',
@@ -82,23 +83,23 @@ function ExpenseModal({ initial, onSave, onClose }: ModalProps) {
         {/* Top accent */}
         <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-400 to-transparent" />
 
-        <div className="p-6">
+        <div className="p-5 flex flex-col h-full overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-400/20 flex items-center justify-center">
                 <TrendingDown className="w-5 h-5 text-indigo-400" />
               </div>
-              <h2 className="text-lg font-bold text-theme-text-primary">
-                {isEditing ? 'Chỉnh sửa Chi phí' : 'Thêm Chi phí Cố định'}
+              <h2 className="text-base font-bold text-theme-text-primary">
+                {isEditing ? 'Chỉnh sửa Chi phí' : 'Thêm Chi phí'}
               </h2>
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl text-theme-text-muted hover:text-theme-text-primary hover:bg-white/5 transition-colors">
+            <button onClick={onClose} className="p-2 rounded-xl text-theme-text-muted hover:text-theme-text-primary hover:bg-[var(--theme-subtle-bg)] transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto px-1 custom-scrollbar flex-1 pb-4 -mx-1">
             {/* Name */}
             <div>
               <label className="text-[11px] font-bold text-theme-text-muted uppercase tracking-widest block mb-1.5">Tên khoản phí</label>
@@ -148,7 +149,7 @@ function ExpenseModal({ initial, onSave, onClose }: ModalProps) {
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
                       category === cat
                         ? CATEGORY_COLORS[cat] ?? 'text-theme-text-primary bg-indigo-500/20 border-indigo-500/30'
-                        : 'text-theme-text-muted border-white/5 hover:text-theme-text-muted hover:border-white/10'
+                        : 'text-theme-text-muted border-[var(--theme-subtle-border)] hover:text-theme-text-muted hover:border-[var(--theme-subtle-border)]'
                     }`}
                     style={{ background: category === cat ? undefined : 'rgba(6,20,40,0.6)' }}
                   >
@@ -158,27 +159,25 @@ function ExpenseModal({ initial, onSave, onClose }: ModalProps) {
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button" onClick={onClose}
-                className="flex-1 py-3 rounded-xl border border-white/8 text-theme-text-muted hover:text-theme-text-primary hover:border-white/15 transition-colors text-sm font-medium"
-                style={{ background: 'rgba(6,20,40,0.5)' }}
-              >
-                Hủy
-              </button>
-              <motion.button
-                type="submit"
-                whileHover={{ scale: 1.02, boxShadow: '0 0 28px rgba(99,102,241,0.55)' }}
-                whileTap={{ scale: 0.97 }}
-                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-theme-text-primary font-bold text-sm flex items-center justify-center gap-2"
-                style={{ boxShadow: '0 0 20px rgba(99,102,241,0.35)' }}
-              >
-                <Check className="w-4 h-4" />
-                {isEditing ? 'Lưu thay đổi' : 'Thêm khoản phí'}
-              </motion.button>
-            </div>
           </form>
+          
+          <div className="flex items-center gap-3 pt-4 border-t border-[var(--theme-subtle-border)] shrink-0">
+            <button
+              type="button" onClick={onClose}
+              className="flex-1 px-4 py-2.5 rounded-xl text-theme-text-muted font-bold hover:bg-[var(--theme-subtle-bg)] transition-all border border-[var(--theme-subtle-border)] text-sm"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={(e) => {
+                const form = (e.currentTarget.parentElement?.previousElementSibling as HTMLFormElement);
+                if (form) form.requestSubmit();
+              }}
+              className="flex-[1.5] px-4 py-2.5 rounded-xl bg-indigo-500 text-white font-bold hover:bg-indigo-600 transition-all shadow-[0_0_20px_rgba(99,102,241,0.3)] text-sm"
+            >
+              {isEditing ? 'Cập nhật' : 'Thêm ngay'}
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>
@@ -300,7 +299,7 @@ function ConfirmDeleteAccountModal({ onConfirm, onCancel }: ConfirmDeleteAccount
           <div className="flex gap-3">
             <button
               onClick={onCancel}
-              className="flex-1 py-3.5 rounded-xl border border-white/10 text-theme-text-muted hover:text-theme-text-primary transition-colors text-sm font-bold"
+              className="flex-1 py-3.5 rounded-xl border border-[var(--theme-subtle-border)] text-theme-text-muted hover:text-theme-text-primary transition-colors text-sm font-bold"
               style={{ background: 'rgba(255,255,255,0.03)' }}
             >
               Giữ lại tài khoản
@@ -336,22 +335,40 @@ export default function Profile() {
   const [deleteTarget, setDeleteTarget] = useState<FixedExpense | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load real expenses on mount
+  // Load real expenses on mount - merge budgets + fixed income sources
   useEffect(() => {
     const loadRealData = async () => {
       setIsLoading(true);
       try {
-        const res = await dashboardApi.getBudget();
-        if (res.success) {
-          const mapped = res.data.budgets
-            .filter((b: any) => b.limit_amount > 0)
-            .map((b: any) => ({
-              id: b.id.toString(),
-              name: b.category_name,
-              amount: parseFloat(b.limit_amount),
-              category: b.category_name // Defaulting category to name for sync
-            }));
-          setExpenses(mapped);
+        // Load both budgets and income sources in parallel
+        const [budgetRes, incomeRes, profileRes] = await Promise.all([
+          dashboardApi.getBudget(),
+          incomeApi.getSources(),
+          userApi.getProfile(),
+        ]);
+
+        // Build a map of existing budgets by name (Filtering out the 5 Jars mapped to DB categories)
+        const jarNames = ['ăn uống', 'đầu tư', 'giáo dục', 'giải trí', 'sức khỏe'];
+        const merged: FixedExpense[] = [];
+        
+        if (budgetRes.success) {
+          budgetRes.data.budgets
+            .filter((b: any) => b.limit_amount > 0 && !jarNames.includes(b.category_name.toLowerCase()))
+            .forEach((b: any) => {
+              merged.push({
+                id: `budget-${b.id}`,
+                name: b.category_name,
+                amount: parseFloat(b.limit_amount),
+                category: b.category_name,
+              });
+            });
+        }
+
+        setExpenses(merged);
+
+        // Update user monthly_income from profile if available
+        if (profileRes.success && profileRes.data.monthly_income) {
+          setUser(prev => prev ? { ...prev, monthly_income: profileRes.data.monthly_income } : prev);
         }
       } catch (err) {
         console.error("Failed to load profile budget:", err);
@@ -378,8 +395,15 @@ export default function Profile() {
 
   const handleSave = async (name: string, amount: number, category: string) => {
     let updated: FixedExpense[];
+    const payload: { categoryName: string; amount: number }[] = [];
+
     if (modalData?.id) {
       updated = expenses.map(e => e.id === modalData.id ? { ...e, name, amount, category } : e);
+      // Zero out the old budget if the name was changed
+      const oldItem = expenses.find(e => e.id === modalData.id);
+      if (oldItem && oldItem.name !== name) {
+        payload.push({ categoryName: oldItem.name, amount: 0 });
+      }
     } else {
       updated = [...expenses, { id: Math.random().toString(36).slice(2), name, amount, category }];
     }
@@ -387,11 +411,14 @@ export default function Profile() {
     setExpenses(updated);
     setModalData(null);
 
+    // Add all current expenses to payload
+    updated.forEach(e => payload.push({ categoryName: e.name, amount: e.amount }));
+
     // Persist to Backend
     try {
       await userApi.updateOnboarding(
         user?.monthly_income || 0,
-        updated.map(e => ({ categoryName: e.name, amount: e.amount }))
+        payload
       );
     } catch (err) {
       console.error("Failed to persist expenses:", err);
@@ -400,15 +427,24 @@ export default function Profile() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    
+    const deletedItem = expenses.find(e => e.id === deleteTarget.id);
     const updated = expenses.filter(e => e.id !== deleteTarget.id);
     setExpenses(updated);
     setDeleteTarget(null);
+
+    const payload = updated.map(e => ({ categoryName: e.name, amount: e.amount }));
+    
+    // Crucial: Send the deleted item with amount 0 to zero out its limit in the database
+    if (deletedItem) {
+      payload.push({ categoryName: deletedItem.name, amount: 0 });
+    }
 
     // Persist to Backend
     try {
       await userApi.updateOnboarding(
         user?.monthly_income || 0,
-        updated.map(e => ({ categoryName: e.name, amount: e.amount }))
+        payload
       );
     } catch (err) {
       console.error("Failed to delete expense in backend:", err);
@@ -463,7 +499,7 @@ export default function Profile() {
       {/* ── Hero Card ── */}
       <motion.div variants={itemVars} className="group relative rounded-[2.5rem] overflow-hidden p-px bg-gradient-to-br from-white/10 to-transparent shadow-2xl">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl" />
-        <div className="relative bg-[#0F172A]/90 backdrop-blur-3xl rounded-[2.3rem] p-8 md:p-12 border border-white/5 flex flex-col md:flex-row items-center md:items-start gap-8 overflow-hidden">
+        <div className="relative bg-[var(--theme-bg-panel)] backdrop-blur-3xl rounded-[2.3rem] p-8 md:p-12 border border-[var(--theme-border)] flex flex-col md:flex-row items-center md:items-start gap-8 overflow-hidden">
           <Compass className="absolute -bottom-10 -right-10 w-64 h-64 text-theme-text-primary/[0.02] -rotate-12 group-hover:rotate-12 transition-transform duration-[10s]" />
           <div className="relative group/avatar">
             <div className="w-24 h-24 rounded-[1.5rem] bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 flex items-center justify-center text-4xl font-extrabold text-theme-text-primary shadow-[0_0_30px_rgba(99,102,241,0.3)] transition-all duration-300 group-hover/avatar:scale-105 overflow-hidden">
@@ -471,7 +507,7 @@ export default function Profile() {
                 <Loader2 className="w-8 h-8 animate-spin text-white/50" />
               ) : user?.avatar_url ? (
                 <img 
-                  src={user.avatar_url.startsWith('http') ? user.avatar_url : `http://localhost:5001${user.avatar_url}`} 
+                  src={user.avatar_url.startsWith('http') ? user.avatar_url : `${API_ROOT}${user.avatar_url}`} 
                   alt={user.full_name} 
                   className="w-full h-full object-cover"
                 />
@@ -479,7 +515,7 @@ export default function Profile() {
                 user?.full_name?.charAt(0) || 'U'
               )}
             </div>
-            <label className={`absolute -bottom-2 -right-2 w-8 h-8 bg-[#1E293B] border-2 border-[#0F172A] rounded-full flex items-center justify-center text-theme-text-muted hover:text-theme-text-primary hover:bg-indigo-500 transition-colors cursor-pointer shadow-lg ${avatarLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+            <label className={`absolute -bottom-2 -right-2 w-8 h-8 bg-[var(--theme-bg-surface)] border-2 border-[var(--theme-bg-panel)] rounded-full flex items-center justify-center text-theme-text-muted hover:text-theme-text-primary hover:bg-indigo-500 transition-colors cursor-pointer shadow-lg ${avatarLoading ? 'opacity-50 pointer-events-none' : ''}`}>
               <Pencil className="w-3.5 h-3.5" />
               <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} disabled={avatarLoading} />
             </label>
@@ -525,7 +561,7 @@ export default function Profile() {
               className={`flex items-center gap-3 px-5 py-4 rounded-2xl w-full font-medium transition-all duration-300 text-left whitespace-nowrap ${
                 activeTab === id
                   ? `bg-gradient-to-r ${gradient} text-theme-text-primary`
-                  : 'text-theme-text-muted hover:text-theme-text-primary bg-[#1E293B]/50 hover:bg-[#1E293B] border border-transparent hover:border-white/5'
+                  : 'text-theme-text-muted hover:text-theme-text-primary bg-[var(--theme-bg-surface)] hover:bg-[var(--theme-bg-panel)] border border-transparent hover:border-[var(--theme-subtle-border)]'
               }`}
               style={activeTab === id ? { boxShadow: `0 0 22px ${glow}` } : {}}
             >
@@ -627,24 +663,32 @@ export default function Profile() {
                                 {fmt(exp.amount)}<span className="text-xs font-normal text-theme-text-muted ml-0.5">đ</span>
                               </span>
 
-                              {/* Actions — visible on hover */}
+                              {/* Actions */}
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <motion.button
-                                  whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                                  onClick={() => openEditModal(exp)}
-                                  className="p-2 rounded-lg text-theme-text-muted hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
-                                  title="Chỉnh sửa"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </motion.button>
-                                <motion.button
-                                  whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                                  onClick={() => setDeleteTarget(exp)}
-                                  className="p-2 rounded-lg text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                  title="Xóa"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </motion.button>
+                                {exp.id.startsWith('income-') ? (
+                                  <span className="px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 whitespace-nowrap">
+                                    ✓ Từ Thu nhập
+                                  </span>
+                                ) : (
+                                  <>
+                                    <motion.button
+                                      whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                                      onClick={() => openEditModal(exp)}
+                                      className="p-2 rounded-lg text-theme-text-muted hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
+                                      title="Chỉnh sửa"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </motion.button>
+                                    <motion.button
+                                      whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                                      onClick={() => setDeleteTarget(exp)}
+                                      className="p-2 rounded-lg text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                      title="Xóa"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </motion.button>
+                                  </>
+                                )}
                               </div>
                             </motion.div>
                           </motion.div>
@@ -681,10 +725,10 @@ export default function Profile() {
                   <p className="text-theme-text-muted mb-8 text-sm text-center">Tài khoản của bạn được bảo vệ bằng mã hóa cấp cao. Hãy luôn theo dõi thông tin xác thực bên dưới.</p>
 
                   {/* Authentication Provider Display */}
-                  <div className="mb-8 p-5 rounded-2xl border border-white/5 w-full" style={{ background: 'rgba(15, 23, 42, 0.5)' }}>
+                  <div className="mb-8 p-5 rounded-2xl border border-[var(--theme-subtle-border)] w-full" style={{ background: 'rgba(15, 23, 42, 0.5)' }}>
                      <p className="text-[11px] font-bold text-theme-text-muted uppercase tracking-widest mb-3">Phương thức đăng nhập hiện tại</p>
                      <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)] text-theme-text-primary">
+                       <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] shadow-[0_0_15px_rgba(255,255,255,0.05)] text-theme-text-primary">
                           {userAuth.provider === 'google' ? (
                             <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.2-7.27c3.09 0 4.9 1.97 4.9 1.97L19 4.72S16.56 2 12.1 2C6.42 2 2.03 6.8 2.03 12c0 5.05 4.13 10 10.22 10c5.35 0 9.25-3.67 9.25-9.09c0-1.15-.15-1.81-.15-1.81Z"/></svg>
                           ) : (
@@ -709,7 +753,7 @@ export default function Profile() {
                           <Icon className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${color} pointer-events-none`} />
                           <input
                             type="password"
-                            className="w-full bg-[#0F172A] border border-white/5 rounded-2xl px-4 py-4 pl-12 text-lg text-theme-text-primary placeholder-gray-600 focus:outline-none transition-all font-mono"
+                            className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-subtle-border)] rounded-2xl px-4 py-4 pl-12 text-lg text-theme-text-primary placeholder-gray-600 focus:outline-none transition-all font-mono"
                             placeholder="••••••••"
                             onFocus={e => { e.target.style.borderColor = focus; e.target.style.boxShadow = `0 0 0 3px ${focus}33`; }}
                             onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.05)'; e.target.style.boxShadow = 'none'; }}
@@ -719,7 +763,7 @@ export default function Profile() {
                     ))}
                   </div>
 
-                  <div className="flex justify-end pt-6 border-t border-white/5 w-full">
+                  <div className="flex justify-end pt-6 border-t border-[var(--theme-subtle-border)] w-full">
                     <motion.button
                       whileHover={{ scale: 1.02, boxShadow: '0 0 28px rgba(217,70,239,0.45)' }}
                       whileTap={{ scale: 0.97 }}

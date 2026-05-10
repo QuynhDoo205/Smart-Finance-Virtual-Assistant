@@ -72,7 +72,7 @@ export default function OnboardingSurvey() {
     <div className="flex-1 flex min-h-screen relative bg-[#030712] overflow-hidden">
       
       {/* LEFT SIDE: Visual Data Representation */}
-      <div className="hidden lg:flex w-[45%] relative flex-col justify-center items-center p-12 border-r border-white/5 overflow-hidden">
+      <div className="hidden lg:flex w-[45%] relative flex-col justify-center items-center p-12 border-r border-[var(--theme-subtle-border)] overflow-hidden">
         {/* Animated Background */}
         <div className="absolute inset-0">
           <div className="absolute top-[20%] left-[20%] w-96 h-96 bg-primary-600/10 rounded-full blur-[100px] animate-pulse" />
@@ -86,14 +86,14 @@ export default function OnboardingSurvey() {
           transition={{ duration: 1 }}
           className="relative z-10 w-full max-w-sm flex flex-col items-center"
         >
-          <div className="w-20 h-20 rounded-3xl bg-[#1F2937]/50 border border-white/10 flex items-center justify-center mb-8 shadow-[0_0_50px_rgba(56,189,248,0.2)] backdrop-blur-xl">
+          <div className="w-20 h-20 rounded-3xl bg-[#1F2937]/50 border border-[var(--theme-subtle-border)] flex items-center justify-center mb-8 shadow-[0_0_50px_rgba(56,189,248,0.2)] backdrop-blur-xl">
             <PieChartIcon className="w-10 h-10 text-primary-400" />
           </div>
           <h2 className="text-3xl font-bold text-theme-text-primary mb-2 tracking-tight">Phân tích Real-time</h2>
           <p className="text-theme-text-muted text-center mb-12">Hệ thống đang mô phỏng dòng tiền cố định của bạn.</p>
 
           {/* Dynamic Stacked Bar */}
-          <div className="w-full h-8 rounded-full bg-[#111827] border border-white/5 overflow-hidden flex shadow-inner">
+          <div className="w-full h-8 rounded-full bg-[#111827] border border-[var(--theme-subtle-border)] overflow-hidden flex shadow-inner">
             <AnimatePresence>
               {expenses.map(exp => {
                 const val = Number(exp.amount.replace(/\D/g, '')) || 0;
@@ -127,7 +127,7 @@ export default function OnboardingSurvey() {
           
           <div className="flex items-center gap-2 mb-12">
             <div className="h-1.5 w-12 rounded-full bg-primary-500 shadow-[0_0_10px_rgba(56,189,248,0.5)]" />
-            <div className={`h-1.5 w-12 rounded-full transition-all duration-500 ${step === 2 ? 'bg-primary-500 shadow-[0_0_10px_rgba(56,189,248,0.5)]' : 'bg-white/10'}`} />
+            <div className={`h-1.5 w-12 rounded-full transition-all duration-500 ${step === 2 ? 'bg-primary-500 shadow-[0_0_10px_rgba(56,189,248,0.5)]' : 'bg-[var(--theme-bg-surface)]'}`} />
             <div className="ml-auto flex items-center gap-2 text-primary-400 font-bold text-sm tracking-widest uppercase bg-primary-500/10 px-4 py-1.5 rounded-full border border-primary-500/20">
               <Activity className="w-4 h-4 animate-pulse" />
               Bước {step}/2
@@ -162,8 +162,8 @@ export default function OnboardingSurvey() {
                       {/* Animated Glow Border on Focus-within */}
                       <div className="absolute -inset-[1px] bg-gradient-to-r from-transparent via-primary-500/50 to-transparent rounded-[1.5rem] opacity-0 group-focus-within:opacity-100 transition-opacity duration-500 blur-sm" />
                       
-                      <div className="relative p-3 sm:p-4 rounded-[1.5rem] bg-[#111827] border border-white/5 transition-all duration-300 flex items-center gap-4 hover:bg-[#1F2937]/50 shadow-lg">
-                        <div className={`w-14 h-14 rounded-[1.2rem] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center flex-shrink-0 border border-white/5 shadow-inner`}>
+                      <div className="relative p-3 sm:p-4 rounded-[1.5rem] bg-[#111827] border border-[var(--theme-subtle-border)] transition-all duration-300 flex items-center gap-4 hover:bg-[#1F2937]/50 shadow-lg">
+                        <div className={`w-14 h-14 rounded-[1.2rem] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center flex-shrink-0 border border-[var(--theme-subtle-border)] shadow-inner`}>
                           {exp.icon}
                         </div>
                         <div className="flex-1 min-w-0">

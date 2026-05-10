@@ -18,9 +18,12 @@ import {
   Upload,
   X,
   Trash2,
+  TrendingUp,
+  ChevronDown,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { aiApi, transactionsApi } from "../../utils/api";
+import { numberToVietnameseWords } from "../../utils/numberToWords";
 import {
   CATEGORY_INFO,
   type ExpenseCategory,
@@ -46,6 +49,7 @@ interface ExpenseItem {
   date: string;
   store?: string;
   source: "scanner" | "chat" | "manual";
+  type: "income" | "expense";
 }
 
 type ChatMsg = { role: "user" | "bot" | "typing"; text: string };
@@ -109,7 +113,7 @@ function NeonCard({
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl bg-[#050d1a]/85 backdrop-blur-2xl border border-white/[0.07] ${className}`}
+      className={`relative overflow-hidden rounded-2xl bg-[var(--theme-bg-panel)] backdrop-blur-2xl border border-[var(--theme-border)] ${className}`}
       style={{
         boxShadow: `0 0 50px -18px ${accentColor}, inset 0 1px 0 rgba(255,255,255,0.06)`,
         ...style,
@@ -165,6 +169,7 @@ export default function ExpenseTracker() {
             store: t.title || t.tieu_de,
             date: t.transaction_date || t.ngay_giao_dich,
             source: "manual" as const,
+            type: (t.type === 'income' || t.loai_giao_dich === 'thu_nhap' ? 'income' : 'expense') as "income" | "expense",
           }))
           .sort((a, b) => {
             const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
@@ -179,6 +184,9 @@ export default function ExpenseTracker() {
     };
     loadData();
   }, []);
+  
+  const todayStr = getLocalDateStr();
+  const yesterdayStr = getLocalDateStr(new Date(Date.now() - 86400000));
 
   // Scanner state
   const [scanPhase, setScanPhase] = useState<"idle" | "scanning" | "done">(
@@ -204,8 +212,9 @@ export default function ExpenseTracker() {
   // Manual state
   const [manualAmount, setManualAmount] = useState("");
   const [manualCat, setManualCat] = useState<ExpenseCategory>("food");
-  const [manualDate, setManualDate] = useState(getLocalDateStr());
+  const [manualDate, setManualDate] = useState(todayStr);
   const [manualNote, setManualNote] = useState("");
+  const [wordsPreview, setWordsPreview] = useState("");
   const [manualSuccess, setManualSuccess] = useState(false);
 
   // --- Notification ---
@@ -229,10 +238,11 @@ export default function ExpenseTracker() {
   ) => {
     const rawValue = e.target.value.replace(/\D/g, "");
     setter(rawValue);
+    if (setter === setManualAmount) {
+      setWordsPreview(rawValue ? numberToVietnameseWords(parseInt(rawValue)) : "");
+    }
   };
 
-  const todayStr = getLocalDateStr();
-  const yesterdayStr = getLocalDateStr(new Date(Date.now() - 86400000));
 
   // Filtering & Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -246,9 +256,18 @@ export default function ExpenseTracker() {
         .includes(searchQuery.toLowerCase()) ||
       (exp.store &&
         exp.store.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCategory =
-      selectedFilterCategory === "all" ||
-      exp.category === selectedFilterCategory;
+        
+    let matchesCategory = false;
+    if (selectedFilterCategory === 'all') {
+      matchesCategory = true;
+    } else if (selectedFilterCategory === 'expense') {
+      matchesCategory = exp.type === 'expense';
+    } else if (selectedFilterCategory === 'income') {
+      matchesCategory = exp.type === 'income';
+    } else {
+      matchesCategory = exp.category === selectedFilterCategory;
+    }
+    
     return matchesSearch && matchesCategory;
   });
 
@@ -350,8 +369,9 @@ export default function ExpenseTracker() {
             amount: scannedData.amount,
             category: scannedData.category,
             description: scannedData.store || scannedData.description,
-            date: scannedData.date,
-            source: "scanner",
+            date: scannedData.date || todayStr,
+            source: "scanner" as const,
+            type: "expense" as const,
           },
           ...prev,
         ]);
@@ -423,6 +443,7 @@ export default function ExpenseTracker() {
                 description: result.description || info.label,
                 date: result.date || getLocalDateStr(),
                 source: "chat",
+                type: "expense" as const,
               },
               ...prev,
             ]);
@@ -474,9 +495,10 @@ export default function ExpenseTracker() {
             id: res.data.transaction.id.toString(),
             amount,
             category: manualCat,
-            description: manualNote || CATEGORY_INFO[manualCat].label,
+            description: manualNote,
             date: manualDate,
-            source: "manual",
+            source: "manual" as const,
+            type: "expense" as const,
           },
           ...prev,
         ]);
@@ -807,7 +829,7 @@ export default function ExpenseTracker() {
                                   whileHover={{ scale: 1.02 }}
                                   whileTap={{ scale: 0.97 }}
                                   onClick={resetScanner}
-                                  className="flex-1 py-3 rounded-xl border border-white/10 text-theme-text-muted hover:text-theme-text-primary hover:border-white/20 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                  className="flex-1 py-3 rounded-xl border border-[var(--theme-subtle-border)] text-theme-text-muted hover:text-theme-text-primary hover:border-white/20 transition-colors text-sm font-medium flex items-center justify-center gap-2"
                                 >
                                   <X className="w-4 h-4" /> Thử lại
                                 </motion.button>
@@ -1050,13 +1072,13 @@ export default function ExpenseTracker() {
                         <label className="text-[11px] font-bold text-theme-text-muted uppercase tracking-widest block mb-2">
                           Số tiền
                         </label>
-                        <div className="relative">
+                        <div className="relative group">
                           <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-fuchsia-400 pointer-events-none" />
                           <input
                             type="text"
                             required
                             placeholder="0"
-                            value={manualAmount}
+                            value={manualAmount ? fmt(parseFmt(manualAmount)) : ""}
                             onChange={(e) =>
                               handleFormattedAmountChange(e, setManualAmount)
                             }
@@ -1075,14 +1097,17 @@ export default function ExpenseTracker() {
                               e.target.style.borderColor =
                                 "rgba(255,255,255,0.08)";
                               e.target.style.boxShadow = "none";
-                              if (manualAmount)
-                                setManualAmount(fmt(parseFmt(manualAmount)));
                             }}
                           />
                           <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-theme-text-muted">
                             VNĐ
                           </div>
                         </div>
+                        {wordsPreview && (
+                          <p className="text-[10px] text-fuchsia-400/80 font-bold italic ml-2 mt-1.5">
+                            {wordsPreview}
+                          </p>
+                        )}
                       </div>
 
                       {/* Category grid */}
@@ -1278,36 +1303,53 @@ export default function ExpenseTracker() {
               </div>
 
               {/* Search & Filter Bar */}
-              <div className="flex gap-2 mb-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-theme-text-muted" />
-                  <input
-                    type="text"
-                    placeholder="Tìm kiếm..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-theme-text-primary outline-none focus:border-cyan-500/50 transition-all"
-                  />
-                </div>
-                <select
-                  value={selectedFilterCategory}
-                  onChange={(e) => setSelectedFilterCategory(e.target.value)}
-                  className="px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-theme-text-primary outline-none focus:border-cyan-500/50 transition-all cursor-pointer appearance-none"
-                  style={{ minWidth: "100px" }}
-                >
-                  <option value="all" className="bg-slate-900 text-white">
+              <div className="flex flex-col gap-3 mb-4">
+                <div className="flex bg-[var(--theme-subtle-bg)] p-1 rounded-xl border border-[var(--theme-subtle-border)]">
+                  <button 
+                    onClick={() => setSelectedFilterCategory('all')} 
+                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${selectedFilterCategory === 'all' ? 'bg-cyan-500 text-white' : 'text-theme-text-muted hover:text-white'}`}
+                  >
                     Tất cả
-                  </option>
-                  {Object.entries(CATEGORY_INFO).map(([key, info]) => (
-                    <option
-                      key={key}
-                      value={key}
-                      className="bg-slate-900 text-white"
+                  </button>
+                  <button 
+                    onClick={() => setSelectedFilterCategory('expense')} 
+                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${selectedFilterCategory === 'expense' ? 'bg-rose-500 text-white' : 'text-theme-text-muted hover:text-white'}`}
+                  >
+                    Chi tiêu
+                  </button>
+                  <button 
+                    onClick={() => setSelectedFilterCategory('income')} 
+                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${selectedFilterCategory === 'income' ? 'bg-emerald-500 text-white' : 'text-theme-text-muted hover:text-white'}`}
+                  >
+                    Thu nhập
+                  </button>
+                </div>
+                
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-theme-text-muted" />
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded-xl text-xs text-theme-text-primary outline-none focus:border-cyan-500/50 transition-all"
+                    />
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={selectedFilterCategory === 'all' || selectedFilterCategory === 'income' || selectedFilterCategory === 'expense' ? 'all' : selectedFilterCategory}
+                      onChange={(e) => setSelectedFilterCategory(e.target.value)}
+                      className="pl-3 pr-8 py-2 bg-[var(--theme-bg-surface)] border border-[var(--theme-subtle-border)] rounded-xl text-[10px] font-bold text-theme-text-primary outline-none focus:border-cyan-500/50 transition-all cursor-pointer appearance-none min-w-[100px]"
                     >
-                      {info.label}
-                    </option>
-                  ))}
-                </select>
+                      <option value="all">Mọi loại</option>
+                      {Object.entries(CATEGORY_INFO).map(([key, info]) => (
+                        <option key={key} value={key}>{info.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-theme-text-muted pointer-events-none" />
+                  </div>
+                </div>
               </div>
 
               {/* Total counter */}
@@ -1326,7 +1368,7 @@ export default function ExpenseTracker() {
                   transition={{ duration: 0.5 }}
                   className="text-2xl font-extrabold mt-1"
                 >
-                  {fmt(filteredExpenses.reduce((s, e) => s + e.amount, 0))}
+                  {fmt(filteredExpenses.reduce((s, e) => e.type === 'expense' ? s + e.amount : s, 0))}
                   <span className="text-sm font-normal text-theme-text-muted">
                     đ
                   </span>
@@ -1348,11 +1390,11 @@ export default function ExpenseTracker() {
                       ([date, items]) => (
                         <div key={date} className="space-y-2">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className="h-[1px] flex-1 bg-white/5" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-theme-text-muted px-2 py-0.5 rounded-full border border-white/5 bg-white/[0.02]">
+                            <div className="h-[1px] flex-1 bg-[var(--theme-subtle-bg)]" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-theme-text-muted px-2 py-0.5 rounded-full border border-[var(--theme-subtle-border)] bg-white/[0.02]">
                               {getDateLabel(date)}
                             </span>
-                            <div className="h-[1px] flex-1 bg-white/5" />
+                            <div className="h-[1px] flex-1 bg-[var(--theme-subtle-bg)]" />
                           </div>
 
                           {items.map((exp: ExpenseItem) => {
@@ -1402,8 +1444,8 @@ export default function ExpenseTracker() {
                                     </p>
                                   </div>
                                   <div className="flex flex-col items-end gap-1">
-                                    <span className="text-sm font-bold text-rose-400">
-                                      -{fmt(exp.amount)}
+                                    <span className={`text-sm font-bold ${exp.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                      {exp.type === 'income' ? '+' : '-'}{fmt(exp.amount)}đ
                                     </span>
                                     <button 
                                       onClick={(e) => { 
@@ -1444,7 +1486,7 @@ export default function ExpenseTracker() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 10 }}
-              className="glass-panel w-full max-w-sm p-8 rounded-[32px] relative z-10 border border-white/10 shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-sm p-8 rounded-[32px] relative z-10 border border-[var(--theme-subtle-border)] shadow-2xl overflow-hidden"
               style={{ background: 'rgba(15, 23, 42, 0.85)' }}
             >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500/0 via-rose-500/50 to-rose-500/0" />
@@ -1464,7 +1506,7 @@ export default function ExpenseTracker() {
                 <div className="grid grid-cols-2 gap-3 w-full mt-6">
                   <button
                     onClick={() => setConfirmDelete(null)}
-                    className="px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-theme-text-muted font-bold text-sm hover:bg-white/10 transition-all"
+                    className="px-4 py-3 rounded-2xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] text-theme-text-muted font-bold text-sm hover:bg-[var(--theme-bg-surface)] transition-all"
                   >
                     Hủy bỏ
                   </button>
@@ -1525,7 +1567,7 @@ export default function ExpenseTracker() {
             </div>
             <button
               onClick={() => setNotification(null)}
-              className="p-1 hover:bg-white/5 rounded-lg transition-colors"
+              className="p-1 hover:bg-[var(--theme-subtle-bg)] rounded-lg transition-colors"
             >
               <X className="w-4 h-4 text-theme-text-muted" />
             </button>

@@ -2,18 +2,18 @@ import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Wallet, PieChart, MessageSquare, Award, LogOut, Menu, X, Sparkles, Target, AlertTriangle, ShoppingBag, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_ROOT } from '../../utils/api';
 import ThemeSidebar from './ThemeSidebar';
 import authStore from '../../store/authStore';
-
 const NAV_ITEMS = [
   { path: '/app', label: 'Tổng quan', icon: LayoutDashboard },
   { path: '/app/income', label: 'Thu nhập', icon: Wallet },
   { path: '/app/budget', label: 'Ngân sách', icon: PieChart },
+  { path: '/app/expense', label: 'Chi tiêu', icon: ShoppingBag },
   { path: '/app/chat', label: 'AI Trợ lý', icon: MessageSquare },
   { path: '/app/badges', label: 'Huy hiệu', icon: Award },
   { path: '/app/insights', label: 'Mục tiêu', icon: Target },
   { path: '/app/crisis', label: 'Khủng hoảng', icon: AlertTriangle },
-  { path: '/app/expense', label: 'Chi tiêu', icon: ShoppingBag },
 ];
 
 export default function MainLayout() {
@@ -82,12 +82,16 @@ export default function MainLayout() {
         })}
       </nav>
 
-      <div className="pt-4 border-t border-white/10 mt-auto flex flex-col gap-2">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors group">
+      <div className="pt-4 border-t border-[var(--theme-subtle-border)] mt-auto flex flex-col gap-2">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-[var(--theme-subtle-bg)] transition-colors group">
           <Link to="/app/profile" className="flex items-center gap-3 flex-1 min-w-0">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-theme-text-primary font-bold border border-white/20 overflow-hidden flex-shrink-0">
               {user?.avatar_url ? (
-                <img src={user.avatar_url.startsWith('http') ? user.avatar_url : `http://localhost:5001${user.avatar_url}`} alt={user.full_name} className="w-full h-full object-cover" />
+                <img 
+                  src={user.avatar_url.startsWith('http') ? user.avatar_url : `${API_ROOT}${user.avatar_url}`} 
+                  alt={user.full_name} 
+                  className="w-full h-full object-cover" 
+                />
               ) : (
                 user?.full_name?.charAt(0) || 'U'
               )}
@@ -98,7 +102,7 @@ export default function MainLayout() {
             </div>
           </Link>
           <div className="flex items-center gap-1">
-            <button onClick={() => setIsThemeOpen(true)} className="p-2 rounded-lg hover:bg-white/10 text-theme-text-muted transition-all">
+            <button onClick={() => setIsThemeOpen(true)} className="p-2 rounded-lg hover:bg-[var(--theme-subtle-bg)] text-theme-text-muted transition-all">
               <Settings className="w-5 h-5" />
             </button>
             <button onClick={handleLogout} className="p-2 rounded-lg hover:bg-red-500/10 group/logout transition-all flex-shrink-0">
@@ -111,16 +115,16 @@ export default function MainLayout() {
   );
 
   return (
-    <div className="h-screen flex overflow-hidden" style={{ background: 'var(--theme-bg-deep)', color: 'var(--theme-text-primary)' }}>
+    <div className="h-screen flex overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-deep)', color: 'var(--theme-text-primary)' }}>
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-64 h-full z-20 flex-shrink-0">
-        <div className="h-full border-r border-white/5" style={{ background: 'var(--theme-bg-panel)', backdropFilter: 'blur(24px)' }}>
+        <div className="h-full border-r border-[var(--theme-subtle-border)]" style={{ backgroundColor: 'var(--theme-bg-panel)', backdropFilter: 'blur(24px)' }}>
           <SidebarContent />
         </div>
       </aside>
 
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 inset-x-0 h-16 z-30 flex items-center justify-between px-4 bg-theme-bg-panel/80 border-b border-white/5 backdrop-blur-md">
+      <div className="lg:hidden fixed top-0 inset-x-0 h-16 z-30 flex items-center justify-between px-4 border-b border-[var(--theme-subtle-border)] backdrop-blur-md" style={{ backgroundColor: 'var(--theme-glass-bg)' }}>
         <div className="flex items-center gap-2">
           <Sparkles className="text-primary-400 w-6 h-6" />
           <span className="text-xl font-bold text-theme-text-primary">Nova<span className="text-primary-400">Finance</span></span>
@@ -134,12 +138,13 @@ export default function MainLayout() {
         {isMobileOpen && (
           <motion.div initial={{ opacity: 0, x: -100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -100 }} className="lg:hidden fixed inset-0 z-40">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={toggleMobileMenu} />
-            <div className="absolute inset-y-0 left-0 w-64 max-w-[80%] bg-theme-bg-panel border-r border-white/5">
+            <div className="absolute inset-y-0 left-0 w-64 max-w-[80%] border-r border-[var(--theme-subtle-border)]" style={{ backgroundColor: 'var(--theme-bg-surface)' }}>
               <SidebarContent />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
 
       {/* Main Content Area - Cố định hoàn toàn chiều cao */}
       <main className={`flex-1 flex flex-col h-screen overflow-hidden relative pt-16 lg:pt-0`}>

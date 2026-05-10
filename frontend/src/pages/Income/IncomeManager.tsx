@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus, X, Trash2, CheckCircle2, AlertCircle, Info, Settings, Wallet, Banknote, Edit3, TrendingUp, ChevronDown } from "lucide-react";
+import { Plus, X, Trash2, CheckCircle2, AlertCircle, Info, Settings, Wallet, Banknote, Edit3, TrendingUp, ChevronDown, HelpCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { incomeApi, transactionsApi } from "../../utils/api";
+import { dashboardApi, incomeApi, transactionsApi, userApi } from "../../utils/api";
 import { calculateMonthlyForecast } from "../../utils/salaryCalculator";
+import { numberToVietnameseWords } from "../../utils/numberToWords";
 
 type IncomeType = "fixed" | "variable" | "scheduled";
 type SourceCategory = "salary" | "allowance" | "other";
@@ -46,6 +47,7 @@ export default function IncomeManager() {
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string; type: 'record' | 'source' } | null>(null);
 
   const todayStr = getLocalDateStr();
+  const [globalFilter, setGlobalFilter] = useState<'all' | SourceCategory>('all');
 
   const [sources, setSources] = useState<IncomeSource[]>([]);
   const [records, setRecords] = useState<IncomeRecord[]>([]);
@@ -58,6 +60,9 @@ export default function IncomeManager() {
   const [newSourceRate, setNewSourceRate] = useState("");
   const [newWorkSchedule, setNewWorkSchedule] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
   const [isSelectOpen, setIsSelectOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<"all" | SourceCategory>("all");
+  const [wordsPreview, setWordsPreview] = useState("");
+  const [modalWordsPreview, setModalWordsPreview] = useState("");
 
   const [notification, setNotification] = useState<{
     type: "success" | "error" | "info";
@@ -70,6 +75,7 @@ export default function IncomeManager() {
       return () => clearTimeout(timer);
     }
   }, [notification]);
+  const [showLogicInfo, setShowLogicInfo] = useState(false);
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
 
   // Load data from Backend
@@ -146,6 +152,11 @@ export default function IncomeManager() {
   ) => {
     const rawValue = e.target.value.replace(/\D/g, "");
     setter(rawValue);
+    if (setter === setAmount) {
+      setWordsPreview(rawValue ? numberToVietnameseWords(parseInt(rawValue)) : "");
+    } else if (setter === setNewSourceAmount || setter === setNewSourceRate) {
+      setModalWordsPreview(rawValue ? numberToVietnameseWords(parseInt(rawValue)) : "");
+    }
   };
 
   const handleAddRecord = async (e: React.FormEvent) => {
@@ -204,8 +215,36 @@ export default function IncomeManager() {
       } else {
         const res = await incomeApi.deleteSource(parseInt(id));
         if (res.success) {
-          setSources((prev) => prev.filter((s) => s.id !== id));
-          setNotification({ type: 'success', message: 'Đã gỡ bỏ nguồn thu này' });
+          const deletedSource = sources.find(s => s.id === id);
+          const updatedSources = sources.filter((s) => s.id !== id);
+          setSources(updatedSources);
+          
+          // --- SYNC ON DELETE ---
+          if (deletedSource?.type === 'fixed') {
+            try {
+              const [profileRes, budgetRes] = await Promise.all([
+                userApi.getProfile(),
+                dashboardApi.getBudget()
+              ]);
+
+              const totalFixedIncome = updatedSources
+                .filter(x => x.type === 'fixed')
+                .reduce((sum, x) => sum + (x.expectedAmount || 0), 0);
+
+              const existingBudgets = budgetRes.success 
+                ? budgetRes.data.budgets.map((b: any) => ({ categoryName: b.category_name, amount: b.limit_amount }))
+                : [];
+              
+              // Remove the budget that matches the deleted source name
+              const remainingBudgets = existingBudgets.filter((b: any) => b.categoryName !== deletedSource.name);
+              
+              await userApi.updateOnboarding(totalFixedIncome, remainingBudgets);
+            } catch (syncErr) {
+              console.warn('Sync after delete failed:', syncErr);
+            }
+          }
+
+          setNotification({ type: 'success', message: 'Đã gỡ bỏ nguồn thu này và cập nhật Hồ sơ ✓' });
         }
       }
     } catch (err) {
@@ -251,19 +290,25 @@ export default function IncomeManager() {
       expectedAmount:
         newSourceType === "fixed"
           ? parseFormattedNumber(newSourceAmount)
-          : null,
+          : undefined,
       hourlyRate:
         newSourceType === "scheduled"
           ? parseFormattedNumber(newSourceRate)
-          : null,
-      schedule: newSourceType === "scheduled" ? newWorkSchedule : null,
+          : undefined,
+      schedule: newSourceType === "scheduled" ? newWorkSchedule : undefined,
     };
 
     try {
-      const res = await (incomeApi as any).createSource(sourceData);
+      let res;
+      if (editingSource) {
+        res = await incomeApi.updateSource(parseInt(editingSource.id), sourceData);
+      } else {
+        res = await incomeApi.createSource(sourceData);
+      }
+
       if (res.success) {
         const s = res.data.source;
-        const newSource: IncomeSource = {
+        const savedSource: IncomeSource = {
           id: s.id.toString(),
           name: s.ten_nguon,
           type: s.loai_nguon,
@@ -276,17 +321,53 @@ export default function IncomeManager() {
             : undefined,
           workSchedule: s.lich_lam_viec,
         };
-        setSources((prev) => [
-          ...prev.filter((x) => x.id !== newSource.id),
-          newSource,
-        ]);
-        setNotification({ type: 'success', message: `Đã lưu nguồn thu: ${newSourceName}` });
+
+        // Update local state
+        const updatedSources = editingSource
+          ? sources.map(src => src.id === savedSource.id ? savedSource : src)
+          : [...sources, savedSource];
+        
+        setSources(updatedSources);
+
+        // --- SMART SYNC LOGIC ---
+        // Requirement: Sync fixed income sources -> Profile (Monthly Income ONLY)
+        // We DO NOT sync this as a budget/expense anymore because income is NOT an expense.
+        if (newSourceType === 'fixed' && sourceData.expectedAmount) {
+          try {
+            // 1. Fetch current status to avoid overwriting unrelated data
+            const [profileRes, budgetRes] = await Promise.all([
+              userApi.getProfile(),
+              dashboardApi.getBudget()
+            ]);
+
+            // 2. Calculate new Total Monthly Income (sum of all FIXED sources)
+            const totalFixedIncome = updatedSources
+              .filter(x => x.type === 'fixed')
+              .reduce((sum, x) => sum + (x.expectedAmount || 0), 0);
+
+            // 3. Keep existing budgets exactly as they are
+            const existingBudgets = budgetRes.success 
+              ? budgetRes.data.budgets.map((b: any) => ({ categoryName: b.category_name, amount: b.limit_amount }))
+              : [];
+
+            // 4. Update Onboarding (this updates monthly_income without touching fixed expenses)
+            await userApi.updateOnboarding(totalFixedIncome, existingBudgets);
+
+          } catch (syncErr) {
+            console.warn('Sync to fixed expenses/profile failed:', syncErr);
+          }
+        }
+
+        setNotification({ 
+          type: 'success', 
+          message: `${editingSource ? 'Đã cập nhật' : 'Đã lưu'} nguồn thu: ${newSourceName}${newSourceType === 'fixed' ? ' và đồng bộ vào Hồ sơ ✓' : ''}` 
+        });
         setShowAddSourceModal(false);
         resetSourceForm();
       }
     } catch (err) {
       console.error("Save source failed:", err);
-      setNotification({ type: 'error', message: 'Không thể lưu nguồn thu. Vui lòng thử lại.' });
+      setNotification({ type: 'error', message: 'Lỗi khi lưu nguồn thu' });
     }
   };
 
@@ -323,7 +404,27 @@ export default function IncomeManager() {
 
 
 
+  // --- Breakdown by category ---
+  const incomeBreakdown = useMemo(() => {
+    const salary = sources.filter(s => s.sourceType === 'salary').reduce((sum, s) => sum + (s.expectedAmount ?? 0), 0);
+    const allowance = sources.filter(s => s.sourceType === 'allowance').reduce((sum, s) => sum + (s.expectedAmount ?? 0), 0);
+    const other = sources.filter(s => s.sourceType === 'other').reduce((sum, s) => {
+      if (s.type === 'scheduled' && s.workSchedule && s.hourlyRate) {
+        return sum + calculateMonthlyForecast(s.workSchedule, s.hourlyRate);
+      }
+      return sum + (s.expectedAmount ?? 0);
+    }, 0);
+    return { salary, allowance, other };
+  }, [sources]);
+
+  const QUICK_ADD = [
+    { label: '+Thưởng (1M)', amount: 1000000 },
+    { label: '+Phụ cấp (500k)', amount: 500000 },
+    { label: '+Bán đồ', amount: 0 },
+  ];
+
   return (
+    <>
     <motion.div
       variants={containerVars}
       initial="hidden"
@@ -369,9 +470,59 @@ export default function IncomeManager() {
             Ghi nhận các khoản thu nhập và theo dõi dự báo tài chính.
           </p>
         </div>
+        <button 
+          onClick={() => setShowLogicInfo(!showLogicInfo)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] text-theme-text-muted hover:text-theme-text-primary transition-all text-sm font-bold"
+        >
+          <HelpCircle className="w-4 h-4" /> Hướng dẫn & Logic
+        </button>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <AnimatePresence>
+        {showLogicInfo && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="glass-panel p-6 rounded-[24px] border-emerald-500/20 bg-emerald-500/5 mb-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <h4 className="text-emerald-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Cố định (Fixed)
+                  </h4>
+                  <p className="text-[11px] text-theme-text-muted leading-relaxed">
+                    Dùng cho Lương, Học bổng... Nhận đều đặn mỗi tháng. Loại này sẽ <b>tự động tạo 1 khoản "Chi phí cố định"</b> trong Hồ sơ để hệ thống cân đối ngân sách cho bạn.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-sky-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-sky-400" /> Theo lịch (Scheduled)
+                  </h4>
+                  <p className="text-[11px] text-theme-text-muted leading-relaxed">
+                    Dùng cho việc làm thêm tính giờ. Bạn nhập lịch làm, hệ thống <b>tự động tính toán Dự báo (Forecast)</b> thu nhập dựa trên số giờ làm dự kiến trong tháng.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-purple-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400" /> Biến đổi (Variable)
+                  </h4>
+                  <p className="text-[11px] text-theme-text-muted leading-relaxed">
+                    Dùng cho Thưởng, Hoa hồng, Quà tặng... Không có định mức. Bạn chỉ cần <b>Ghi nhận thực tế</b> khi tiền thực sự về tài khoản.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-[var(--theme-subtle-border)] flex items-center gap-3">
+                <div className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">✓ Tự động đồng bộ</div>
+                <p className="text-[10px] text-theme-text-muted italic">Mọi thay đổi ở Nguồn thu "Cố định" sẽ được cập nhật ngay lập tức sang tab "Chi phí Cố định" ở trang Hồ sơ & Dashboard.</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <motion.div
           variants={itemVars}
           className="glass-panel p-6 rounded-[24px] relative overflow-hidden group hover:border-emerald-500/30 transition-all duration-500"
@@ -391,7 +542,7 @@ export default function IncomeManager() {
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2">
-            <div className="h-1 flex-1 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-1 flex-1 bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.min((actualIncomeThisMonth / (totalForecasted || 1)) * 100, 100)}%` }}
@@ -412,7 +563,7 @@ export default function IncomeManager() {
           <div className="flex items-start justify-between">
             <div>
               <h3 className="text-theme-text-muted font-bold text-[10px] uppercase tracking-widest mb-1">
-                Tiền mặt đã nhận (Tháng {new Date().getMonth() + 1})
+                Thực thu (Đã nhận)
               </h3>
               <div className="text-2xl font-black text-sky-400 tracking-tight">
                 {formatCurrency(actualIncomeThisMonth)} <span className="text-sm text-theme-text-muted font-normal uppercase">vnđ</span>
@@ -422,16 +573,73 @@ export default function IncomeManager() {
               <Wallet className="w-5 h-5 text-sky-400" />
             </div>
           </div>
-          <p className="mt-4 text-[10px] text-theme-text-muted italic">
-            * Số tiền bạn đã thực sự nhập vào ngân sách.
-          </p>
+          <div className="mt-3 h-1 bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden">
+            <div className="h-full bg-sky-400" style={{ width: `${Math.min((actualIncomeThisMonth / (totalForecasted || 1)) * 100, 100)}%` }} />
+          </div>
+          <p className="mt-1 text-[10px] text-theme-text-muted italic">{Math.round((actualIncomeThisMonth / (totalForecasted || 1)) * 100)}% dự báo</p>
+        </motion.div>
+
+        {/* 3rd card: Phân loại Luồng tiền */}
+        <motion.div
+          variants={itemVars}
+          className="glass-panel p-6 rounded-[24px] relative overflow-hidden group hover:border-purple-500/30 transition-all duration-500"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl -mr-12 -mt-12" />
+          <div className="flex items-start justify-between mb-3">
+            <h3 className="text-theme-text-muted font-bold text-[10px] uppercase tracking-widest">Phân loại Luồng tiền</h3>
+          </div>
+          <div className="space-y-2">
+            {[
+              { label: 'Lương', amount: incomeBreakdown.salary, color: 'bg-emerald-400' },
+              { label: 'Trợ cấp', amount: incomeBreakdown.allowance, color: 'bg-yellow-400' },
+              { label: 'Khác (thực tế)', amount: incomeBreakdown.other, color: 'bg-purple-400' },
+            ].map(item => (
+              <div key={item.label} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${item.color}`} />
+                  <span className="text-xs text-theme-text-muted">{item.label}</span>
+                </div>
+                <span className="text-xs font-bold text-theme-text-primary">{formatCurrency(item.amount)}đ</span>
+              </div>
+            ))}
+          </div>
         </motion.div>
       </div>
+
+      {/* --- Global Filter Tabs (Universal Filter) --- */}
+      <motion.div variants={itemVars} className="flex justify-start my-8">
+        <div className="flex  p-1.5 rounded-[1.5rem] border border-[var(--theme-subtle-border)] backdrop-blur-xl shadow-2xl">
+          <button 
+            onClick={() => setGlobalFilter('all')} 
+            className={`px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${globalFilter === 'all' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-105' : 'text-theme-text-muted hover:text-white'}`}
+          >
+            Tất cả
+          </button>
+          <button 
+            onClick={() => setGlobalFilter('salary')} 
+            className={`px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${globalFilter === 'salary' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-105' : 'text-theme-text-muted hover:text-white'}`}
+          >
+            Lương / Job
+          </button>
+          <button 
+            onClick={() => setGlobalFilter('allowance')} 
+            className={`px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${globalFilter === 'allowance' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-105' : 'text-theme-text-muted hover:text-white'}`}
+          >
+            Trợ cấp
+          </button>
+          <button 
+            onClick={() => setGlobalFilter('other')} 
+            className={`px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${globalFilter === 'other' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-105' : 'text-theme-text-muted hover:text-white'}`}
+          >
+            Khác
+          </button>
+        </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <motion.div
           variants={itemVars}
-          className="glass-panel p-6 rounded-[32px] shadow-xl relative border border-white/5"
+          className="glass-panel p-6 rounded-[32px] shadow-xl relative border border-[var(--theme-subtle-border)]"
         >
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-black text-theme-text-primary flex items-center gap-2">
@@ -469,10 +677,10 @@ export default function IncomeManager() {
                         exit={{ opacity: 0, y: 0, scale: 0.95 }}
                         className="absolute top-full left-0 w-full z-20 bg-[#1e293b] border border-white/20 rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] overflow-hidden py-2"
                       >
-                        {sources.length === 0 ? (
-                          <div className="px-4 py-3 text-xs text-theme-text-muted italic">Chưa có nguồn tiền nào</div>
+                        {sources.filter(s => globalFilter === 'all' || s.sourceType === globalFilter).length === 0 ? (
+                          <div className="px-4 py-3 text-xs text-theme-text-muted italic">Chưa có nguồn tiền nào cho mục này</div>
                         ) : (
-                          sources.map((s) => (
+                          sources.filter(s => globalFilter === 'all' || s.sourceType === globalFilter).map((s) => (
                             <button
                               key={s.id}
                               type="button"
@@ -505,10 +713,15 @@ export default function IncomeManager() {
                   placeholder="0"
                   value={amount}
                   onChange={(e) => handleAmountChange(e, setAmount)}
-                  className="w-full pl-5 pr-10 py-4 bg-white/5 border border-white/10 rounded-2xl text-2xl font-black text-theme-text-primary outline-none focus:border-emerald-500/30 transition-all placeholder:text-white/10"
+                  className="w-full pl-5 pr-10 py-4 bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded-2xl text-2xl font-black text-theme-text-primary outline-none focus:border-emerald-500/30 transition-all placeholder:text-white/10"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-theme-text-muted">đ</span>
               </div>
+              {wordsPreview && (
+                <p className="text-[10px] text-emerald-400/80 font-bold italic ml-2 mt-1.5">
+                  {wordsPreview}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -524,8 +737,27 @@ export default function IncomeManager() {
             </div>
 
             <button type="submit" className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-sm shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 active:translate-y-0 transition-all uppercase tracking-widest">
-              Xác nhận nhận tiền
+              Cộng vào Ngân sách Tháng
             </button>
+
+            {/* Quick Add */}
+            <div className="pt-2">
+              <p className="text-[9px] font-black text-theme-text-muted uppercase tracking-widest mb-2">✦ Thu nhập phụ (thêm nhanh)</p>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_ADD.map(q => (
+                  <button
+                    key={q.label}
+                    type="button"
+                    onClick={() => {
+                      if (q.amount > 0) setAmount(q.amount.toString());
+                    }}
+                    className="px-3 py-1.5 text-[10px] font-bold rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/20 transition-all"
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </form>
         </motion.div>
 
@@ -544,36 +776,48 @@ export default function IncomeManager() {
               </button>
             </div>
             <div className="space-y-2 mb-8">
-              {sources.map(s => (
-                <div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 group hover:border-emerald-500/20 transition-all">
+              {sources.filter(s => globalFilter === 'all' || s.sourceType === globalFilter).map(s => (
+                <div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] group hover:border-emerald-500/20 transition-all">
                   <div>
                     <p className="text-xs font-bold text-theme-text-primary">{s.name}</p>
                     <p className="text-[9px] text-theme-text-muted">
-                      {s.type === 'fixed' ? 'Cố định' : s.type === 'variable' ? 'Linh hoạt' : 'Theo lịch'} • {formatCurrency(s.expectedAmount || 0)}đ
+                      {s.sourceType === 'salary' ? '💼 Lương / Job' : s.sourceType === 'allowance' ? '🎁 Trợ cấp' : '✨ Khác'} • {s.type === 'fixed' ? 'Cố định' : s.type === 'variable' ? 'Linh hoạt' : 'Theo lịch'} • {formatCurrency(s.expectedAmount || 0)}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <button onClick={() => handleEditSource(s)} className="p-1.5 hover:bg-white/10 rounded-lg text-theme-text-muted hover:text-emerald-400"><Edit3 className="w-3 h-3" /></button>
+                    <button onClick={() => handleEditSource(s)} className="p-1.5 hover:bg-[var(--theme-bg-surface)] rounded-lg text-theme-text-muted hover:text-emerald-400"><Edit3 className="w-3 h-3" /></button>
                     <button onClick={() => handleDeleteSource(s.id)} className="p-1.5 hover:bg-rose-500/15 rounded-lg text-theme-text-muted hover:text-rose-400"><Trash2 className="w-3 h-3" /></button>
                   </div>
                 </div>
               ))}
             </div>
 
-            <h3 className="text-base font-black text-theme-text-primary mb-4">
-              Lịch sử Giao dịch
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-black text-theme-text-primary">
+                Lịch sử Giao dịch
+              </h3>
+            </div>
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-              {records.length === 0 && (
+              {records.filter(r => {
+                if (globalFilter === 'all') return true;
+                const src = sources.find(s => s.id === r.sourceId);
+                return src?.sourceType === globalFilter;
+              }).length === 0 && (
                 <div className="py-10 text-center">
-                  <p className="text-theme-text-muted text-xs font-medium">Chưa có lịch sử thu nhập</p>
+                  <p className="text-theme-text-muted text-xs font-medium">Chưa có lịch sử thu nhập cho mục này</p>
                 </div>
               )}
-              {records.map((record) => (
+              {records
+                .filter(r => {
+                  if (globalFilter === 'all') return true;
+                  const src = sources.find(s => s.id === r.sourceId);
+                  return src?.sourceType === globalFilter;
+                })
+                .map((record) => (
                 <motion.div
                   layout
                   key={record.id}
-                  className="flex justify-between items-center p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-emerald-500/20 transition-all group"
+                  className="flex justify-between items-center p-3 rounded-2xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] hover:border-emerald-500/20 transition-all group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
@@ -583,12 +827,15 @@ export default function IncomeManager() {
                       <p className="text-xs font-bold text-theme-text-primary">
                         {sources.find((s) => s.id === record.sourceId)?.name || "Thu nhập"}
                       </p>
-                      <p className="text-[9px] font-bold text-theme-text-muted">{getLocalDateStr(record.date)}</p>
+                      <p className="text-[9px] font-bold text-theme-text-muted">
+                        {sources.find(s => s.id === record.sourceId)?.sourceType === 'salary' ? '💼 Lương' : 
+                         sources.find(s => s.id === record.sourceId)?.sourceType === 'allowance' ? '🎁 Trợ cấp' : '✨ Khác'} • {getLocalDateStr(record.date)}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-base font-black text-emerald-400">
-                      +{formatCurrency(record.amount)}<span className="text-[10px] font-normal ml-0.5 uppercase">đ</span>
+                      +{formatCurrency(record.amount)}
                     </span>
                     <button 
                       onClick={() => handleDeleteRecord(record)}
@@ -604,140 +851,9 @@ export default function IncomeManager() {
         </motion.div>
       </div>
 
-      <AnimatePresence>
-        {showAddSourceModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="glass-panel w-full max-w-lg p-8 rounded-3xl relative"
-            >
-              <button
-                onClick={() => setShowAddSourceModal(false)}
-                className="absolute right-6 top-6 p-2 hover:bg-white/5 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-theme-text-muted" />
-              </button>
-              <h2 className="text-2xl font-bold text-theme-text-primary mb-6">{editingSource ? 'Sửa Nguồn Thu' : 'Đăng ký Nguồn Thu'}</h2>
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  className="glass-input w-full"
-                  placeholder="Tên nguồn tiền (VD: Lương chính, Freelance...)"
-                  value={newSourceName}
-                  onChange={(e) => setNewSourceName(e.target.value)}
-                />
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: "fixed", label: "Cố định" },
-                    { id: "variable", label: "Linh hoạt" },
-                    { id: "scheduled", label: "Theo lịch" },
-                  ].map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setNewSourceType(t.id as IncomeType)}
-                      className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${newSourceType === t.id ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-inner shadow-emerald-500/10" : "bg-white/5 border-white/10 text-theme-text-muted hover:bg-white/10"}`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-2xl">
-                  <p className="text-[10px] text-emerald-400 font-medium leading-relaxed">
-                    {newSourceType === 'fixed' && "• Dùng cho lương cố định, tiền nhà... thu nhập đều đặn mỗi tháng."}
-                    {newSourceType === 'variable' && "• Dùng cho thưởng, freelance, bán hàng... thu nhập không cố định."}
-                    {newSourceType === 'scheduled' && "• Dùng cho công việc làm thêm tính theo giờ hoặc theo ca."}
-                  </p>
-                </div>
-
-                {newSourceType === "fixed" && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-theme-text-muted ml-1 uppercase">Số tiền nhận mỗi tháng</label>
-                    <input
-                      type="text"
-                      className="glass-input w-full"
-                      placeholder="VD: 10.000.000"
-                      value={newSourceAmount}
-                      onChange={(e) => handleAmountChange(e, setNewSourceAmount)}
-                      onBlur={() => { if (newSourceAmount) setNewSourceAmount(formatCurrency(parseFormattedNumber(newSourceAmount))); }}
-                    />
-                  </div>
-                )}
-
-                {newSourceType === "scheduled" && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-theme-text-muted ml-1 uppercase">Mức lương mỗi giờ</label>
-                    <input
-                      type="text"
-                      className="glass-input w-full"
-                      placeholder="VD: 50.000"
-                      value={newSourceRate}
-                      onChange={(e) => handleAmountChange(e, setNewSourceRate)}
-                      onBlur={() => { if (newSourceRate) setNewSourceRate(formatCurrency(parseFormattedNumber(newSourceRate))); }}
-                    />
-                  </div>
-                )}
-                <button
-                  onClick={handleSaveSource}
-                  className="btn-primary w-full mt-6"
-                >
-                  Lưu nguồn thu
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {/* --- Custom Confirmation Modal --- */}
-      <AnimatePresence>
-        {confirmDelete && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setConfirmDelete(null)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 10 }}
-              className="glass-panel w-full max-w-sm p-8 rounded-[32px] relative z-10 border border-white/10 shadow-2xl overflow-hidden"
-              style={{ background: 'rgba(15, 23, 42, 0.85)' }}
-            >
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500/0 via-rose-500/50 to-rose-500/0" />
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20 mb-2">
-                  <Trash2 className="w-8 h-8 text-rose-500" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-theme-text-primary mb-2">Xác nhận xóa?</h3>
-                  <p className="text-sm text-theme-text-muted leading-relaxed">
-                    Bạn có chắc chắn muốn xóa <span className="text-rose-400 font-bold">{confirmDelete.type === 'source' ? 'nguồn thu' : 'khoản thu'}</span> <span className="text-rose-400 font-bold">"{confirmDelete.title}"</span>?
-                  </p>
-                  {confirmDelete.type === 'source' && (
-                    <p className="mt-4 p-3 bg-white/5 border border-white/5 rounded-xl text-[10px] text-theme-text-muted italic">
-                      * Lưu ý: Lịch sử tiền mặt đã nhận từ nguồn này vẫn sẽ được giữ lại để đảm bảo số dư ngân sách của bạn không bị sai lệch.
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3 w-full mt-6">
-                  <button onClick={() => setConfirmDelete(null)} className="px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-theme-text-muted font-bold text-sm hover:bg-white/10 transition-all">Hủy bỏ</button>
-                  <button onClick={() => executeDelete()} className="px-4 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 text-white font-bold text-sm shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 transition-all">Xác nhận xóa</button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
       <motion.div
         variants={itemVars}
-        className="glass-panel p-6 rounded-[24px] border border-white/5 relative overflow-hidden"
+        className="glass-panel p-6 rounded-[24px] border border-[var(--theme-subtle-border)] relative overflow-hidden"
       >
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/0 via-emerald-500/50 to-emerald-500/0" />
         <h3 className="text-base font-black text-theme-text-primary mb-4 flex items-center gap-2">
@@ -760,5 +876,257 @@ export default function IncomeManager() {
         </div>
       </motion.div>
     </motion.div>
+
+    {/* --- Modals (Moved outside main container to fix 'fixed' positioning scroll bug) --- */}
+    <AnimatePresence>
+      {showAddSourceModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto"
+          onClick={() => setShowAddSourceModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="glass-panel w-full max-w-lg p-6 rounded-3xl relative max-h-[90vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowAddSourceModal(false)}
+              className="absolute right-6 top-6 p-2 hover:bg-[var(--theme-subtle-bg)] rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-theme-text-muted" />
+            </button>
+            <h2 className="text-xl font-bold text-theme-text-primary mb-5 shrink-0 px-1">{editingSource ? 'Sửa Nguồn Thu' : 'Đăng ký Nguồn Thu'}</h2>
+            
+            <div className="space-y-5 overflow-y-auto px-1 custom-scrollbar flex-1 pb-4 -mx-1">
+              <div>
+                <label className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest block mb-1.5">Tên nguồn tiền (VD: Tiền làm bếp)</label>
+                <input
+                  type="text"
+                  className={`glass-input w-full px-4 py-2.5 text-sm transition-all ${!newSourceName.trim() ? 'border-rose-500/30' : ''}`}
+                  placeholder="Tên công ty hoặc job"
+                  value={newSourceName}
+                  onChange={(e) => setNewSourceName(e.target.value)}
+                />
+                {!newSourceName.trim() && <p className="text-[9px] text-rose-400 mt-1 ml-1">* Bắt buộc nhập tên</p>}
+              </div>
+
+            {/* Source Category */}
+            <div>
+              <p className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest mb-1.5 ml-1">Phân loại Dòng tiền</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'salary', label: 'Lương / Đi làm' },
+                  { id: 'allowance', label: 'Trợ cấp' },
+                  { id: 'other', label: 'Linh tính' },
+                ].map(c => (
+                  <button key={c.id} type="button" onClick={() => setNewSourceCategory(c.id as SourceCategory)}
+                    className={`px-2 py-2 rounded-xl text-[11px] font-bold border transition-all ${newSourceCategory === c.id ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] text-theme-text-muted hover:bg-[var(--theme-bg-surface)]'}`}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Income Type */}
+            <div>
+              <p className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest mb-1.5 ml-1">Tần suất làm việc</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "fixed", label: "Cố định" },
+                  { id: "variable", label: "Biến đổi" },
+                  { id: "scheduled", label: "Theo lịch (Job)" },
+                ].map((t) => (
+                  <button key={t.id} type="button"
+                    onClick={() => setNewSourceType(t.id as IncomeType)}
+                    className={`px-2 py-2 rounded-xl text-[11px] font-bold border transition-all ${newSourceType === t.id ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] text-theme-text-muted hover:bg-[var(--theme-bg-surface)]"}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 bg-emerald-500/5 border border-emerald-500/10 p-2.5 rounded-xl">
+                <p className="text-[10px] text-emerald-400 font-medium leading-relaxed">
+                  {newSourceType === 'fixed' && "💼 Cố định: Lương tháng, học bổng... — nhận đều đặn, không đổi. Tự động cộng vào Tổng thu nhập hàng tháng."}
+                  {newSourceType === 'variable' && "📈 Biến đổi: Thưởng, hoa hồng... — số tiền thay đổi. Ghi nhận khi thực sự nhận được tiền."}
+                  {newSourceType === 'scheduled' && "🕐 Theo lịch: Làm tính giờ — chọn lịch làm, hệ thống tự tính lương dự kiến."}
+                </p>
+              </div>
+            </div>
+
+              {/* FIXED */}
+              {newSourceType === "fixed" && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-theme-text-muted ml-1 uppercase">Số tiền cố định nhận mỗi tháng (VNĐ)</label>
+                  <input type="text" className="glass-input w-full px-4 py-2.5 text-sm"
+                    placeholder="VD: 10.000.000" value={newSourceAmount}
+                    onChange={(e) => handleAmountChange(e, setNewSourceAmount)}
+                    onBlur={() => { if (newSourceAmount) setNewSourceAmount(formatCurrency(parseFormattedNumber(newSourceAmount))); }}
+                  />
+                  {newSourceType === 'fixed' && modalWordsPreview && (
+                    <p className="text-[10px] text-emerald-400/80 font-bold italic ml-2 mt-1">
+                      {modalWordsPreview}
+                    </p>
+                  )}
+                  <p className="text-[9px] text-emerald-400/70 ml-1 mt-1">💡 Sẽ tự động tính vào "Tổng thu nhập" trong hồ sơ.</p>
+                </div>
+              )}
+
+              {/* VARIABLE */}
+              {newSourceType === "variable" && (
+                <div className="p-3 rounded-xl bg-sky-500/5 border border-sky-500/15">
+                  <p className="text-[10px] text-sky-400 leading-relaxed">
+                    ℹ️ Với loại <strong>Biến đổi</strong>, không cần nhập số tiền trước. Khi có tiền, dùng form <strong className="text-emerald-400">"Ghi nhận Thu nhập"</strong> bên trái để cộng vào ngân sách.
+                  </p>
+                </div>
+              )}
+
+              {/* SCHEDULED */}
+              {newSourceType === "scheduled" && (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest mb-2">1. Chọn các ngày đi làm trong tuần</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','CN'].map((day, idx) => {
+                        const isSelected = (newWorkSchedule[idx] ?? 0) > 0;
+                        return (
+                          <button key={day} type="button"
+                            onClick={() => {
+                              const u = [...newWorkSchedule];
+                              u[idx] = isSelected ? 0 : 4;
+                              setNewWorkSchedule(u);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${isSelected ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' : 'bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] text-theme-text-muted hover:bg-[var(--theme-bg-surface)]'}`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {newWorkSchedule.some(h => h > 0) && (
+                    <div>
+                      <p className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest mb-2">2. Số giờ làm mỗi ca</p>
+                      <div className="space-y-2">
+                        {['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','CN'].map((day, idx) => {
+                          if ((newWorkSchedule[idx] ?? 0) === 0) return null;
+                          return (
+                            <div key={day} className="flex items-center gap-3">
+                              <span className="text-xs text-theme-text-muted w-14">{day}</span>
+                              <input type="number" min="0.5" max="24" step="0.5"
+                                value={newWorkSchedule[idx]}
+                                onChange={(e) => {
+                                  const u = [...newWorkSchedule];
+                                  u[idx] = parseFloat(e.target.value) || 0;
+                                  setNewWorkSchedule(u);
+                                }}
+                                className="glass-input w-24 py-2 text-center text-sm font-bold"
+                              />
+                              <span className="text-xs text-theme-text-muted">giờ</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest mb-2">3. Mức lương / giờ (VNĐ)</p>
+                    <input type="text" className="glass-input w-full px-4 py-2.5 text-sm"
+                      placeholder="VD: 50.000" value={newSourceRate}
+                      onChange={(e) => handleAmountChange(e, setNewSourceRate)}
+                      onBlur={() => { if (newSourceRate) setNewSourceRate(formatCurrency(parseFormattedNumber(newSourceRate))); }}
+                    />
+                    {newSourceType === 'scheduled' && modalWordsPreview && (
+                      <p className="text-[10px] text-emerald-400/80 font-bold italic ml-2 mt-1">
+                        {modalWordsPreview}
+                      </p>
+                    )}
+                  </div>
+
+                  {newSourceRate && newWorkSchedule.some(h => h > 0) && (() => {
+                    const totalHours = newWorkSchedule.reduce((sum, h, idx) => sum + h * (idx < 5 ? 4.33 : 4), 0);
+                    const forecast = Math.round(totalHours * parseFormattedNumber(newSourceRate));
+                    return (
+                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                        <p className="text-[10px] text-emerald-300">📊 Hệ thống đếm được tổng <strong>{totalHours.toFixed(1)} giờ</strong> làm việc trong tháng này.</p>
+                        <p className="text-sm font-black text-emerald-400 mt-1">Dự báo lương sẽ nhận: <span className="text-base">{formatCurrency(forecast)}đ</span></p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+            </div>
+            
+            <div className="pt-4 shrink-0 border-t border-[var(--theme-subtle-border)] mt-auto">
+              <button 
+                onClick={handleSaveSource} 
+                disabled={!newSourceName.trim() || (newSourceType === 'scheduled' && !newWorkSchedule.some(h => h > 0))}
+                className={`w-full py-3 rounded-2xl font-bold transition-all duration-300 ${
+                  (!newSourceName.trim() || (newSourceType === 'scheduled' && !newWorkSchedule.some(h => h > 0)))
+                    ? 'bg-[var(--theme-subtle-bg)] text-theme-text-muted cursor-not-allowed border border-[var(--theme-subtle-border)]' 
+                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5 active:scale-95'
+                }`}
+              >
+                {!newSourceName.trim() 
+                  ? 'Vui lòng nhập tên nguồn tiền' 
+                  : (newSourceType === 'scheduled' && !newWorkSchedule.some(h => h > 0))
+                    ? 'Vui lòng chọn lịch làm việc'
+                    : 'Xác nhận Nguồn Thu'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
+    <AnimatePresence>
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setConfirmDelete(null)}
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+          />
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 10 }}
+            className="glass-panel w-full max-w-sm p-8 rounded-[32px] relative z-10 border border-[var(--theme-subtle-border)] shadow-2xl overflow-hidden"
+            style={{ background: 'rgba(15, 23, 42, 0.85)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500/0 via-rose-500/50 to-rose-500/0" />
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20 mb-2">
+                <Trash2 className="w-8 h-8 text-rose-500" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-theme-text-primary mb-2">Xác nhận xóa?</h3>
+                <p className="text-sm text-theme-text-muted leading-relaxed">
+                  Bạn có chắc chắn muốn xóa <span className="text-rose-400 font-bold">{confirmDelete.type === 'source' ? 'nguồn thu' : 'khoản thu'}</span> <span className="text-rose-400 font-bold">"{confirmDelete.title}"</span>?
+                </p>
+                {confirmDelete.type === 'source' && (
+                  <p className="mt-4 p-3 bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded-xl text-[10px] text-theme-text-muted italic">
+                    * Lưu ý: Lịch sử tiền mặt đã nhận từ nguồn này vẫn sẽ được giữ lại để đảm bảo số dư ngân sách của bạn không bị sai lệch.
+                  </p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3 w-full mt-6">
+                <button onClick={() => setConfirmDelete(null)} className="px-4 py-3 rounded-2xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] text-theme-text-muted font-bold text-sm hover:bg-[var(--theme-bg-surface)] transition-all">Hủy bỏ</button>
+                <button onClick={() => executeDelete()} className="px-4 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 text-white font-bold text-sm shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 transition-all">Xác nhận xóa</button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }

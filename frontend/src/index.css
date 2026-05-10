@@ -8,59 +8,125 @@
    VIP PRO THEME SYSTEM - CSS CUSTOM PROPERTIES
    ============================================ */
 
-/* DEFAULT / CYBERPUNK THEME */
+/* NOVA DARK (Replaces Cyberpunk) */
 :root,
 [data-theme="cyberpunk"] {
-  --theme-bg-deep:       #030712;
-  --theme-bg-surface:    #0B0F19;
-  --theme-bg-panel:      rgba(15, 23, 42, 0.75);
-  --theme-neon-primary:  #00f5ff;
-  --theme-neon-accent:   #ff00c8;
-  --theme-neon-green:    #39ff14;
-  --theme-text-primary:  #f0f9ff;
-  --theme-text-muted:    #94a3b8;
-  --theme-border:        rgba(0, 245, 255, 0.15);
-  --theme-border-glow:   0 0 8px rgba(0,245,255,0.4), 0 0 24px rgba(0,245,255,0.15);
-  --theme-glass-bg:      rgba(15, 23, 42, 0.70);
-  --theme-glass-blur:    20px;
-  --theme-scrollbar:     rgba(0, 245, 255, 0.2);
-  --theme-ai-color:      #a855f7;
-}
-
-/* LIGHT TECH THEME */
-[data-theme="light-tech"] {
-  --theme-bg-deep:       #e8edf5;
-  --theme-bg-surface:    #f0f4fb;
-  --theme-bg-panel:      rgba(255, 255, 255, 0.65);
-  --theme-neon-primary:  #0ea5e9;
-  --theme-neon-accent:   #6366f1;
-  --theme-neon-green:    #10b981;
-  --theme-text-primary:  #0f172a;
-  --theme-text-muted:    #475569;
-  --theme-border:        rgba(14, 165, 233, 0.30);
-  --theme-border-glow:   0 0 12px rgba(14,165,233,0.25), 0 2px 8px rgba(0,0,0,0.08);
-  --theme-glass-bg:      rgba(255, 255, 255, 0.60);
+  --theme-bg-deep:       #0A0A0A;
+  --theme-bg-surface:    #111111;
+  --theme-bg-panel:      rgba(17, 17, 17, 0.85);
+  --theme-neon-primary:  #3B82F6;
+  --theme-neon-accent:   #8B5CF6;
+  --theme-neon-green:    #10B981;
+  --theme-text-primary:  #F8FAFC;
+  --theme-text-muted:    #94A3B8;
+  --theme-border:        rgba(255, 255, 255, 0.08);
+  --theme-border-glow:   0 0 10px rgba(59, 130, 246, 0.1);
+  --theme-glass-bg:      rgba(17, 17, 17, 0.7);
   --theme-glass-blur:    24px;
-  --theme-scrollbar:     rgba(14, 165, 233, 0.3);
-  --theme-ai-color:      #6366f1;
+  --theme-subtle-bg:     rgba(255, 255, 255, 0.05);
+  --theme-subtle-border: rgba(255, 255, 255, 0.1);
+  --theme-scrollbar:     rgba(59, 130, 246, 0.2);
+  --theme-ai-color:      #A855F7;
 }
 
-/* MATRIX THEME */
-[data-theme="matrix"] {
-  --theme-bg-deep:       #000500;
-  --theme-bg-surface:    #010d01;
-  --theme-bg-panel:      rgba(0, 20, 0, 0.80);
-  --theme-neon-primary:  #00ff41;
-  --theme-neon-accent:   #39ff14;
-  --theme-neon-green:    #00ff41;
-  --theme-text-primary:  #00ff41;
-  --theme-text-muted:    #00a82a;
-  --theme-border:        rgba(0, 255, 65, 0.25);
-  --theme-border-glow:   0 0 10px rgba(0,255,65,0.5), 0 0 30px rgba(0,255,65,0.2);
-  --theme-glass-bg:      rgba(0, 15, 0, 0.75);
+/* NOVA LIGHT (Replaces Light Tech) */
+[data-theme="light-tech"] {
+  --theme-bg-deep:       #F8FAFC;
+  --theme-bg-surface:    #FFFFFF;
+  --theme-bg-panel:      rgba(255, 255, 255, 0.95);
+  --theme-neon-primary:  #2563EB;
+  --theme-neon-accent:   #6366F1;
+  --theme-neon-green:    #059669;
+  --theme-text-primary:  #0F172A;
+  --theme-text-muted:    #64748B;
+  --theme-border:        rgba(0, 0, 0, 0.08);
+  --theme-border-glow:   0 4px 12px rgba(0,0,0,0.03);
+  --theme-glass-bg:      rgba(255, 255, 255, 0.8);
   --theme-glass-blur:    16px;
-  --theme-scrollbar:     rgba(0, 255, 65, 0.3);
-  --theme-ai-color:      #00ff41;
+  --theme-subtle-bg:     rgba(0, 0, 0, 0.03);
+  --theme-subtle-border: rgba(0, 0, 0, 0.08);
+  --theme-scrollbar:     rgba(0, 0, 0, 0.1);
+  --theme-ai-color:      #7C3AED;
+}
+
+/* MIDNIGHT EMERALD (Replaces Matrix) */
+[data-theme="matrix"] {
+  --theme-bg-deep:       #000000;
+  --theme-bg-surface:    #050505;
+  --theme-bg-panel:      rgba(5, 5, 5, 0.9);
+  --theme-neon-primary:  #10B981;
+  --theme-neon-accent:   #059669;
+  --theme-neon-green:    #34D399;
+  --theme-text-primary:  #ECFDF5;
+  --theme-text-muted:    #6EE7B7;
+  --theme-border:        rgba(16, 185, 129, 0.15);
+  --theme-border-glow:   0 0 15px rgba(16, 185, 129, 0.1);
+  --theme-glass-bg:      rgba(5, 5, 5, 0.8);
+  --theme-glass-blur:    20px;
+  --theme-subtle-bg:     rgba(16, 185, 129, 0.05);
+  --theme-subtle-border: rgba(16, 185, 129, 0.1);
+  --theme-scrollbar:     rgba(16, 185, 129, 0.2);
+  --theme-ai-color:      #10B981;
+}
+
+/* SAKURA PINK (Cute & Girly Theme) */
+[data-theme="sakura"] {
+  --theme-bg-deep:       #FFF0F5;
+  --theme-bg-surface:    #FFFFFF;
+  --theme-bg-panel:      rgba(255, 255, 255, 0.9);
+  --theme-neon-primary:  #EC4899;
+  --theme-neon-accent:   #F43F5E;
+  --theme-neon-green:    #F472B6;
+  --theme-text-primary:  #831843;
+  --theme-text-muted:    #BE185D;
+  --theme-border:        rgba(236, 72, 153, 0.2);
+  --theme-border-glow:   0 4px 15px rgba(236, 72, 153, 0.1);
+  --theme-glass-bg:      rgba(255, 250, 252, 0.85);
+  --theme-glass-blur:    16px;
+  --theme-subtle-bg:     rgba(236, 72, 153, 0.06);
+  --theme-subtle-border: rgba(236, 72, 153, 0.15);
+  --theme-scrollbar:     rgba(236, 72, 153, 0.15);
+  --theme-ai-color:      #DB2777;
+}
+
+/* OCEAN BLUE (Refreshing & Calm Theme) */
+[data-theme="ocean"] {
+  --theme-bg-deep:       #F0F9FF;
+  --theme-bg-surface:    #FFFFFF;
+  --theme-bg-panel:      rgba(255, 255, 255, 0.9);
+  --theme-neon-primary:  #0EA5E9;
+  --theme-neon-accent:   #0284C7;
+  --theme-neon-green:    #38BDF8;
+  --theme-text-primary:  #082F49;
+  --theme-text-muted:    #0369A1;
+  --theme-border:        rgba(14, 165, 233, 0.2);
+  --theme-border-glow:   0 4px 15px rgba(14, 165, 233, 0.1);
+  --theme-glass-bg:      rgba(240, 249, 255, 0.85);
+  --theme-glass-blur:    16px;
+  --theme-subtle-bg:     rgba(14, 165, 233, 0.06);
+  --theme-subtle-border: rgba(14, 165, 233, 0.15);
+  --theme-scrollbar:     rgba(14, 165, 233, 0.15);
+  --theme-ai-color:      #0284C7;
+}
+
+/* SUNSET ORANGE (Warm & Vibrant Theme) */
+[data-theme="sunset"] {
+  --theme-bg-deep:       #1A0B02;
+  --theme-bg-surface:    #2D1305;
+  --theme-bg-panel:      rgba(45, 19, 5, 0.85);
+  --theme-neon-primary:  #F97316;
+  --theme-neon-accent:   #EF4444;
+  --theme-neon-green:    #F59E0B;
+  --theme-text-primary:  #FFF7ED;
+  --theme-text-muted:    #FDBA74;
+  --theme-border:        rgba(249, 115, 22, 0.15);
+  --theme-border-glow:   0 0 15px rgba(249, 115, 22, 0.15);
+  --theme-glass-bg:      rgba(45, 19, 5, 0.7);
+  --theme-glass-blur:    20px;
+  --theme-subtle-bg:     rgba(249, 115, 22, 0.05);
+  --theme-subtle-border: rgba(249, 115, 22, 0.1);
+  --theme-scrollbar:     rgba(249, 115, 22, 0.2);
+  --theme-ai-color:      #EA580C;
 }
 
 /* ============================================
@@ -83,9 +149,10 @@
     font-family: 'Outfit', sans-serif;
   }
 
-  [data-theme="matrix"] body,
-  [data-theme="matrix"] * {
-    font-family: 'Share Tech Mono', monospace !important;
+  /* Remove browser default password reveal/clear buttons (Edge/Chrome) */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
   }
 }
 
@@ -93,46 +160,40 @@
    COMPONENT LIBRARY - THEME AWARE
    ============================================ */
 @layer components {
-  /* VIP PRO Glass Panel */
+  /* VIP PRO Glass Panel - Optimized for Mobile & Sharpness */
   .glass-panel {
     background: var(--theme-glass-bg);
-    backdrop-filter: blur(var(--theme-glass-blur));
-    -webkit-backdrop-filter: blur(var(--theme-glass-blur));
+    backdrop-filter: blur(10px); /* Reduced from 24px for sharpness */
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid var(--theme-border);
     border-radius: 1.5rem;
-    box-shadow: var(--theme-border-glow), 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.05);
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    box-shadow: var(--theme-border-glow), 0 4px 20px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
     overflow: hidden;
     position: relative;
   }
 
-  /* Neon Jar Card (Budget Jars) */
-  .neon-jar-card {
-    background: var(--theme-glass-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 1.25rem;
-    border: 1px solid var(--theme-border);
-    box-shadow: var(--theme-border-glow);
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    position: relative;
-    overflow: hidden;
+  @media (min-width: 1024px) {
+    .glass-panel {
+      backdrop-filter: blur(var(--theme-glass-blur));
+      -webkit-backdrop-filter: blur(var(--theme-glass-blur));
+    }
   }
 
-  .neon-jar-card:hover {
-    transform: scale(1.02) translateY(-2px);
-    box-shadow: var(--theme-border-glow), 0 20px 40px rgba(0,0,0,0.4);
-  }
-
-  /* Input fields */
+  /* Input fields - Sharper on Mobile */
   .glass-input {
-    background: var(--theme-glass-bg);
+    background: var(--theme-bg-surface);
     border: 1px solid var(--theme-border);
-    backdrop-filter: blur(8px);
-    @apply w-full rounded-2xl px-4 py-3.5 placeholder-gray-500 focus:outline-none focus:ring-2 transition-all duration-300;
+    @apply w-full rounded-2xl px-4 py-3 sm:py-3.5 placeholder-gray-500 focus:outline-none focus:ring-2 transition-all duration-300;
     color: var(--theme-text-primary);
-    focus-ring-color: var(--theme-neon-primary);
+    font-size: 16px !important; /* Prevent iOS zoom on focus */
   }
+
+  [data-theme="light-tech"] .glass-input {
+    background: #fff;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+  }
+
 
   .btn-primary {
     @apply relative overflow-hidden font-bold tracking-wide py-3.5 px-6 rounded-2xl transition-all duration-300 active:scale-[0.98];
@@ -141,17 +202,17 @@
     box-shadow: 0 0 20px rgba(0,245,255,0.3);
   }
 
-  [data-theme="cyberpunk"] .btn-primary {
-    color: #000;
-  }
-
-  [data-theme="light-tech"] .btn-primary {
+  [data-theme="sakura"] .btn-primary,
+[data-theme="ocean"] .btn-primary,
+[data-theme="light-tech"] .btn-primary {
     color: #fff;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
   }
 
-  [data-theme="matrix"] .btn-primary {
+[data-theme="sunset"] .btn-primary,
+[data-theme="cyberpunk"] .btn-primary,
+[data-theme="matrix"] .btn-primary {
     color: #000;
-    font-family: 'Share Tech Mono', monospace;
   }
 
   .btn-secondary {
@@ -163,6 +224,7 @@
 
   .btn-secondary:hover {
     color: var(--theme-text-primary);
+    background: var(--theme-bg-surface);
     border-color: var(--theme-neon-primary);
     box-shadow: var(--theme-border-glow);
   }

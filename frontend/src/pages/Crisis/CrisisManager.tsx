@@ -107,7 +107,7 @@ export default function CrisisManager() {
               {isCrisis ? <Flame className="w-6 h-6 text-orange-500" /> : <CheckCircle className="w-6 h-6 text-emerald-500" />}
             </div>
 
-            <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] hover:bg-[var(--theme-bg-surface)] transition-colors">
               <div>
                 <h4 className="text-gray-200 font-bold">Số dư khả dụng</h4>
                 <p className="text-sm text-theme-text-muted mt-1">Hiện tại: {new Intl.NumberFormat('vi-VN').format(summary?.totalBalance || 0)} đ</p>
@@ -118,7 +118,7 @@ export default function CrisisManager() {
         </motion.div>
 
         {/* AI Recommendations */}
-        <motion.div variants={itemVars} className="glass-panel p-8 rounded-3xl border-white/5 relative overflow-hidden group">
+        <motion.div variants={itemVars} className="glass-panel p-8 rounded-3xl border-[var(--theme-subtle-border)] relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
           <h2 className="text-xl font-bold text-theme-text-primary mb-6 flex items-center gap-2">
             <ShieldAlert className="w-6 h-6 text-indigo-400" />
@@ -128,7 +128,7 @@ export default function CrisisManager() {
           <ul className="space-y-4">
             {isCrisis ? (
               <>
-                <li className="flex items-start gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer border border-transparent hover:border-white/10">
+                <li className="flex items-start gap-3 p-3 rounded-xl hover:bg-[var(--theme-subtle-bg)] transition-colors group cursor-pointer border border-transparent hover:border-[var(--theme-subtle-border)]">
                   <div className="mt-1 w-6 h-6 rounded-full bg-rose-500/20 flex items-center justify-center shrink-0">
                     <ArrowDownToLine className="w-3 h-3 text-rose-400" />
                   </div>
@@ -137,7 +137,7 @@ export default function CrisisManager() {
                     <span className="text-sm text-theme-text-muted leading-relaxed block mt-1">Hạn chế các khoản quẹt thẻ không kiểm soát trong 14 ngày tới.</span>
                   </div>
                 </li>
-                <li className="flex items-start gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer border border-transparent hover:border-white/10">
+                <li className="flex items-start gap-3 p-3 rounded-xl hover:bg-[var(--theme-subtle-bg)] transition-colors group cursor-pointer border border-transparent hover:border-[var(--theme-subtle-border)]">
                   <div className="mt-1 w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
                     <Shield className="w-3 h-3 text-amber-500" />
                   </div>

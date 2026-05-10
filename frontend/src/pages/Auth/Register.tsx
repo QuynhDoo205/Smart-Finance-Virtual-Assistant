@@ -112,33 +112,33 @@ export default function Register() {
                 </h1>
               </div>
 
-              <motion.div variants={itemVariants} className="mb-8 text-center lg:text-left">
-                <h2 className="text-3xl font-bold text-theme-text-primary mb-2">Tạo tài khoản</h2>
-                <p className="text-theme-text-muted">Gia nhập thế hệ quản lý tài chính 4.0</p>
+              <motion.div variants={itemVariants} className="mb-6 text-center lg:text-left">
+                <h2 className="text-2xl font-bold text-theme-text-primary mb-1">Tạo tài khoản</h2>
+                <p className="text-xs text-theme-text-muted">Gia nhập thế hệ quản lý tài chính 4.0</p>
               </motion.div>
               
-              <motion.div variants={itemVariants} className="glass-panel p-8 sm:p-10">
+              <motion.div variants={itemVariants} className="glass-panel p-6 sm:p-8 max-w-[420px] mx-auto lg:ml-0">
                 {error && (
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-3"
+                    className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-2"
                   >
-                    <AlertCircle className="w-5 h-5 text-rose-400 flex-shrink-0" />
-                    <p className="text-sm text-rose-300">{error}</p>
+                    <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                    <p className="text-[12px] text-rose-300">{error}</p>
                   </motion.div>
                 )}
 
-                <form onSubmit={handleRegister} className="space-y-6">
-                  <div className="space-y-1.5">
-                    <label className="text-sm text-theme-text-muted font-medium ml-1">Họ và tên</label>
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[12px] text-theme-text-muted font-medium ml-1">Họ và tên</label>
                     <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
-                        <User className="h-5 w-5" />
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
+                        <User className="h-4 w-4" />
                       </div>
                       <input
                         type="text"
-                        className="glass-input pl-11"
+                        className="glass-input pl-10 py-2.5 text-sm"
                         placeholder="Nguyễn Văn A"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
@@ -148,15 +148,15 @@ export default function Register() {
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-sm text-theme-text-muted font-medium ml-1">Email</label>
+                  <div className="space-y-1">
+                    <label className="text-[12px] text-theme-text-muted font-medium ml-1">Email</label>
                     <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
-                        <Mail className="h-5 w-5" />
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
+                        <Mail className="h-4 w-4" />
                       </div>
                       <input
                         type="email"
-                        className="glass-input pl-11"
+                        className="glass-input pl-10 py-2.5 text-sm"
                         placeholder="name@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -166,15 +166,15 @@ export default function Register() {
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-sm text-theme-text-muted font-medium ml-1">Mật khẩu</label>
+                  <div className="space-y-1">
+                    <label className="text-[12px] text-theme-text-muted font-medium ml-1">Mật khẩu</label>
                     <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
-                        <Lock className="h-5 w-5" />
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
+                        <Lock className="h-4 w-4" />
                       </div>
                       <input
                         type={showPassword ? "text" : "password"}
-                        className={`glass-input pl-11 pr-12 ${password.length > 0 && password.length < 6 ? 'border-rose-500/50 bg-rose-500/5' : ''}`}
+                        className="glass-input pl-10 pr-10 py-2.5 text-sm"
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -184,25 +184,22 @@ export default function Register() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-theme-text-muted hover:text-primary-400 transition-colors"
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-theme-text-muted hover:text-primary-400 transition-colors"
                       >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    {password.length > 0 && password.length < 6 && (
-                      <p className="text-[10px] text-rose-400 font-bold ml-1">Mật khẩu tối thiểu 6 ký tự</p>
-                    )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-sm text-theme-text-muted font-medium ml-1">Xác nhận mật khẩu</label>
+                  <div className="space-y-1">
+                    <label className="text-[12px] text-theme-text-muted font-medium ml-1">Xác nhận mật khẩu</label>
                     <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
-                        <CheckCircle2 className="h-5 w-5" />
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
+                        <CheckCircle2 className="h-4 w-4" />
                       </div>
                       <input
                         type={showConfirmPassword ? "text" : "password"}
-                        className={`glass-input pl-11 pr-12 ${confirmPassword.length > 0 && confirmPassword !== password ? 'border-rose-500/50 bg-rose-500/5' : ''}`}
+                        className="glass-input pl-10 pr-10 py-2.5 text-sm"
                         placeholder="••••••••"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -212,54 +209,49 @@ export default function Register() {
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-theme-text-muted hover:text-primary-400 transition-colors"
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-theme-text-muted hover:text-primary-400 transition-colors"
                       >
-                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    {confirmPassword.length > 0 && confirmPassword !== password && (
-                      <p className="text-[10px] text-rose-400 font-bold ml-1">Mật khẩu xác nhận không khớp</p>
-                    )}
                   </div>
 
                   <motion.button 
-                    whileHover={{ scale: loading ? 1 : 1.02 }}
-                    whileTap={{ scale: loading ? 1 : 0.98 }}
+                    whileHover={{ scale: loading ? 1 : 1.01 }}
+                    whileTap={{ scale: loading ? 1 : 0.99 }}
                     type="submit" 
-                    className="btn-primary w-full flex justify-center items-center gap-2 mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="btn-primary w-full flex justify-center items-center gap-2 py-3 mt-2 disabled:opacity-60 text-sm shadow-lg shadow-primary-500/20"
                     disabled={loading}
                   >
                     {loading ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Đang khởi tạo...</span>
-                      </>
+                      <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
-                        <UserPlus className="w-5 h-5" />
+                        <UserPlus className="w-4 h-4" />
                         <span>Đăng ký ngay</span>
                       </>
                     )}
                   </motion.button>
                 </form>
 
-                <div className="mt-8">
+                <div className="mt-6">
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-white/10"></div>
+                      <div className="w-full border-t border-[var(--theme-subtle-border)]"></div>
                     </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-3 bg-[#111827] text-theme-text-muted rounded-full border border-white/5">Hoặc tiếp tục với</span>
+                    <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold">
+                      <span className="px-3 bg-[#030712] text-theme-text-muted">Hoặc tiếp tục với</span>
                     </div>
                   </div>
 
-                  <div className="mt-6 flex flex-col gap-4 items-center">
-                    <div className="w-full max-w-sm flex justify-center py-2 bg-white rounded-xl overflow-hidden hover:bg-gray-50 transition-colors">
+                  <div className="mt-4 flex flex-col items-center">
+                    <div className="w-full flex justify-center scale-90 origin-center transition-transform hover:scale-95">
                       <GoogleLogin
                         onSuccess={handleGoogleSuccess}
                         onError={() => setError('Đăng ký Google bị gián đoạn')}
                         useOneTap
-                        shape="pill"
+                        shape="rectangular"
+                        theme="filled_black"
                         text="signup_with"
                         width="320"
                       />
@@ -267,13 +259,14 @@ export default function Register() {
                   </div>
                 </div>
                 
-                <p className="mt-8 text-center text-theme-text-muted">
+                <p className="mt-6 text-center text-[13px] text-theme-text-muted">
                   Đã có tài khoản?{' '}
                   <Link to="/login" className="text-primary-400 hover:text-primary-300 font-bold transition-colors">
                     Trở lại đăng nhập
                   </Link>
                 </p>
               </motion.div>
+
             </motion.div>
           ) : (
             <motion.div 
@@ -305,7 +298,7 @@ export default function Register() {
       </div>
 
       {/* RIGHT SIDE: Brand & Graphic */}
-      <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-12 overflow-hidden border-l border-white/5">
+      <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-12 overflow-hidden border-l border-[var(--theme-subtle-border)]">
         <div className="absolute inset-0 z-0 text-right">
           <img 
             src="/hero-bg.png" 
@@ -330,7 +323,7 @@ export default function Register() {
           transition={{ duration: 1, delay: 0.5 }}
           className="relative z-20 max-w-lg ml-auto"
         >
-          <div className="p-8 rounded-[2rem] bg-white/5 backdrop-blur-md border border-white/10 shadow-2xl text-right">
+          <div className="p-8 rounded-[2rem] bg-[var(--theme-subtle-bg)] backdrop-blur-md border border-[var(--theme-subtle-border)] shadow-2xl text-right">
             <h2 className="text-4xl font-extrabold text-theme-text-primary leading-tight mb-4 drop-shadow-lg">
               Bắt đầu hành trình<br/>
               tự do tài chính.

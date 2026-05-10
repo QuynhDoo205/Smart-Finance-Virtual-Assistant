@@ -18,8 +18,7 @@ import ExpenseTracker from './pages/Expense/ExpenseTracker';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
-  // Demo placeholder Client ID. The user will need to configure their real one.
-  const GOOGLE_CLIENT_ID = '97914893984-ucfpo0bs0ggn0vtvlgg1l0l7o1eifaja.apps.googleusercontent.com';
+  const GOOGLE_CLIENT_ID = '509981311672-d3g4gkko1ir0qmritmdpvquh01gvnvso.apps.googleusercontent.com';
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>

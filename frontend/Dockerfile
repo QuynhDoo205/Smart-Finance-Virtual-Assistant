@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 
 # Install pnpm and dependencies
-RUN npm install -g pnpm && pnpm install
+RUN npm install -g pnpm && pnpm config set ignore-scripts true && pnpm install
 
 # Copy source maps and resources
 COPY . .
@@ -28,6 +28,14 @@ RUN echo "server { \
         root /usr/share/nginx/html; \
         index index.html index.htm; \
         try_files \$uri \$uri/ /index.html; \
+    } \
+    location /api { \
+        proxy_pass http://novafinance_backend:5000; \
+        proxy_http_version 1.1; \
+        proxy_set_header Upgrade \$http_upgrade; \
+        proxy_set_header Connection 'upgrade'; \
+        proxy_set_header Host \$host; \
+        proxy_cache_bypass \$http_upgrade; \
     } \
 }" > /etc/nginx/conf.d/default.conf
 
