@@ -23,6 +23,7 @@ interface IncomeRecord {
   sourceId: string;
   amount: number;
   date: string;
+  category?: SourceCategory;
 }
 
 export default function IncomeManager() {
@@ -42,8 +43,9 @@ export default function IncomeManager() {
   };
 
   const [amount, setAmount] = useState("");
-  const [sourceId, setSourceId] = useState("");
-  const [date, setDate] = useState(getLocalDateStr());
+  const [sourceId, setSourceId] = useState<string>("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedRecordCategory, setSelectedRecordCategory] = useState<SourceCategory>("salary");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string; type: 'record' | 'source' } | null>(null);
 
   const todayStr = getLocalDateStr();
@@ -87,8 +89,9 @@ export default function IncomeManager() {
           transactionsApi.list(50),
         ]);
 
+        let mappedSources: IncomeSource[] = [];
         if (srcRes.success) {
-          const mappedSources: IncomeSource[] = srcRes.data.sources.map(
+          mappedSources = srcRes.data.sources.map(
             (s: any) => ({
               id: s.id.toString(),
               name: s.ten_nguon,
@@ -112,12 +115,30 @@ export default function IncomeManager() {
               (t: any) =>
                 t.type === "income" || t.loai_giao_dich === "thu_nhap",
             )
-            .map((t: any) => ({
-              id: t.id.toString(),
-              sourceId: "1",
-              amount: parseFloat(t.so_tien || t.amount),
-              date: t.ngay_giao_dich || t.transaction_date,
-            }))
+            .map((t: any) => {
+              // Tìm sourceId từ note hoặc title nếu có (format: "Thu nhập từ [Tên Nguồn]")
+              const note = t.ghi_chu || t.note || "";
+              const matchedSource = mappedSources.find(s => note.includes(s.name) || (t.tieu_de || t.title || "").includes(s.name));
+              
+              // Xác định loại dựa trên note [salary], [allowance], [other]...
+              let type: SourceCategory | undefined = undefined;
+              if (note.includes('[salary]')) type = 'salary';
+              else if (note.includes('[allowance]')) type = 'allowance';
+              else if (note.includes('[other]')) type = 'other';
+              
+              // Nếu không có tag cụ thể, lấy loại của nguồn tiền tương ứng
+              if (!type && matchedSource) {
+                type = matchedSource.sourceType;
+              }
+
+              return {
+                id: t.id.toString(),
+                sourceId: matchedSource ? matchedSource.id : "other",
+                amount: parseFloat(t.so_tien || t.amount),
+                date: t.ngay_giao_dich || t.transaction_date,
+                category: type || 'other'
+              };
+            })
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
           setRecords(mappedRecords);
         }
@@ -179,9 +200,9 @@ export default function IncomeManager() {
         title: source?.name || "Thu nhập",
         amount: numericAmount,
         type: "thu_nhap",
-        categoryId: 1,
+        categoryId: selectedRecordCategory === 'salary' ? 1 : selectedRecordCategory === 'allowance' ? 2 : 3,
         date: date,
-        note: `Thu nhập ghi từ ${source?.name}`,
+        note: `Thu nhập [${selectedRecordCategory}] từ ${source?.name}`,
       });
 
       if (res.success) {
@@ -404,18 +425,40 @@ export default function IncomeManager() {
 
 
 
-  // --- Breakdown by category ---
+  // --- Breakdown by category (Actual money received this month) ---
   const incomeBreakdown = useMemo(() => {
-    const salary = sources.filter(s => s.sourceType === 'salary').reduce((sum, s) => sum + (s.expectedAmount ?? 0), 0);
-    const allowance = sources.filter(s => s.sourceType === 'allowance').reduce((sum, s) => sum + (s.expectedAmount ?? 0), 0);
-    const other = sources.filter(s => s.sourceType === 'other').reduce((sum, s) => {
-      if (s.type === 'scheduled' && s.workSchedule && s.hourlyRate) {
-        return sum + calculateMonthlyForecast(s.workSchedule, s.hourlyRate);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const currentMonthRecords = records.filter(r => {
+      const d = new Date(r.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    let salary = 0;
+    let allowance = 0;
+    let other = 0;
+
+    currentMonthRecords.forEach(r => {
+      // Ưu tiên lấy category trực tiếp từ record (đã được lưu trong note)
+      if (r.category === 'salary') salary += r.amount;
+      else if (r.category === 'allowance') allowance += r.amount;
+      else {
+        // Nếu không có category cụ thể, thử khớp qua Source
+        const source = sources.find(s => s.id === r.sourceId);
+        if (source) {
+          if (source.sourceType === 'salary') salary += r.amount;
+          else if (source.sourceType === 'allowance') allowance += r.amount;
+          else other += r.amount;
+        } else {
+          other += r.amount;
+        }
       }
-      return sum + (s.expectedAmount ?? 0);
-    }, 0);
+    });
+
     return { salary, allowance, other };
-  }, [sources]);
+  }, [records, sources]);
 
   const QUICK_ADD = [
     { label: '+Thưởng (1M)', amount: 1000000 },
@@ -705,6 +748,27 @@ export default function IncomeManager() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest ml-1">Phân loại khoản thu này</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'salary', label: 'Lương', icon: '💼' },
+                  { id: 'allowance', label: 'Trợ cấp', icon: '🎁' },
+                  { id: 'other', label: 'Thưởng/Tips/Khác', icon: '✨' },
+                ].map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedRecordCategory(cat.id as SourceCategory)}
+                    className={`py-2 rounded-xl text-[11px] font-bold border transition-all flex flex-col items-center gap-1 ${selectedRecordCategory === cat.id ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] text-theme-text-muted hover:bg-[var(--theme-bg-surface)]'}`}
+                  >
+                    <span className="text-sm">{cat.icon}</span>
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest ml-1">Số tiền thực nhận (đ)</label>
               <div className="relative">
@@ -856,21 +920,27 @@ export default function IncomeManager() {
         className="glass-panel p-6 rounded-[24px] border border-[var(--theme-subtle-border)] relative overflow-hidden"
       >
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/0 via-emerald-500/50 to-emerald-500/0" />
-        <h3 className="text-base font-black text-theme-text-primary mb-4 flex items-center gap-2">
+        <h3 className="text-base font-black text-theme-text-primary mb-6 flex items-center gap-2">
           <Settings className="w-5 h-5 text-emerald-400" />
           Giải thích thuật ngữ
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-2">
-            <h4 className="text-emerald-400 font-black text-[9px] uppercase tracking-widest">Thu nhập dự tính là gì?</h4>
-            <p className="text-[11px] text-theme-text-muted leading-relaxed">
-              Đây là số tiền <b>bạn mong đợi</b> nhận được (Ví dụ: Lương cố định 10tr). Nó giúp bạn lập kế hoạch chi tiêu trước khi có tiền mặt.
+            <h4 className="text-emerald-400 font-bold text-[10px] uppercase tracking-wider">Thu nhập dự tính là gì?</h4>
+            <p className="text-xs text-theme-text-muted leading-relaxed">
+              Đây là số tiền bạn <b>kỳ vọng</b> nhận được (VD: Lương cố định 15Tr). Nó giúp bạn lập kế hoạch chi tiêu trước khi có tiền mặt.
             </p>
           </div>
           <div className="space-y-2">
-            <h4 className="text-sky-400 font-black text-[9px] uppercase tracking-widest">Tiền mặt thực tế là gì?</h4>
-            <p className="text-[11px] text-theme-text-muted leading-relaxed">
+            <h4 className="text-sky-400 font-bold text-[10px] uppercase tracking-wider">Tiền mặt thực tế là gì?</h4>
+            <p className="text-xs text-theme-text-muted leading-relaxed">
               Đây là số tiền <b>thực sự đã vào túi</b> bạn. Khi nhận tiền, bạn hãy "Ghi nhận" để số dư ngân sách được cập nhật chính xác.
+            </p>
+          </div>
+          <div className="space-y-2 md:col-span-2 pt-2 border-t border-white/5">
+            <h4 className="text-purple-400 font-bold text-[10px] uppercase tracking-wider">Tại sao Thực thu có thể cao hơn Dự tính?</h4>
+            <p className="text-xs text-theme-text-muted leading-relaxed">
+              Khi thực thu (70Tr) cao hơn dự tính (15Tr), phần <b>vượt mức (55Tr)</b> thường đến từ các khoản phát sinh như: Thưởng đột xuất, Bán đồ cũ, hoặc các khoản Trợ cấp không nằm trong kế hoạch. Hệ thống sẽ tự động đưa các khoản này vào mục <b>"Khác (thực tế)"</b> để đảm bảo dòng tiền của bạn luôn khớp với thực tế 100%.
             </p>
           </div>
         </div>
