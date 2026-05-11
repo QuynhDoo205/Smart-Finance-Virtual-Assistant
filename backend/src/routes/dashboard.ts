@@ -206,6 +206,33 @@ router.get('/savings-goals', async (req: AuthRequest, res: Response): Promise<vo
 });
 
 // ============================================================
+// POST /api/dashboard/savings-goals – Thêm Mục tiêu tiết kiệm
+// ============================================================
+router.post('/savings-goals', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { name, targetAmount, deadline, icon, color } = req.body;
+
+    if (!name || !targetAmount || !deadline) {
+      res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc' });
+      return;
+    }
+
+    const result = await pool.query(
+      `INSERT INTO muc_tieu_tiet_kiem (nguoi_dung_id, ten_muc_tieu, so_tien_muc_tieu, so_tien_hien_tai, ngay_het_han, bieu_tuong, mau_sac, trang_thai)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'in_progress')
+       RETURNING id, ten_muc_tieu AS name, so_tien_muc_tieu AS target_amount, so_tien_hien_tai AS current_amount, ngay_het_han AS deadline, bieu_tuong AS icon, mau_sac AS color, trang_thai AS status`,
+      [userId, name, targetAmount, 0, deadline, icon || '🎯', color || '#818cf8']
+    );
+
+    res.json({ success: true, data: { goal: result.rows[0] } });
+  } catch (err) {
+    console.error('Create savings goal error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
+  }
+});
+
+// ============================================================
 // GET /api/dashboard/chart-data – Dữ liệu biểu đồ 6 tháng gần nhất
 // ============================================================
 router.get('/chart-data', async (req: AuthRequest, res: Response): Promise<void> => {

@@ -150,7 +150,13 @@ export default function Dashboard() {
   })();
 
   return (
-    <motion.div variants={containerVars} initial="hidden" animate="show" className="space-y-6 pb-16 p-2 sm:p-0">
+    <motion.div 
+      variants={containerVars} 
+      initial="hidden" 
+      whileInView="show" 
+      viewport={{ once: true, amount: 0.05 }} 
+      className="space-y-6 pb-16 p-2 sm:p-0"
+    >
       
       {/* --- Premium Greeting Header --- */}
       <motion.div variants={itemVars} className="flex justify-between items-end mb-2 px-2">

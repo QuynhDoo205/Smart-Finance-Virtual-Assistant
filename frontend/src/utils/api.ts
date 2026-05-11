@@ -119,6 +119,12 @@ export const dashboardApi = {
   
   getSavingsGoals: () =>
     apiFetch<{ success: boolean; data: { goals: SavingsGoal[] } }>('/dashboard/savings-goals'),
+    
+  createSavingsGoal: (goalData: { name: string; targetAmount: number; deadline: string; icon?: string; color?: string }) =>
+    apiFetch<{ success: boolean; data: { goal: SavingsGoal } }>('/dashboard/savings-goals', {
+      method: 'POST',
+      body: JSON.stringify(goalData),
+    }),
   
   getChartData: () =>
     apiFetch<{ success: boolean; data: { chartData: ChartDataPoint[] } }>('/dashboard/chart-data'),

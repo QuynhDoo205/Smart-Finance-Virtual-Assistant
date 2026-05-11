@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus, X, Trash2, CheckCircle2, AlertCircle, Info, Settings, Wallet, Banknote, Edit3, TrendingUp, ChevronDown, HelpCircle } from "lucide-react";
+import { Plus, X, Trash2, CheckCircle2, AlertCircle, Info, Settings, Wallet, Banknote, Edit3, TrendingUp, ChevronDown, HelpCircle, Gift, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { dashboardApi, incomeApi, transactionsApi, userApi } from "../../utils/api";
 import { calculateMonthlyForecast } from "../../utils/salaryCalculator";
@@ -212,10 +212,15 @@ export default function IncomeManager() {
             sourceId,
             amount: numericAmount,
             date,
+            category: selectedRecordCategory,
           },
           ...prev,
         ]);
         setAmount("");
+        setNotification({ 
+          type: 'success', 
+          message: `Đã cộng ${formatCurrency(numericAmount)}đ vào ngân sách tháng này! ✓` 
+        });
       }
     } catch (err) {
       console.error("Record income failed:", err);
@@ -471,7 +476,8 @@ export default function IncomeManager() {
     <motion.div
       variants={containerVars}
       initial="hidden"
-      animate="show"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.05 }}
       className="space-y-8 max-w-5xl mx-auto pb-20 p-6"
     >
       {/* Notification Toast */}
@@ -884,16 +890,22 @@ export default function IncomeManager() {
                   className="flex justify-between items-center p-3 rounded-2xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] hover:border-emerald-500/20 transition-all group"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-                      <Wallet className="w-4 h-4 text-emerald-400" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-colors ${
+                      (record.category || sources.find(s => s.id === record.sourceId)?.sourceType) === 'salary' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                      (record.category || sources.find(s => s.id === record.sourceId)?.sourceType) === 'allowance' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+                      'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                    }`}>
+                      {(record.category || sources.find(s => s.id === record.sourceId)?.sourceType) === 'salary' ? <Banknote className="w-4 h-4" /> :
+                       (record.category || sources.find(s => s.id === record.sourceId)?.sourceType) === 'allowance' ? <Gift className="w-4 h-4" /> :
+                       <Sparkles className="w-4 h-4" />}
                     </div>
                     <div>
                       <p className="text-xs font-bold text-theme-text-primary">
                         {sources.find((s) => s.id === record.sourceId)?.name || "Thu nhập"}
                       </p>
                       <p className="text-[9px] font-bold text-theme-text-muted">
-                        {sources.find(s => s.id === record.sourceId)?.sourceType === 'salary' ? '💼 Lương' : 
-                         sources.find(s => s.id === record.sourceId)?.sourceType === 'allowance' ? '🎁 Trợ cấp' : '✨ Khác'} • {getLocalDateStr(record.date)}
+                        {record.category === 'salary' || (!record.category && sources.find(s => s.id === record.sourceId)?.sourceType === 'salary') ? '💼 Lương' : 
+                         record.category === 'allowance' || (!record.category && sources.find(s => s.id === record.sourceId)?.sourceType === 'allowance') ? '🎁 Trợ cấp' : '✨ Khác'} • {getLocalDateStr(record.date)}
                       </p>
                     </div>
                   </div>
