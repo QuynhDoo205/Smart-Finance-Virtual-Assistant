@@ -164,6 +164,25 @@ export const userApi = {
       body: formData,
     });
   },
+  
+  getBadges: () =>
+    apiFetch<{ 
+      success: boolean; 
+      data: { 
+        xp: number; 
+        level: number; 
+        nextLevelXp: number; 
+        badges: Array<{
+          id: number;
+          ma_danh_hieu: string;
+          ten_danh_hieu: string;
+          mo_ta: string;
+          icon: string;
+          loai: string;
+          isUnlocked: boolean;
+        }>
+      } 
+    }>('/user/badges'),
 };
 
 // Transactions API
@@ -295,6 +314,8 @@ export interface UserProfile {
   onboarding_completed: boolean;
   avatar_url?: string;
   currency?: string;
+  xp: number;
+  level: number;
 }
 
 export interface DashboardSummary {

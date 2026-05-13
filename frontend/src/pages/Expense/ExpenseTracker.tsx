@@ -131,6 +131,49 @@ function NeonCard({
   );
 }
 
+function numberToVietnameseText(number: number): string {
+  if (number === 0) return 'Không đồng';
+  const units = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
+  const digits = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+
+  function readGroup(n: number): string {
+    let s = '';
+    const h = Math.floor(n / 100);
+    const t = Math.floor((n % 100) / 10);
+    const u = n % 10;
+
+    if (h > 0) s += digits[h] + ' trăm ';
+    if (t > 1) {
+      s += digits[t] + ' mươi ';
+      if (u === 1) s += 'mốt';
+      else if (u === 5) s += 'lăm';
+      else if (u > 0) s += digits[u];
+    } else if (t === 1) {
+      s += 'mười ';
+      if (u === 5) s += 'lăm';
+      else if (u > 0) s += digits[u];
+    } else if (h > 0 && u > 0) {
+      s += 'lẻ ' + digits[u];
+    } else if (u > 0) {
+      s += digits[u];
+    }
+    return s.trim();
+  }
+
+  let res = '';
+  let i = 0;
+  let tempNum = number;
+  while (tempNum > 0) {
+    const group = tempNum % 1000;
+    if (group > 0) {
+      res = readGroup(group) + ' ' + units[i] + ' ' + res;
+    }
+    tempNum = Math.floor(tempNum / 1000);
+    i++;
+  }
+  return res.trim().charAt(0).toUpperCase() + res.trim().slice(1) + ' đồng';
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function ExpenseTracker() {
   const [activeTab, setActiveTab] = useState<Tab>("scanner");
@@ -210,11 +253,11 @@ export default function ExpenseTracker() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Manual state
-  const [manualAmount, setManualAmount] = useState("");
+  const [manualAmount, setManualAmount] = useState<number | ''>("");
+  const [isManualFocused, setIsManualFocused] = useState(false);
   const [manualCat, setManualCat] = useState<ExpenseCategory>("food");
   const [manualDate, setManualDate] = useState(todayStr);
   const [manualNote, setManualNote] = useState("");
-  const [wordsPreview, setWordsPreview] = useState("");
   const [manualSuccess, setManualSuccess] = useState(false);
 
   // --- Notification ---
@@ -222,6 +265,9 @@ export default function ExpenseTracker() {
     type: "success" | "error" | "info";
     message: string;
   } | null>(null);
+
+  const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n);
+
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 4000);
@@ -229,18 +275,9 @@ export default function ExpenseTracker() {
     }
   }, [notification]);
 
-  const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n);
-  const parseFmt = (s: string) => Number(s.replace(/\D/g, ""));
-
-  const handleFormattedAmountChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    setter: (val: string) => void,
-  ) => {
-    const rawValue = e.target.value.replace(/\D/g, "");
-    setter(rawValue);
-    if (setter === setManualAmount) {
-      setWordsPreview(rawValue ? numberToVietnameseWords(parseInt(rawValue)) : "");
-    }
+  const getManualDisplayAmount = () => {
+    if (isManualFocused) return manualAmount === '' ? '' : manualAmount.toString();
+    return manualAmount === '' ? '' : new Intl.NumberFormat('vi-VN').format(manualAmount);
   };
 
 
@@ -471,8 +508,8 @@ export default function ExpenseTracker() {
   // ── Manual ──
   const submitManual = async (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = parseFmt(manualAmount);
-    if (!amount) return;
+    if (!manualAmount) return;
+    const amount = Number(manualAmount);
 
     try {
       const categoryId = CATEGORY_MAP[manualCat];
@@ -1082,24 +1119,24 @@ export default function ExpenseTracker() {
                             type="text"
                             required
                             placeholder="0"
-                            value={manualAmount ? fmt(parseFmt(manualAmount)) : ""}
-                            onChange={(e) =>
-                              handleFormattedAmountChange(e, setManualAmount)
-                            }
+                            value={getManualDisplayAmount()}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              setManualAmount(val === '' ? '' : Number(val));
+                            }}
                             className="w-full pl-11 pr-16 py-4 rounded-xl text-2xl font-extrabold text-theme-text-primary placeholder-gray-700 outline-none transition-all"
                             style={{
                               background: "rgba(6,20,40,0.8)",
                               border: "1px solid rgba(255,255,255,0.08)",
                             }}
                             onFocus={(e) => {
-                              e.target.style.borderColor =
-                                "rgba(232,121,249,0.5)";
-                              e.target.style.boxShadow =
-                                "0 0 0 3px rgba(232,121,249,0.08)";
+                              setIsManualFocused(true);
+                              e.target.style.borderColor = "rgba(232,121,249,0.5)";
+                              e.target.style.boxShadow = "0 0 0 3px rgba(232,121,249,0.08)";
                             }}
                             onBlur={(e) => {
-                              e.target.style.borderColor =
-                                "rgba(255,255,255,0.08)";
+                              setIsManualFocused(false);
+                              e.target.style.borderColor = "rgba(255,255,255,0.08)";
                               e.target.style.boxShadow = "none";
                             }}
                           />
@@ -1107,9 +1144,9 @@ export default function ExpenseTracker() {
                             VNĐ
                           </div>
                         </div>
-                        {wordsPreview && (
-                          <p className="text-[10px] text-fuchsia-400/80 font-bold italic ml-2 mt-1.5">
-                            {wordsPreview}
+                        {manualAmount !== '' && Number(manualAmount) > 0 && (
+                          <p className="text-[10px] text-fuchsia-400/80 font-bold italic ml-2 mt-1.5 animate-in fade-in slide-in-from-top-1">
+                            ~ {numberToVietnameseText(Number(manualAmount))}
                           </p>
                         )}
                       </div>

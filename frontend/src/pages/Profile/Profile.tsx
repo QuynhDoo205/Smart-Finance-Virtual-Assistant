@@ -22,16 +22,23 @@ interface FixedExpense {
 // ─── Initial Mock Data ─────────────────────────────────────────────────────────
 const INITIAL_EXPENSES: FixedExpense[] = [];
 
-const CATEGORY_OPTIONS = ['Nhà ở', 'Tiện ích', 'Giải trí', 'Học tập', 'Bảo hiểm', 'Khác'];
+const CATEGORY_OPTIONS = [
+  'Nhà ở', 'Điện & Nước', 'Ăn uống', 'Di chuyển', 
+  'Sức khỏe', 'Học tập', 'Giải trí', 'Đầu tư', 
+  'Nợ & Thuế', 'Khác'
+];
 
 const CATEGORY_COLORS: Record<string, string> = {
-  'Nhà ở':    'text-sky-400 bg-sky-500/10 border-sky-500/20',
-  'Tiện ích': 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  'Giải trí': 'text-fuchsia-400 bg-fuchsia-500/10 border-fuchsia-500/20',
-  'Học tập':  'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-  'Bảo hiểm': 'text-rose-400 bg-rose-500/10 border-rose-500/20',
-  'Khác':     'text-theme-text-muted bg-gray-500/10 border-gray-500/20',
-  '🔒 Nguồn thu cố định': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  'Nhà ở':       'text-sky-400 bg-sky-500/10 border-sky-500/20',
+  'Điện & Nước': 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  'Ăn uống':     'text-orange-400 bg-orange-500/10 border-orange-500/20',
+  'Di chuyển':   'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  'Sức khỏe':    'text-rose-400 bg-rose-500/10 border-rose-500/20',
+  'Học tập':     'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
+  'Giải trí':    'text-fuchsia-400 bg-fuchsia-500/10 border-fuchsia-500/20',
+  'Đầu tư':      'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
+  'Nợ & Thuế':   'text-slate-400 bg-slate-500/10 border-slate-500/20',
+  'Khác':        'text-theme-text-muted bg-gray-500/10 border-gray-500/20',
 };
 
 // ─── ExpenseModal (Add / Edit) ────────────────────────────────────────────────
@@ -41,24 +48,64 @@ interface ModalProps {
   onClose: () => void;
 }
 
+function numberToVietnameseText(number: number): string {
+  if (number === 0) return 'Không đồng';
+  const units = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
+  const digits = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+
+  function readGroup(n: number): string {
+    let s = '';
+    const h = Math.floor(n / 100);
+    const t = Math.floor((n % 100) / 10);
+    const u = n % 10;
+
+    if (h > 0) s += digits[h] + ' trăm ';
+    if (t > 1) {
+      s += digits[t] + ' mươi ';
+      if (u === 1) s += 'mốt';
+      else if (u === 5) s += 'lăm';
+      else if (u > 0) s += digits[u];
+    } else if (t === 1) {
+      s += 'mười ';
+      if (u === 5) s += 'lăm';
+      else if (u > 0) s += digits[u];
+    } else if (h > 0 && u > 0) {
+      s += 'lẻ ' + digits[u];
+    } else if (u > 0) {
+      s += digits[u];
+    }
+    return s.trim();
+  }
+
+  let res = '';
+  let i = 0;
+  while (number > 0) {
+    const group = number % 1000;
+    if (group > 0) {
+      res = readGroup(group) + ' ' + units[i] + ' ' + res;
+    }
+    number = Math.floor(number / 1000);
+    i++;
+  }
+  return res.trim().charAt(0).toUpperCase() + res.trim().slice(1) + ' đồng';
+}
+
 function ExpenseModal({ initial, onSave, onClose }: ModalProps) {
   const amountInputId = useId();
   const [name, setName] = useState(initial.name ?? '');
-  const [amountStr, setAmountStr] = useState(
-    initial.amount ? new Intl.NumberFormat('vi-VN').format(initial.amount) : ''
-  );
+  const [amount, setAmount] = useState<number | ''>(initial.amount ?? '');
+  const [isFocused, setIsFocused] = useState(false);
   const [category, setCategory] = useState(initial.category ?? 'Khác');
 
-  const fmt = (v: string) => {
-    const n = v.replace(/\D/g, '');
-    return n === '' ? '' : new Intl.NumberFormat('vi-VN').format(Number(n));
+  const getDisplayAmount = () => {
+    if (isFocused) return amount === '' ? '' : amount.toString();
+    return amount === '' ? '' : new Intl.NumberFormat('vi-VN').format(amount);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = Number(amountStr.replace(/\D/g, ''));
     if (!name.trim() || !amount) return;
-    onSave(name.trim(), amount, category);
+    onSave(name.trim(), Number(amount), category);
   };
 
   const isEditing = !!initial.id;
@@ -129,14 +176,30 @@ function ExpenseModal({ initial, onSave, onClose }: ModalProps) {
                   id={amountInputId}
                   type="text" required
                   placeholder="0"
-                  value={amountStr}
-                  onChange={e => setAmountStr(fmt(e.target.value))}
+                  value={getDisplayAmount()}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    setAmount(val === '' ? '' : Number(val));
+                  }}
+                  onFocus={e => { 
+                    setIsFocused(true);
+                    e.target.style.borderColor = 'rgba(99,102,241,0.5)'; 
+                    e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.08)'; 
+                  }}
+                  onBlur={e => { 
+                    setIsFocused(false);
+                    e.target.style.borderColor = 'rgba(255,255,255,0.08)'; 
+                    e.target.style.boxShadow = 'none'; 
+                  }}
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-theme-text-primary placeholder-gray-600 text-xl font-bold outline-none transition-all"
                   style={{ background: 'rgba(6,20,40,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}
-                  onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.08)'; }}
-                  onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
                 />
               </div>
+              {amount !== '' && amount > 0 && (
+                <p className="mt-2 text-[10px] text-indigo-400 font-medium italic animate-in fade-in slide-in-from-top-1">
+                  ~ {numberToVietnameseText(amount)}
+                </p>
+              )}
             </div>
 
             {/* Category */}
@@ -326,27 +389,24 @@ function ConfirmDeleteAccountModal({ onConfirm, onCancel }: ConfirmDeleteAccount
   );
 }
 
-const getSmartIcon = (title: string, defaultIcon: string) => {
-  const t = title.toLowerCase();
-  if (t.includes('nhà') || t.includes('phòng') || t.includes('trọ')) return 'home';
-  if (t.includes('điện') || t.includes('nước') || t.includes('hóa đơn')) return 'zap';
-  if (t.includes('ăn') || t.includes('uống') || t.includes('chợ')) return 'utensils';
-  if (t.includes('xe') || t.includes('xăng') || t.includes('đi lại')) return 'car';
-  if (t.includes('học') || t.includes('trường') || t.includes('khóa')) return 'book';
-  if (t.includes('mạng') || t.includes('wifi') || t.includes('4g') || t.includes('internet')) return 'wifi';
-  if (t.includes('gym') || t.includes('sức khỏe') || t.includes('thuốc')) return 'heart';
-  if (t.includes('mua') || t.includes('sắm')) return 'shopping-bag';
-  return defaultIcon;
+const getSmartIcon = (category: string) => {
+  const c = category.toLowerCase();
+  if (c.includes('nhà')) return 'home';
+  if (c.includes('điện') || c.includes('nước')) return 'zap';
+  if (c.includes('ăn')) return 'utensils';
+  if (c.includes('di chuyển')) return 'car';
+  if (c.includes('sức khỏe')) return 'heart';
+  if (c.includes('học')) return 'book';
+  if (c.includes('giải trí')) return 'gamepad';
+  if (c.includes('đầu tư')) return 'trending-up';
+  if (c.includes('nợ') || c.includes('thuế')) return 'credit-card';
+  return 'more-horizontal';
 };
 
-const IconRenderer = ({ iconName, className }: { iconName: string, className?: string }) => {
-  if (!iconName) return <HelpCircle className={className} />;
+const IconRenderer = ({ category, className }: { category: string, className?: string }) => {
+  const iconName = getSmartIcon(category);
   
-  // Check if it's an emoji
-  const isEmoji = /\p{Emoji}/u.test(iconName);
-  if (isEmoji) return <span className={className}>{iconName}</span>;
-
-  // Convert kebab-case to PascalCase
+  // Convert kebab-case to PascalCase for Lucide
   const pascalName = iconName
     .split('-')
     .map(part => part.charAt(0).toUpperCase() + part.slice(1))
@@ -355,7 +415,7 @@ const IconRenderer = ({ iconName, className }: { iconName: string, className?: s
   const IconComponent = (Lucide as any)[pascalName];
   if (IconComponent) return <IconComponent className={className} />;
   
-  return <HelpCircle className={className} />;
+  return <Lucide.HelpCircle className={className} />;
 };
 
 // ─── Main Profile Component ───────────────────────────────────────────────────
@@ -368,6 +428,12 @@ export default function Profile() {
   const [modalData, setModalData] = useState<Partial<FixedExpense> | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FixedExpense | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   // Load real expenses on mount - merge budgets + fixed income sources
   useEffect(() => {
@@ -394,7 +460,7 @@ export default function Profile() {
                 name: b.budget_title || b.category_name,
                 amount: parseFloat(b.limit_amount),
                 category: b.category_name,
-                icon: getSmartIcon(b.budget_title || b.category_name, b.category_icon || '💰'),
+                icon: getSmartIcon(b.budget_title || b.category_name),
               });
             });
         }
@@ -466,11 +532,11 @@ export default function Profile() {
           setUser(updatedUser);
           authStore.setUser(updatedUser);
         }
-        alert("Đã lưu thay đổi thành công!");
+        showToast("Đã lưu thay đổi thành công!");
       }
     } catch (err: any) {
       console.error("Failed to persist expenses:", err);
-      alert("Lỗi khi lưu: " + (err.message || "Không xác định"));
+      showToast("Lỗi khi lưu: " + (err.message || "Không xác định"), 'error');
     }
   };
 
@@ -485,11 +551,11 @@ export default function Profile() {
           authStore.setUser(updatedUser);
         }
         setIsEditingIncome(false);
-        alert("Đã cập nhật thu nhập dự tính thành công!");
+        showToast("Đã cập nhật thu nhập dự tính thành công!");
       }
     } catch (err: any) {
       console.error("Failed to update income:", err);
-      alert("Lỗi khi cập nhật thu nhập: " + (err.message || "Không xác định"));
+      showToast("Lỗi khi cập nhật thu nhập: " + (err.message || "Không xác định"), 'error');
     }
   };
 
@@ -533,14 +599,14 @@ export default function Profile() {
             setUser(updatedUser);
             authStore.setUser(updatedUser);
           }
-          alert(`Đồng bộ thành công! Thu nhập dự tính hiện tại là ${new Intl.NumberFormat('vi-VN').format(realIncome)}đ`);
+          showToast(`Đồng bộ thành công! Thu nhập dự tính hiện tại là ${new Intl.NumberFormat('vi-VN').format(realIncome)}đ`);
         }
       } else {
-        alert("Chưa có thu nhập thực tế trong tháng này để đồng bộ.");
+        showToast("Chưa có thu nhập thực tế trong tháng này để đồng bộ.", 'error');
       }
     } catch (err) {
       console.error('Reality sync failed:', err);
-      alert("Lỗi khi đồng bộ thực tế.");
+      showToast("Lỗi khi đồng bộ thực tế.", 'error');
     }
   };
 
@@ -584,6 +650,25 @@ export default function Profile() {
 
   return (
     <motion.div variants={containerVars} initial="hidden" animate="show" className="max-w-6xl mx-auto space-y-8 relative pb-20">
+
+      {/* --- TOAST NOTIFICATION --- */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div 
+            initial={{ opacity: 0, x: 50, y: 20 }} 
+            animate={{ opacity: 1, x: 0, y: 0 }} 
+            exit={{ opacity: 0, x: 50 }} 
+            className="fixed top-6 right-6 z-[100]"
+          >
+            <div className={`${toast.type === 'error' ? 'bg-rose-500/90 shadow-rose-500/30' : 'bg-emerald-500/90 shadow-emerald-500/30'} backdrop-blur-xl text-white px-6 py-4 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-3 font-black uppercase tracking-widest text-[10px]`}>
+               <div className="p-1.5 bg-white/20 rounded-lg">
+                {toast.type === 'error' ? <Lucide.AlertCircle className="w-4 h-4" /> : <Lucide.Sparkles className="w-4 h-4" />}
+               </div>
+               {toast.message}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Ambient blobs */}
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none mix-blend-screen" />
@@ -767,7 +852,7 @@ export default function Profile() {
                             >
                               {/* Icon */}
                               <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border ${catColor}`}>
-                                <IconRenderer iconName={exp.icon || 'dollar-sign'} className="w-5 h-5" />
+                                <IconRenderer category={exp.category} className="w-5 h-5" />
                               </div>
 
                               {/* Info */}

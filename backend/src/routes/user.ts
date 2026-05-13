@@ -158,6 +158,10 @@ router.put('/onboarding', async (req: AuthRequest, res: Response): Promise<void>
 
     await client.query('COMMIT');
 
+    // Tặng 200 XP và huy hiệu cho lần đầu thiết lập
+    await addXP(userId as number, 200);
+    await unlockBadge(userId as number, 'FIRST_BUDGET');
+
     // Fetch updated user to return
     const updatedUserRes = await client.query(
       'SELECT id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed FROM nguoi_dung WHERE id = $1',
@@ -185,7 +189,7 @@ router.get('/profile', async (req: AuthRequest, res: Response): Promise<void> =>
   try {
     const userId = req.user?.id;
     const result = await pool.query(
-      'SELECT id, ho_ten AS full_name, email, hinh_anh AS avatar_url, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, ngay_tao AS created_at FROM nguoi_dung WHERE id = $1',
+      'SELECT id, ho_ten AS full_name, email, hinh_anh AS avatar_url, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, xp, level, ngay_tao AS created_at FROM nguoi_dung WHERE id = $1',
       [userId]
     );
 
@@ -200,5 +204,94 @@ router.get('/profile', async (req: AuthRequest, res: Response): Promise<void> =>
     res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
   }
 });
+
+// ============================================================
+// GET /api/user/badges – Lấy danh hiệu và tiến trình
+// ============================================================
+router.get('/badges', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    
+    // 1. Lấy thông tin XP, Level của User
+    const userRes = await pool.query('SELECT xp, level FROM nguoi_dung WHERE id = $1', [userId]);
+    const { xp, level } = userRes.rows[0];
+
+    // 2. Lấy toàn bộ thư viện danh hiệu
+    const allBadgesRes = await pool.query('SELECT * FROM danh_hieu ORDER BY id');
+    
+    // 3. Lấy danh sách danh hiệu người dùng đã đạt được
+    const userBadgesRes = await pool.query(
+      'SELECT danh_hieu_id FROM nguoi_dung_danh_hieu WHERE nguoi_dung_id = $1',
+      [userId]
+    );
+    const achievedIds = userBadgesRes.rows.map(r => r.danh_hieu_id);
+
+    // 4. Map dữ liệu để trả về
+    const badges = allBadgesRes.rows.map(b => ({
+      ...b,
+      isUnlocked: achievedIds.includes(b.id)
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        xp,
+        level,
+        nextLevelXp: level * 1000, // Công thức đơn giản: mỗi level cần level * 1000 XP
+        badges
+      }
+    });
+  } catch (err) {
+    console.error('Badges error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ khi lấy danh hiệu' });
+  }
+});
+
+/**
+ * Hàm tiện ích để cộng XP cho người dùng
+ */
+export async function addXP(userId: number, amount: number) {
+  try {
+    const res = await pool.query(
+      'UPDATE nguoi_dung SET xp = xp + $1 WHERE id = $2 RETURNING xp, level',
+      [amount, userId]
+    );
+    
+    const { xp, level } = res.rows[0];
+    const nextLevelThreshold = level * 1000;
+
+    if (xp >= nextLevelThreshold) {
+      await pool.query(
+        'UPDATE nguoi_dung SET level = level + 1, xp = xp - $1 WHERE id = $2',
+        [nextLevelThreshold, userId]
+      );
+      return { levelUp: true, newLevel: level + 1 };
+    }
+    return { levelUp: false };
+  } catch (err) {
+    console.error('Add XP error:', err);
+    return null;
+  }
+}
+
+/**
+ * Hàm tiện ích để trao danh hiệu cho người dùng
+ */
+export async function unlockBadge(userId: number, badgeCode: string) {
+  try {
+    const badgeRes = await pool.query('SELECT id FROM danh_hieu WHERE ma_danh_hieu = $1', [badgeCode]);
+    if (badgeRes.rows.length === 0) return false;
+    
+    const badgeId = badgeRes.rows[0].id;
+    await pool.query(
+      'INSERT INTO nguoi_dung_danh_hieu (nguoi_dung_id, danh_hieu_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [userId, badgeId]
+    );
+    return true;
+  } catch (err) {
+    console.error('Unlock badge error:', err);
+    return false;
+  }
+}
 
 export default router;

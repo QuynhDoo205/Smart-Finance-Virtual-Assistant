@@ -1,30 +1,24 @@
 import { motion } from 'framer-motion';
 import { Lock, Star, Trophy, Zap, Map, Code, Shield, Award, Crown, Loader2 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
-import { authApi, dashboardApi, transactionsApi } from '../../utils/api';
+import { authApi, dashboardApi, transactionsApi, userApi } from '../../utils/api';
 
 export default function Badges() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<{
+    xp: number;
+    level: number;
+    nextLevelXp: number;
+    badges: any[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [profileRes, dashRes, budgetRes, goalsRes, transRes] = await Promise.all([
-          authApi.me(),
-          dashboardApi.getSummary(),
-          dashboardApi.getBudget(),
-          dashboardApi.getSavingsGoals(),
-          transactionsApi.list(10)
-        ]);
-
-        setData({
-          user: profileRes.success ? profileRes.data.user : null,
-          summary: dashRes.success ? dashRes.data : null,
-          budgets: budgetRes.success ? budgetRes.data.budgets : [],
-          goals: goalsRes.success ? goalsRes.data.goals : [],
-          transactions: transRes.success ? transRes.data.transactions : []
-        });
+        const res = await userApi.getBadges();
+        if (res.success) {
+          setData(res.data);
+        }
       } catch (err) {
         console.error("Failed to load gamification data:", err);
       } finally {
@@ -34,73 +28,42 @@ export default function Badges() {
     loadData();
   }, []);
 
-  const badgeLogic = useMemo(() => {
+  const badges = useMemo(() => {
     if (!data) return [];
     
-    return [
-      { 
-        id: 1, 
-        name: 'Người Khởi Đầu', 
-        description: 'Hoàn thành Onboarding & thiết lập ngân sách đầu tiên.', 
-        icon: <Map className="w-8 h-8" />, 
-        unlocked: data.user?.onboarding_completed || false, 
-        rarity: 'common', 
-        color: 'from-blue-400 to-blue-600' 
-      },
-      { 
-        id: 2, 
-        name: 'Chi Tiêu Thông Thái', 
-        description: 'Giữ chi tiêu dưới mức ngân sách đã thiết lập.', 
-        icon: <Shield className="w-8 h-8" />, 
-        unlocked: data.budgets.some((b: any) => b.limit_amount > 0 && b.usage_percent < 100), 
-        rarity: 'uncommon', 
-        color: 'from-emerald-400 to-emerald-600' 
-      },
-      { 
-        id: 3, 
-        name: 'Kỷ Luật Thép', 
-        description: 'Chi tiêu tháng này thấp hơn thu nhập.', 
-        icon: <Award className="w-8 h-8" />, 
-        unlocked: data.summary && data.summary.totalExpense < data.summary.totalIncome && data.summary.totalIncome > 0, 
-        rarity: 'rare', 
-        color: 'from-purple-400 to-purple-600' 
-      },
-      { 
-        id: 4, 
-        name: 'Bậc Thầy AI', 
-        description: 'Đã thực hiện ít nhất 5 giao dịch trong hệ thống.', 
-        icon: <Zap className="w-8 h-8" />, 
-        unlocked: data.transactions.length >= 5, 
-        rarity: 'epic', 
-        color: 'from-fuchsia-400 to-pink-600' 
-      },
-      { 
-        id: 5, 
-        name: 'Tự Do Tài Chính', 
-        description: 'Đạt số dư tài khoản trên 100M VND.', 
-        icon: <Crown className="w-8 h-8" />, 
-        unlocked: data.summary?.totalBalance >= 100000000, 
-        rarity: 'legendary', 
-        color: 'from-amber-300 to-orange-500' 
-      },
-      { 
-        id: 6, 
-        name: 'Người Bắt Bugs', 
-        description: 'Đã tham gia khảo sát và đóng góp ý kiến.', 
-        icon: <Code className="w-8 h-8" />, 
-        unlocked: true, // Gifted to early users
-        rarity: 'mythic', 
-        color: 'from-gray-300 to-gray-500' 
-      },
-    ];
+    const iconMap: Record<string, any> = {
+      'map': <Map className="w-8 h-8" />,
+      'shield': <Shield className="w-8 h-8" />,
+      'zap': <Zap className="w-8 h-8" />,
+      'lock': <Crown className="w-8 h-8" />,
+      'code': <Code className="w-8 h-8" />,
+    };
+
+    const colorMap: Record<string, string> = {
+      'common': 'from-blue-400 to-blue-600',
+      'uncommon': 'from-emerald-400 to-emerald-600',
+      'rare': 'from-purple-400 to-purple-600',
+      'epic': 'from-fuchsia-400 to-pink-600',
+      'legendary': 'from-amber-300 to-orange-500',
+      'mythic': 'from-gray-300 to-gray-500',
+    };
+
+    return data.badges.map(b => ({
+      id: b.id,
+      name: b.ten_danh_hieu,
+      description: b.mo_ta,
+      icon: iconMap[b.icon] || <Award className="w-8 h-8" />,
+      unlocked: b.isUnlocked,
+      rarity: b.loai,
+      color: colorMap[b.loai] || 'from-gray-400 to-gray-600'
+    }));
   }, [data]);
 
-  const unlockedCount = badgeLogic.filter(b => b.unlocked).length;
-  const xpPerBadge = 500;
-  const currentXP = unlockedCount * xpPerBadge;
-  const level = Math.floor(currentXP / 1000) + 1;
-  const xpInLevel = currentXP % 1000;
-  const progressPercent = (xpInLevel / 1000) * 100;
+  const unlockedCount = badges.filter(b => b.unlocked).length;
+  const currentXP = data?.xp || 0;
+  const level = data?.level || 1;
+  const nextLevelXp = data?.nextLevelXp || 1000;
+  const progressPercent = (currentXP / nextLevelXp) * 100;
 
   if (loading) {
     return (
@@ -151,7 +114,7 @@ export default function Badges() {
           <div className="space-y-2 max-w-xl">
             <div className="flex justify-between items-end text-sm">
               <span className="font-semibold text-theme-text-muted">Tiến trình Level {level + 1}</span>
-              <span className="font-bold text-amber-500">{xpInLevel} / 1000 XP</span>
+              <span className="font-bold text-amber-500">{currentXP} / {nextLevelXp} XP</span>
             </div>
             <div className="h-3 w-full bg-gray-800 rounded-full overflow-hidden shadow-inner">
               <motion.div 
@@ -171,11 +134,11 @@ export default function Badges() {
       <div>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-theme-text-primary">Tủ Huy Hiệu Tâm Huyết</h2>
-          <span className="text-theme-text-muted font-medium">Đã mở khóa: {unlockedCount}/6</span>
+          <span className="text-theme-text-muted font-medium">Đã mở khóa: {unlockedCount}/{badges.length}</span>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {badgeLogic.map((badge) => (
+          {badges.map((badge: any) => (
             <motion.div 
               key={badge.id}
               variants={itemVars}

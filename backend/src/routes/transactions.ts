@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import pool from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthRequest } from '../middleware/auth.js';
+import { addXP, unlockBadge } from './user.js';
 
 const router = Router();
 
@@ -50,6 +51,15 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     }
 
     await client.query('COMMIT');
+
+    // Tặng 50 XP cho mỗi giao dịch
+    const xpRes = await addXP(userId as number, 50);
+
+    // Kiểm tra nếu đã đủ 5 giao dịch để tặng huy hiệu AI_MASTER
+    const countRes = await pool.query('SELECT COUNT(*) FROM giao_dich WHERE nguoi_dung_id = $1', [userId]);
+    if (parseInt(countRes.rows[0].count) >= 5) {
+      await unlockBadge(userId as number, 'AI_MASTER');
+    }
 
     res.status(201).json({
       success: true,

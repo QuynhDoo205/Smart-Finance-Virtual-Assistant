@@ -64,39 +64,31 @@ export interface AIParsedExpense {
 }
 
 const SYSTEM_PROMPT = `
-Bạn là Nova, một trợ lý tài chính cá nhân thông minh, thân thiện và chuyên nghiệp.
-Nhiệm vụ của bạn là trò chuyện với người dùng và hỗ trợ họ quản lý chi tiêu.
+Bạn là Nova, một trợ lý tài chính tối giản và hiệu quả. 
+Nhiệm vụ: Phân tích chi tiêu và trả lời câu hỏi tài chính của người dùng dựa trên dữ liệu thật được cung cấp.
 
-QUY TẮC PHẢN HỒI:
-1. Luôn phản hồi bằng tiếng Việt với giọng văn tự nhiên, gần gũi như một người bạn thực thụ.
-2. Nếu người dùng nhắn tin về một khoản chi tiêu (vd: "Nay ăn sáng 50k"), hãy bóc tách thông tin VÀ đưa ra một câu phản hồi xác nhận thân thiện.
-3. Nếu người dùng chỉ chào hỏi hoặc hỏi đáp bình thường, hãy trả lời tự nhiên và giữ đúng vai trò là trợ lý tài chính.
-4. LUÔN TRẢ VỀ kết quả dưới dạng JSON có cấu trúc như sau:
-
+QUY TẮC CỰC KỲ QUAN TRỌNG (VÌ TIẾT KIỆM TOKEN):
+1. KHÔNG chào hỏi rườm rà (Chào bạn, Nova đây...). TRẢ LỜI THẲNG VÀO VẤN ĐỀ.
+2. Dùng Markdown để trình bày: Table, Bold, List để dễ nhìn.
+3. Nếu người dùng hỏi về tình hình tài chính, hãy dựa vào phần "DỮ LIỆU THẬT" trong context.
+4. LUÔN TRẢ VỀ JSON theo format:
 {
-  "reply": "Câu trả lời tự nhiên của bạn ở đây",
+  "reply": "Câu trả lời Markdown ngắn gọn, súc tích",
   "data": {
-    "store": "Tên cửa hàng hoặc null",
-    "amount": số tiền VNĐ (number),
+    "amount": number,
     "category": "food" | "transport" | "shopping" | "entertainment" | "health" | "education" | "other",
-    "description": "Mô tả ngắn gọn",
+    "description": "string",
     "date": "YYYY-MM-DD"
   } | null
 }
 
-DANH MỤC CHI TIÊU:
-- 'food': Ăn uống, cà phê, nhà hàng.
-- 'transport': Xăng xe, Grab, Bus, Taxi.
-- 'shopping': Mua sắm, Shopee, Tiki, Lazada.
-- 'entertainment': Giải trí, phim, game, du lịch.
-- 'health': Sức khỏe, thuốc, gym.
-- 'education': Học tập, sách, khóa học.
-- 'other': Các khoản khác.
+DANH MỤC: food, transport, shopping, entertainment, health, education, other.
 `;
 
 export interface AIChatResponse {
   reply: string;
   data: AIParsedExpense | null;
+  isCached?: boolean;
 }
 
 export async function analyzeReceiptImage(imageBuffer: Buffer, mimeType: string): Promise<AIParsedExpense> {
@@ -135,10 +127,10 @@ export async function analyzeReceiptImage(imageBuffer: Buffer, mimeType: string)
   });
 }
 
-export async function analyzeChatMessage(message: string): Promise<AIChatResponse> {
+export async function analyzeChatMessage(message: string, context?: string): Promise<AIChatResponse> {
   return callWithRetry(async (model) => {
     const today = new Date().toISOString().split('T')[0];
-    const prompt = `${SYSTEM_PROMPT}\n\nTin nhắn từ người dùng: "${message}"\nNgày hiện tại: ${today}\nHãy trả lời và bóc tách dữ liệu nếu cần.`;
+    const prompt = `${SYSTEM_PROMPT}\n\nNGÀY HIỆN TẠI: ${today}\n\nDỮ LIỆU TÀI CHÍNH THỰC TẾ (CONTEXT):\n${context || "Chưa có dữ liệu giao dịch."}\n\nCÂU HỎI NGƯỜI DÙNG: "${message}"\n\nHãy trả lời dựa trên context và bóc tách dữ liệu nếu đó là một giao dịch.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -146,9 +138,13 @@ export async function analyzeChatMessage(message: string): Promise<AIChatRespons
     
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return { reply: text || "Xin lỗi, mình chưa hiểu ý bạn. Bạn thử nói lại nhé!", data: null };
+      return { reply: text || "Dữ liệu không rõ ràng.", data: null };
     }
 
-    return JSON.parse(jsonMatch[0]);
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      return { reply: text, data: null };
+    }
   });
 }

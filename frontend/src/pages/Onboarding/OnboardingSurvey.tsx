@@ -64,12 +64,28 @@ export default function OnboardingSurvey() {
     } catch (err) {
       console.error('Failed to save onboarding data:', err);
       setIsFinishing(false);
-      alert('Có lỗi xảy ra khi lưu dữ liệu. Vui lòng thử lại.');
+      setError('Có lỗi xảy ra khi lưu dữ liệu. Vui lòng thử lại.');
+      setTimeout(() => setError(null), 4000);
     }
   };
 
+  const [error, setError] = useState<string | null>(null);
+
   return (
     <div className="flex-1 flex min-h-screen relative bg-[#030712] overflow-hidden">
+      {/* --- ERROR TOAST --- */}
+      <AnimatePresence>
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-[100]"
+          >
+            <div className="bg-rose-500 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 font-bold text-sm border border-white/10">
+              <Activity className="w-4 h-4" /> {error}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* LEFT SIDE: Visual Data Representation */}
       <div className="hidden lg:flex w-[45%] relative flex-col justify-center items-center p-12 border-r border-[var(--theme-subtle-border)] overflow-hidden">
