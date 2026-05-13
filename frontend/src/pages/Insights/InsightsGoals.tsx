@@ -19,6 +19,9 @@ export default function InsightsGoals() {
     icon: '🎯'
   });
 
+  const [fundGoalId, setFundGoalId] = useState<number | null>(null);
+  const [fundAmount, setFundAmount] = useState('');
+
   const fetchGoals = async () => {
     try {
       const res = await dashboardApi.getSavingsGoals();
@@ -27,6 +30,34 @@ export default function InsightsGoals() {
       console.error(err);
     }
   };
+
+  // AI-Driven Icon Auto-Suggest
+  useEffect(() => {
+    const name = newGoal.name.toLowerCase();
+    let suggestedIcon = newGoal.icon;
+    
+    // Vehicles
+    if (name.includes('xe máy') || name.includes('moto') || name.includes('sh') || name.includes('honda')) suggestedIcon = '🏍️';
+    else if (name.includes('ô tô') || name.includes('xe hơi') || name.includes('oto') || name.includes('car')) suggestedIcon = '🚗';
+    else if (name.includes('máy bay') || name.includes('vé bay') || name.includes('du lịch') || name.includes('tour') || name.includes('chơi')) suggestedIcon = '✈️';
+    // Real Estate
+    else if (name.includes('nhà') || name.includes('chung cư') || name.includes('căn hộ') || name.includes('đất')) suggestedIcon = '🏠';
+    // Tech
+    else if (name.includes('laptop') || name.includes('macbook') || name.includes('máy tính') || name.includes('pc')) suggestedIcon = '💻';
+    else if (name.includes('điện thoại') || name.includes('iphone') || name.includes('smartphone') || name.includes('ipad')) suggestedIcon = '📱';
+    // Life events
+    else if (name.includes('cưới') || name.includes('kết hôn') || name.includes('vợ') || name.includes('chồng') || name.includes('nhẫn')) suggestedIcon = '💍';
+    else if (name.includes('con') || name.includes('bỉm') || name.includes('sữa') || name.includes('đẻ')) suggestedIcon = '👶';
+    // Finance
+    else if (name.includes('khẩn cấp') || name.includes('tiết kiệm') || name.includes('dự phòng') || name.includes('đầu tư') || name.includes('chứng khoán')) suggestedIcon = '🏦';
+    // Education & Health
+    else if (name.includes('học') || name.includes('ielts') || name.includes('toeic') || name.includes('sách') || name.includes('khóa')) suggestedIcon = '📚';
+    else if (name.includes('sức khỏe') || name.includes('bảo hiểm') || name.includes('khám') || name.includes('viện')) suggestedIcon = '🏥';
+
+    if (suggestedIcon !== newGoal.icon && newGoal.name.length > 2) {
+      setNewGoal(prev => ({ ...prev, icon: suggestedIcon }));
+    }
+  }, [newGoal.name]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -65,6 +96,25 @@ export default function InsightsGoals() {
       }
     } catch (err) {
       console.error("Failed to create goal", err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleFundGoal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fundGoalId || !fundAmount) return;
+    
+    setSubmitting(true);
+    try {
+      const res = await dashboardApi.fundSavingsGoal(fundGoalId, Number(fundAmount));
+      if (res.success) {
+        setFundGoalId(null);
+        setFundAmount('');
+        await fetchGoals(); // Refresh list
+      }
+    } catch (err) {
+      console.error("Failed to fund goal", err);
     } finally {
       setSubmitting(false);
     }
@@ -243,18 +293,36 @@ export default function InsightsGoals() {
                         </div>
                         <h4 className="font-bold text-theme-text-primary group-hover:text-indigo-400 transition-colors">{goal.name}</h4>
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-1 bg-[var(--theme-bg-surface)] text-theme-text-primary rounded-lg uppercase tracking-wider">{goal.status}</span>
+                      <span className="text-[10px] font-bold px-2 py-1 bg-[var(--theme-bg-surface)] text-theme-text-primary rounded-lg uppercase tracking-wider">
+                        {goal.status === 'hoat_dong' ? 'Đang thực hiện' : goal.status === 'hoan_thanh' ? 'Đã hoàn thành' : 'Đã hủy'}
+                      </span>
                     </div>
                     <div className="flex justify-between items-end mb-2 text-sm">
-                      <span className="font-bold text-theme-text-primary">{formatCurrency(goal.current_amount)} đ</span>
-                      <span className="text-theme-text-muted">/ {formatCurrency(goal.target_amount)} đ</span>
+                      <div>
+                        <span className="text-xs text-theme-text-muted block mb-0.5">Đã tích lũy</span>
+                        <span className="font-bold text-emerald-400">{formatCurrency(goal.current_amount)} đ</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs text-theme-text-muted block mb-0.5">Mục tiêu</span>
+                        <span className="font-bold text-theme-text-primary">{formatCurrency(goal.target_amount)} đ</span>
+                      </div>
                     </div>
-                    <div className="h-2 w-full bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden mb-3">
                       <motion.div initial={{ width: 0 }} animate={{ width: `${goal.progress_percent}%` }} transition={{ duration: 1 }} className="h-full bg-indigo-500 rounded-full" />
                     </div>
-                    <p className="text-[10px] text-theme-text-muted mt-3 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Deadline: {new Date(goal.deadline).toLocaleDateString('vi-VN')}
-                    </p>
+                    <div className="flex items-center justify-between mt-3">
+                      <p className="text-[10px] text-theme-text-muted flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Deadline: {new Date(goal.deadline).toLocaleDateString('vi-VN')}
+                      </p>
+                      {goal.status !== 'hoan_thanh' && (
+                        <button 
+                          onClick={() => setFundGoalId(goal.id)}
+                          className="px-3 py-1 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white rounded-lg text-xs font-bold transition-all"
+                        >
+                          Nạp tiền
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
@@ -328,14 +396,17 @@ export default function InsightsGoals() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-theme-text-muted mb-1.5 uppercase tracking-wider">Biểu tượng</label>
-                    <div className="flex gap-2">
-                      {['🎯', '🚗', '🏠', '💻', '✈️'].map(emoji => (
+                    <label className="block text-xs font-medium text-theme-text-muted mb-1.5 uppercase tracking-wider flex items-center gap-1">
+                      Biểu tượng 
+                      <span className="text-[9px] bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded-md ml-1">AI Gợi ý</span>
+                    </label>
+                    <div className="grid grid-cols-6 gap-2">
+                      {['🎯', '🚗', '🏍️', '🏠', '💻', '📱', '✈️', '💍', '🏦', '📚', '🏥', '👶'].map(emoji => (
                         <button
                           key={emoji}
                           type="button"
                           onClick={() => setNewGoal({...newGoal, icon: emoji})}
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${
+                          className={`w-full h-10 rounded-xl flex items-center justify-center text-lg transition-all ${
                             newGoal.icon === emoji 
                               ? 'bg-indigo-500/20 border border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.3)]' 
                               : 'bg-[var(--theme-subtle-bg)] border border-transparent opacity-50 hover:opacity-100'
@@ -363,6 +434,68 @@ export default function InsightsGoals() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* --- FUND GOAL MODAL --- */}
+      <AnimatePresence>
+        {fundGoalId !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setFundGoalId(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-sm bg-[var(--theme-bg-surface)] border border-[var(--theme-subtle-border)] p-6 rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-theme-text-primary">Nạp tiền vào Mục tiêu</h3>
+                <button 
+                  onClick={() => setFundGoalId(null)}
+                  className="w-8 h-8 rounded-full bg-[var(--theme-subtle-bg)] flex items-center justify-center text-theme-text-muted hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleFundGoal} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-theme-text-muted mb-1.5 uppercase tracking-wider">Số tiền nạp (VNĐ)</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="VD: 5000000"
+                    value={fundAmount}
+                    onChange={e => setFundAmount(e.target.value)}
+                    className="w-full bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded-xl px-4 py-3 text-theme-text-primary focus:outline-none focus:border-indigo-500 transition-colors font-mono"
+                  />
+                  {summary && (
+                    <p className="text-xs text-theme-text-muted mt-2">
+                      Thặng dư khả dụng tháng này: <strong className="text-emerald-400">{formatCurrency(summary.netSavings)} đ</strong>
+                    </p>
+                  )}
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <TrendingUp className="w-5 h-5" />}
+                    Xác nhận Nạp
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 }

@@ -1,9 +1,10 @@
 import { useState, useId, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import * as Lucide from 'lucide-react';
 import {
   Key, Home, Shield, Compass, ArrowUpRight,
-  Plus, Pencil, Trash2, X, Check, AlertTriangle, DollarSign,
-  FileText, Tag, TrendingDown, Mail, Loader2
+  Plus, Pencil, Trash2, X, Check, CheckCircle2, AlertTriangle, DollarSign,
+  FileText, Tag, TrendingDown, Mail, Loader2, RefreshCw, HelpCircle
 } from 'lucide-react';
 import { userApi, dashboardApi, incomeApi, API_ROOT } from '../../utils/api';
 import authStore from '../../store/authStore';
@@ -15,6 +16,7 @@ interface FixedExpense {
   name: string;
   amount: number;
   category: string;
+  icon?: string;
 }
 
 // ─── Initial Mock Data ─────────────────────────────────────────────────────────
@@ -324,6 +326,38 @@ function ConfirmDeleteAccountModal({ onConfirm, onCancel }: ConfirmDeleteAccount
   );
 }
 
+const getSmartIcon = (title: string, defaultIcon: string) => {
+  const t = title.toLowerCase();
+  if (t.includes('nhà') || t.includes('phòng') || t.includes('trọ')) return 'home';
+  if (t.includes('điện') || t.includes('nước') || t.includes('hóa đơn')) return 'zap';
+  if (t.includes('ăn') || t.includes('uống') || t.includes('chợ')) return 'utensils';
+  if (t.includes('xe') || t.includes('xăng') || t.includes('đi lại')) return 'car';
+  if (t.includes('học') || t.includes('trường') || t.includes('khóa')) return 'book';
+  if (t.includes('mạng') || t.includes('wifi') || t.includes('4g') || t.includes('internet')) return 'wifi';
+  if (t.includes('gym') || t.includes('sức khỏe') || t.includes('thuốc')) return 'heart';
+  if (t.includes('mua') || t.includes('sắm')) return 'shopping-bag';
+  return defaultIcon;
+};
+
+const IconRenderer = ({ iconName, className }: { iconName: string, className?: string }) => {
+  if (!iconName) return <HelpCircle className={className} />;
+  
+  // Check if it's an emoji
+  const isEmoji = /\p{Emoji}/u.test(iconName);
+  if (isEmoji) return <span className={className}>{iconName}</span>;
+
+  // Convert kebab-case to PascalCase
+  const pascalName = iconName
+    .split('-')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+
+  const IconComponent = (Lucide as any)[pascalName];
+  if (IconComponent) return <IconComponent className={className} />;
+  
+  return <HelpCircle className={className} />;
+};
+
 // ─── Main Profile Component ───────────────────────────────────────────────────
 export default function Profile() {
   const [searchParams] = useSearchParams();
@@ -357,9 +391,10 @@ export default function Profile() {
             .forEach((b: any) => {
               merged.push({
                 id: `budget-${b.id}`,
-                name: b.category_name,
+                name: b.budget_title || b.category_name,
                 amount: parseFloat(b.limit_amount),
                 category: b.category_name,
+                icon: getSmartIcon(b.budget_title || b.category_name, b.category_icon || '💰'),
               });
             });
         }
@@ -368,7 +403,9 @@ export default function Profile() {
 
         // Update user monthly_income from profile if available
         if (profileRes.success && profileRes.data.monthly_income) {
-          setUser(prev => prev ? { ...prev, monthly_income: profileRes.data.monthly_income } : prev);
+          const inc = profileRes.data.monthly_income;
+          setUser(prev => prev ? { ...prev, monthly_income: inc } : prev);
+          setNewIncome(inc);
         }
       } catch (err) {
         console.error("Failed to load profile budget:", err);
@@ -381,6 +418,8 @@ export default function Profile() {
 
   // Security features state
   const [user, setUser] = useState(authStore.getUser());
+  const [isEditingIncome, setIsEditingIncome] = useState(false);
+  const [newIncome, setNewIncome] = useState(user?.monthly_income || 0);
   const [userAuth] = useState({ 
     provider: user?.email.includes('gmail') ? 'google' : 'email', 
     email: user?.email || '' 
@@ -411,17 +450,46 @@ export default function Profile() {
     setExpenses(updated);
     setModalData(null);
 
-    // Add all current expenses to payload
-    updated.forEach(e => payload.push({ categoryName: e.name, amount: e.amount }));
+    // Add all current expenses to payload – include category so backend maps correctly
+    updated.forEach(e => payload.push({ categoryName: e.name, amount: e.amount, category: e.category } as any));
 
     // Persist to Backend
     try {
-      await userApi.updateOnboarding(
-        user?.monthly_income || 0,
+      const res = await userApi.updateOnboarding(
+        newIncome,
         payload
       );
-    } catch (err) {
+      if (res.success) {
+        // Cập nhật local user state
+        if (user) {
+          const updatedUser = { ...user, monthly_income: newIncome };
+          setUser(updatedUser);
+          authStore.setUser(updatedUser);
+        }
+        alert("Đã lưu thay đổi thành công!");
+      }
+    } catch (err: any) {
       console.error("Failed to persist expenses:", err);
+      alert("Lỗi khi lưu: " + (err.message || "Không xác định"));
+    }
+  };
+
+  const handleUpdateIncome = async () => {
+    try {
+      const payload = expenses.map(e => ({ categoryName: e.name, amount: e.amount, category: e.category } as any));
+      const res = await userApi.updateOnboarding(newIncome, payload);
+      if (res.success) {
+        if (user) {
+          const updatedUser = { ...user, monthly_income: newIncome };
+          setUser(updatedUser);
+          authStore.setUser(updatedUser);
+        }
+        setIsEditingIncome(false);
+        alert("Đã cập nhật thu nhập dự tính thành công!");
+      }
+    } catch (err: any) {
+      console.error("Failed to update income:", err);
+      alert("Lỗi khi cập nhật thu nhập: " + (err.message || "Không xác định"));
     }
   };
 
@@ -433,11 +501,11 @@ export default function Profile() {
     setExpenses(updated);
     setDeleteTarget(null);
 
-    const payload = updated.map(e => ({ categoryName: e.name, amount: e.amount }));
+    const payload = updated.map(e => ({ categoryName: e.name, amount: e.amount, category: e.category } as any));
     
     // Crucial: Send the deleted item with amount 0 to zero out its limit in the database
     if (deletedItem) {
-      payload.push({ categoryName: deletedItem.name, amount: 0 });
+      payload.push({ categoryName: deletedItem.name, amount: 0 } as any);
     }
 
     // Persist to Backend
@@ -448,6 +516,31 @@ export default function Profile() {
       );
     } catch (err) {
       console.error("Failed to delete expense in backend:", err);
+    }
+  };
+
+  const handleSyncReality = async () => {
+    try {
+      const summaryRes = await dashboardApi.getSummary();
+      if (summaryRes.success && summaryRes.data.totalIncome > 0) {
+        const realIncome = summaryRes.data.totalIncome;
+        setNewIncome(realIncome);
+        const payload = expenses.map(e => ({ categoryName: e.name, amount: e.amount, category: e.category } as any));
+        const res = await userApi.updateOnboarding(realIncome, payload);
+        if (res.success) {
+          if (user) {
+            const updatedUser = { ...user, monthly_income: realIncome };
+            setUser(updatedUser);
+            authStore.setUser(updatedUser);
+          }
+          alert(`Đồng bộ thành công! Thu nhập dự tính hiện tại là ${new Intl.NumberFormat('vi-VN').format(realIncome)}đ`);
+        }
+      } else {
+        alert("Chưa có thu nhập thực tế trong tháng này để đồng bộ.");
+      }
+    } catch (err) {
+      console.error('Reality sync failed:', err);
+      alert("Lỗi khi đồng bộ thực tế.");
     }
   };
 
@@ -531,12 +624,39 @@ export default function Profile() {
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-6">
               {[
                 { label: 'Tài khoản từ', value: '04/2026' },
-                { label: 'Số huy hiệu', value: '12 Badges' },
                 { label: 'Chi phí cố định', value: `${fmt(totalFixed)}đ/tháng` },
+                { 
+                  label: 'Thu nhập dự tính', 
+                  value: isEditingIncome ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        type="number"
+                        value={newIncome}
+                        onChange={(e) => setNewIncome(Number(e.target.value))}
+                        className="w-28 px-2 py-1 bg-white/5 border border-white/10 rounded text-sm text-theme-text-primary focus:border-indigo-500 focus:outline-none"
+                      />
+                      <button onClick={handleUpdateIncome} className="p-1 hover:text-green-400 transition-colors"><CheckCircle2 className="w-4 h-4" /></button>
+                      <button onClick={() => { setIsEditingIncome(false); setNewIncome(user?.monthly_income || 0); }} className="p-1 hover:text-red-400 transition-colors"><X className="w-4 h-4" /></button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2 group/income cursor-pointer" onClick={() => setIsEditingIncome(true)}>
+                        <span>{fmt(user?.monthly_income || 0)}đ/tháng</span>
+                        <Pencil className="w-3 h-3 text-theme-text-muted opacity-0 group-hover/income:opacity-100 transition-all" />
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleSyncReality(); }}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-widest transition-all w-fit"
+                      >
+                        <RefreshCw className="w-2.5 h-2.5" /> Đồng bộ thực tế
+                      </button>
+                    </div>
+                  )
+                },
               ].map((stat, i) => (
                 <div key={i} className="flex flex-col">
                   <span className="text-xs text-theme-text-muted uppercase tracking-wider font-semibold">{stat.label}</span>
-                  <span className="text-theme-text-primary font-medium flex items-center gap-1">{stat.value} <ArrowUpRight className="w-3 h-3 text-theme-text-muted" /></span>
+                  <div className="text-theme-text-primary font-medium flex items-center gap-1">{stat.value}</div>
                 </div>
               ))}
             </div>
@@ -647,7 +767,7 @@ export default function Profile() {
                             >
                               {/* Icon */}
                               <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border ${catColor}`}>
-                                <DollarSign className="w-5 h-5" />
+                                <IconRenderer iconName={exp.icon || 'dollar-sign'} className="w-5 h-5" />
                               </div>
 
                               {/* Info */}

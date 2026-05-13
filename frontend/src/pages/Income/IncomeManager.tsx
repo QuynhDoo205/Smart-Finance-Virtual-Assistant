@@ -79,6 +79,8 @@ export default function IncomeManager() {
   }, [notification]);
   const [showLogicInfo, setShowLogicInfo] = useState(false);
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
+  const [isEditingIncome, setIsEditingIncome] = useState(false);
+  const [newIncomeValue, setNewIncomeValue] = useState(0);
 
   // Load data from Backend
   useEffect(() => {
@@ -107,6 +109,15 @@ export default function IncomeManager() {
             }),
           );
           setSources(mappedSources);
+          
+          // Calculate initial forecast for the editor
+          const initialForecast = mappedSources.reduce((sum, s) => {
+            if (s.type === "scheduled" && s.workSchedule && s.hourlyRate) {
+              return sum + calculateMonthlyForecast(s.workSchedule, s.hourlyRate);
+            }
+            return sum + (s.expectedAmount ?? 0);
+          }, 0);
+          setNewIncomeValue(initialForecast);
         }
 
         if (transRes.success) {
@@ -404,6 +415,26 @@ export default function IncomeManager() {
     }
   };
 
+  const handleUpdateGlobalIncome = async () => {
+    try {
+      // Find or create a 'Khác' fixed source to hold the difference if needed,
+      // but the simplest way is to just update the user's monthly_income in profile.
+      const budgetRes = await dashboardApi.getBudget();
+      const existingBudgets = budgetRes.success 
+        ? budgetRes.data.budgets.map((b: any) => ({ categoryName: b.budget_title || b.category_name, amount: b.limit_amount, category: b.category_name }))
+        : [];
+      
+      await userApi.updateOnboarding(newIncomeValue, existingBudgets);
+      
+      setNotification({ type: 'success', message: 'Đã cập nhật thu nhập dự tính thành công! Đang tải lại...' });
+      setIsEditingIncome(false);
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      console.error("Update global income failed:", err);
+      setNotification({ type: 'error', message: 'Lỗi khi cập nhật thu nhập' });
+    }
+  };
+
   // --- Derived State ---
   const actualIncomeThisMonth = useMemo(() => {
     const now = new Date();
@@ -579,11 +610,36 @@ export default function IncomeManager() {
           <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl -mr-12 -mt-12" />
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-theme-text-muted font-bold text-[10px] uppercase tracking-widest mb-1">
+              <h3 className="text-theme-text-muted font-bold text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
                 Thu nhập dự tính (Cả tháng)
+                {!isEditingIncome && (
+                  <button onClick={() => setIsEditingIncome(true)} className="p-1 hover:text-emerald-400 transition-colors">
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+                )}
               </h3>
               <div className="text-2xl font-black text-theme-text-primary tracking-tight">
-                {formatCurrency(totalForecasted)} <span className="text-sm text-theme-text-muted font-normal uppercase">vnđ</span>
+                {isEditingIncome ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="number"
+                      autoFocus
+                      value={newIncomeValue}
+                      onChange={(e) => setNewIncomeValue(Number(e.target.value))}
+                      className="w-32 px-2 py-1 bg-white/5 border border-white/10 rounded text-sm text-theme-text-primary focus:border-emerald-500 focus:outline-none"
+                    />
+                    <button onClick={handleUpdateGlobalIncome} className="p-1 text-emerald-400 hover:text-emerald-300 transition-colors">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setIsEditingIncome(false)} className="p-1 text-rose-400 hover:text-rose-300 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {formatCurrency(totalForecasted)} <span className="text-sm text-theme-text-muted font-normal uppercase">vnđ</span>
+                  </>
+                )}
               </div>
             </div>
             <div className="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20">

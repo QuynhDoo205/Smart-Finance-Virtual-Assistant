@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { 
   ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, 
   Target, RefreshCw, Search, ShoppingBag, 
@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [incomeSources, setIncomeSources] = useState<IncomeSourceRecord[]>([]);
+  const [chartData, setChartData] = useState<{name: string; income: number; expense: number}[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLogicInfo, setShowLogicInfo] = useState(false);
 
@@ -51,16 +52,41 @@ export default function Dashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [summaryRes, txRes, budgetRes, incomeRes] = await Promise.all([
+      const [summaryRes, txRes, budgetRes, incomeRes, chartRes] = await Promise.all([
         dashboardApi.getSummary(),
         dashboardApi.getTransactions(25),
         dashboardApi.getBudget(),
         incomeApi.getSources(),
+        dashboardApi.getChartData(),
       ]);
       setSummary(summaryRes.data);
       setTransactions(txRes.data.transactions);
       setBudgets(budgetRes.data.budgets);
       if (incomeRes.success) setIncomeSources(incomeRes.data.sources);
+      if (chartRes.success) {
+        // Transform backend data format to Recharts format
+        const rawData = chartRes.data.chartData;
+        const formattedMap = new Map();
+        
+        // Luôn tạo đủ 6 tháng gần nhất (bao gồm tháng hiện tại)
+        const today = new Date();
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+          const monthStr = `Tháng ${d.getMonth() + 1}`;
+          formattedMap.set(monthStr, { name: monthStr, income: 0, expense: 0 });
+        }
+
+        // Đắp dữ liệu thật vào
+        rawData.forEach((row: any) => {
+          const key = `Tháng ${row.month}`;
+          if (formattedMap.has(key)) {
+            if (row.type === 'income') formattedMap.get(key).income = Number(row.total);
+            else formattedMap.get(key).expense = Number(row.total);
+          }
+        });
+        
+        setChartData(Array.from(formattedMap.values()));
+      }
     } catch {
       // Error handling
     } finally {
@@ -232,9 +258,43 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
+      {/* --- 6-Month Trend Chart --- */}
+      {chartData.length > 0 && (
+        <div className="glass-panel p-6 rounded-[2rem] border border-[var(--theme-subtle-border)] shadow-lg">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-md font-black text-theme-text-primary tracking-tight">Biểu đồ dòng tiền (6 tháng)</h3>
+          </div>
+          <div className="w-full h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(value) => `${value / 1000000}tr`} />
+                <RechartsTooltip 
+                  formatter={(value: any) => formatCurrency(Number(value)) + ' đ'}
+                  contentStyle={{ backgroundColor: '#0f172a', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '1rem', fontSize: '12px' }}
+                />
+                <Area type="monotone" dataKey="income" name="Thu nhập" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorIncome)" />
+                <Area type="monotone" dataKey="expense" name="Chi tiêu" stroke="#f43f5e" strokeWidth={3} fillOpacity={1} fill="url(#colorExpense)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       {/* Budget Monitor - Compact & Clear */}
       {mergedBudgets.length > 0 && (
-        <motion.div variants={itemVars} className="glass-panel p-6 rounded-[2rem] border border-[var(--theme-subtle-border)] shadow-lg">
+        <div className="glass-panel p-6 rounded-[2rem] border border-[var(--theme-subtle-border)] shadow-lg">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-primary-500/10 text-primary-400">
@@ -289,7 +349,7 @@ export default function Dashboard() {
               );
             })}
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Main Content - Compact Side-by-Side */}

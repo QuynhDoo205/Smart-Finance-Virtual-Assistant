@@ -117,14 +117,14 @@ router.get('/transactions', async (req: AuthRequest, res: Response): Promise<voi
 
     const result = await pool.query(
       `SELECT t.id, t.tieu_de AS title, t.so_tien AS amount, 
-              CASE WHEN t.loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END AS type, 
-              t.ghi_chu AS note, t.ngay_giao_dich AS transaction_date,
-              c.ten_danh_muc as category_name, c.bieu_tuong as category_icon, c.mau_sac as category_color
-       FROM giao_dich t
-       LEFT JOIN danh_muc c ON t.danh_muc_id = c.id
-       WHERE t.nguoi_dung_id = $1
-       ORDER BY t.ngay_giao_dich DESC
-       LIMIT $2`,
+               CASE WHEN t.loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END AS type, 
+               t.ghi_chu AS note, t.ngay_giao_dich AS transaction_date,
+               c.ten_danh_muc as category_name, c.bieu_tuong as category_icon, c.mau_sac as category_color
+        FROM giao_dich t
+        LEFT JOIN danh_muc c ON t.danh_muc_id = c.id
+        WHERE t.nguoi_dung_id = $1
+        ORDER BY t.ngay_giao_dich DESC
+        LIMIT $2`,
       [userId, limit]
     );
 
@@ -142,35 +142,36 @@ router.get('/budget', async (req: AuthRequest, res: Response): Promise<void> => 
   try {
     const userId = req.user?.id;
     const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
+    const month = parseInt(req.query['month'] as string) || now.getMonth() + 1;
+    const year = parseInt(req.query['year'] as string) || now.getFullYear();
 
     const result = await pool.query(
       `WITH actual_spending AS (
-         SELECT danh_muc_id, SUM(so_tien) as total_spent
-         FROM giao_dich
-         WHERE nguoi_dung_id = $1 AND loai_giao_dich IN ('chi_phi', 'expense')
-         AND EXTRACT(MONTH FROM ngay_giao_dich) = $2
-         AND EXTRACT(YEAR FROM ngay_giao_dich) = $3
-         GROUP BY danh_muc_id
-       )
-       SELECT 
-         COALESCE(b.id, 0) as id,
-         COALESCE(b.gioi_han_chi_tieu, 0) as limit_amount,
-         COALESCE(s.total_spent, b.da_chi_tieu, 0) as spent_amount,
-         c.ten_danh_muc as category_name,
-         c.bieu_tuong as category_icon,
-         c.mau_sac as category_color,
-         CASE 
-           WHEN COALESCE(b.gioi_han_chi_tieu, 0) > 0 
-           THEN ROUND((COALESCE(s.total_spent, b.da_chi_tieu, 0) / b.gioi_han_chi_tieu * 100)::numeric, 1)
-           ELSE 0 
-         END as usage_percent
-       FROM danh_muc c
-       LEFT JOIN ngan_sach b ON c.id = b.danh_muc_id AND b.nguoi_dung_id = $1 AND b.thang = $2 AND b.nam = $3
-       LEFT JOIN actual_spending s ON c.id = s.danh_muc_id
-       WHERE b.id IS NOT NULL OR s.total_spent > 0
-       ORDER BY spent_amount DESC`,
+          SELECT danh_muc_id, SUM(so_tien) as total_spent
+          FROM giao_dich
+          WHERE nguoi_dung_id = $1 AND loai_giao_dich IN ('chi_phi', 'expense')
+          AND EXTRACT(MONTH FROM ngay_giao_dich) = $2
+          AND EXTRACT(YEAR FROM ngay_giao_dich) = $3
+          GROUP BY danh_muc_id
+        )
+        SELECT 
+          COALESCE(b.id, 0) as id,
+          COALESCE(b.gioi_han_chi_tieu, 0) as limit_amount,
+          COALESCE(s.total_spent, b.da_chi_tieu, 0) as spent_amount,
+          c.ten_danh_muc as category_name,
+          b.tieu_de as budget_title,
+          c.bieu_tuong as category_icon,
+          c.mau_sac as category_color,
+          CASE 
+            WHEN COALESCE(b.gioi_han_chi_tieu, 0) > 0 
+            THEN ROUND((COALESCE(s.total_spent, b.da_chi_tieu, 0) / b.gioi_han_chi_tieu * 100)::numeric, 1)
+            ELSE 0 
+          END as usage_percent
+        FROM ngan_sach b
+        JOIN danh_muc c ON b.danh_muc_id = c.id
+        LEFT JOIN actual_spending s ON c.id = s.danh_muc_id
+        WHERE b.nguoi_dung_id = $1 AND b.thang = $2 AND b.nam = $3
+        ORDER BY spent_amount DESC`,
       [userId, month, year]
     );
 
@@ -220,7 +221,7 @@ router.post('/savings-goals', async (req: AuthRequest, res: Response): Promise<v
 
     const result = await pool.query(
       `INSERT INTO muc_tieu_tiet_kiem (nguoi_dung_id, ten_muc_tieu, so_tien_muc_tieu, so_tien_hien_tai, ngay_het_han, bieu_tuong, mau_sac, trang_thai)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'in_progress')
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'hoat_dong')
        RETURNING id, ten_muc_tieu AS name, so_tien_muc_tieu AS target_amount, so_tien_hien_tai AS current_amount, ngay_het_han AS deadline, bieu_tuong AS icon, mau_sac AS color, trang_thai AS status`,
       [userId, name, targetAmount, 0, deadline, icon || '🎯', color || '#818cf8']
     );
@@ -228,6 +229,48 @@ router.post('/savings-goals', async (req: AuthRequest, res: Response): Promise<v
     res.json({ success: true, data: { goal: result.rows[0] } });
   } catch (err) {
     console.error('Create savings goal error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
+  }
+});
+
+// ============================================================
+// POST /api/dashboard/savings-goals/:id/fund – Nạp tiền vào mục tiêu
+// ============================================================
+router.post('/savings-goals/:id/fund', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const goalId = req.params.id;
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0) {
+      res.status(400).json({ success: false, message: 'Số tiền không hợp lệ' });
+      return;
+    }
+
+    const result = await pool.query(
+      `UPDATE muc_tieu_tiet_kiem 
+       SET so_tien_hien_tai = so_tien_hien_tai + $1,
+           trang_thai = CASE WHEN so_tien_hien_tai + $1 >= so_tien_muc_tieu THEN 'hoan_thanh' ELSE trang_thai END
+       WHERE id = $2 AND nguoi_dung_id = $3
+       RETURNING id, ten_muc_tieu, so_tien_hien_tai`,
+      [amount, goalId, userId]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ success: false, message: 'Không tìm thấy mục tiêu' });
+      return;
+    }
+    
+    // Ghi nhận dòng tiền này là một khoản chi (đưa vào lợn đất) để trừ khỏi Tổng số dư khả dụng
+    await pool.query(
+      `INSERT INTO giao_dich (nguoi_dung_id, tieu_de, so_tien, loai_giao_dich, ghi_chu)
+       VALUES ($1, $2, $3, 'chi_phi', 'Chuyển tiền vào quỹ mục tiêu')`,
+      [userId, `Nạp heo đất: ${result.rows[0].ten_muc_tieu}`, amount]
+    );
+
+    res.json({ success: true, message: 'Nạp tiền thành công', data: result.rows[0] });
+  } catch (err) {
+    console.error('Fund savings goal error:', err);
     res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
   }
 });

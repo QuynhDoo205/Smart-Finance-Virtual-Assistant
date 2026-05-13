@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Lucide from 'lucide-react';
-import { BrainCircuit, RefreshCw, Sparkles, Info, HelpCircle, Target, X, ExternalLink, Banknote, PieChart as PieIcon, CheckCircle2, AlertCircle, PlusCircle } from 'lucide-react';
+import { BrainCircuit, RefreshCw, Sparkles, Info, HelpCircle, Target, X, ExternalLink, Banknote, PieChart as PieIcon, CheckCircle2, AlertCircle, PlusCircle, Settings } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import LinkedSliders, { type Jar } from './components/LinkedSliders';
 import { dashboardApi, authApi, transactionsApi } from '../../utils/api';
 
@@ -16,6 +16,19 @@ const INIT_JARS: Jar[] = [
 ];
 
 const fmtVND = (v: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v);
+
+const getSmartIcon = (title: string, defaultIcon: string) => {
+  const t = title.toLowerCase();
+  if (t.includes('nhà') || t.includes('phòng') || t.includes('trọ')) return 'home';
+  if (t.includes('điện') || t.includes('nước') || t.includes('hóa đơn')) return 'zap';
+  if (t.includes('ăn') || t.includes('uống') || t.includes('chợ')) return 'utensils';
+  if (t.includes('xe') || t.includes('xăng') || t.includes('đi lại')) return 'car';
+  if (t.includes('học') || t.includes('trường') || t.includes('khóa')) return 'book';
+  if (t.includes('mạng') || t.includes('wifi') || t.includes('4g') || t.includes('internet')) return 'wifi';
+  if (t.includes('gym') || t.includes('sức khỏe') || t.includes('thuốc')) return 'heart';
+  if (t.includes('mua') || t.includes('sắm')) return 'shopping-bag';
+  return defaultIcon;
+};
 
 const IconRenderer = ({ iconName, className }: { iconName: string, className?: string }) => {
   if (!iconName) return <Lucide.HelpCircle className={className} />;
@@ -37,6 +50,7 @@ const IconRenderer = ({ iconName, className }: { iconName: string, className?: s
 };
 
 export default function BudgetManager() {
+  const navigate = useNavigate();
   const [income, setIncome] = useState(0);
   const [jars, setJars] = useState<Jar[]>(INIT_JARS);
   const [fixedExpenses, setFixedExpenses] = useState<{name: string, emoji: string, amount: number}[]>([]);
@@ -73,8 +87,8 @@ export default function BudgetManager() {
           const mappedFixed = actualBudgets
             .filter((b: any) => b.limit_amount > 0 && !jarNames.includes(b.category_name.toLowerCase()))
             .map((b: any) => ({
-              name: b.category_name,
-              emoji: b.category_icon || '💰',
+              name: b.budget_title || b.category_name,
+              emoji: getSmartIcon(b.budget_title || b.category_name, b.category_icon || '💰'),
               amount: parseFloat(b.limit_amount)
             }));
           
@@ -102,6 +116,29 @@ export default function BudgetManager() {
       // Fallback if AI fails
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const handleSyncReality = async () => {
+    try {
+      const summaryRes = await dashboardApi.getSummary();
+      if (summaryRes.success && summaryRes.data.totalIncome > 0) {
+        const realIncome = summaryRes.data.totalIncome;
+        setIncome(realIncome);
+        // Sync to profile as well
+        const budgetRes = await dashboardApi.getBudget();
+        const existingBudgets = budgetRes.success 
+          ? budgetRes.data.budgets.map((b: any) => ({ 
+              categoryName: b.budget_title || b.category_name, 
+              amount: b.limit_amount,
+              category: b.category_name
+            }))
+          : [];
+        await userApi.updateOnboarding(realIncome, existingBudgets);
+        alert(`Đã đồng bộ Thu nhập thực tế (${fmtVND(realIncome)}) vào kế hoạch!`);
+      }
+    } catch (err) {
+      console.error('Reality sync failed:', err);
     }
   };
 
@@ -209,20 +246,36 @@ export default function BudgetManager() {
       <div className="glass-panel p-8 rounded-[2.5rem] border border-[var(--theme-subtle-border)]  relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500/0 via-cyan-500/50 to-cyan-500/0" />
         
-        <div className="flex items-center gap-2 mb-8">
-          <div className="p-1.5 bg-cyan-500/20 rounded-lg">
-            <Banknote className="w-4 h-4 text-cyan-400" />
+        <div className="flex items-center justify-between gap-2 mb-8">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-cyan-500/20 rounded-lg">
+              <Banknote className="w-4 h-4 text-cyan-400" />
+            </div>
+            <h2 className="text-xs font-black text-theme-text-primary uppercase tracking-[0.2em]">KHU VỰC 1 - THU NHẬP & PHÍ CỐ ĐỊNH</h2>
           </div>
-          <h2 className="text-xs font-black text-theme-text-primary uppercase tracking-[0.2em]">KHU VỰC 1 - THU NHẬP & PHÍ CỐ ĐỊNH</h2>
+          <button
+            onClick={() => navigate('/app/profile?tab=expenses')}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 text-rose-400 text-[10px] font-black uppercase tracking-widest transition-all group"
+          >
+            <Settings className="w-3.5 h-3.5 group-hover:rotate-45 transition-transform duration-300" />
+            Sửa chi phí cố định
+          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           {/* Total Income */}
           <div className="lg:col-span-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-theme-text-muted mb-2">Tổng thu nhập / tháng</p>
-            <h3 className="text-4xl font-black text-theme-text-primary tracking-tighter">
+            <h3 className="text-4xl font-black text-theme-text-primary tracking-tighter mb-2">
               {fmtVND(income)}
             </h3>
+            <button 
+              onClick={handleSyncReality}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-400 text-[9px] font-black uppercase tracking-widest transition-all"
+              title="Lấy số tiền thu nhập thực tế từ các giao dịch trong tháng để lập kế hoạch"
+            >
+              <RefreshCw className="w-3 h-3" /> Đồng bộ thực tế
+            </button>
           </div>
 
           {/* Fixed Expenses List */}

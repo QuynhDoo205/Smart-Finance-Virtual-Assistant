@@ -106,34 +106,68 @@ router.put('/onboarding', async (req: AuthRequest, res: Response): Promise<void>
     );
     const fallbackCategoryId = khaCategory?.id || allCategories[0]?.id;
 
-    for (const exp of expenses) {
-      // Thử tìm category ID theo tên (case-insensitive)
-      const catRes = await client.query(
-        'SELECT id FROM danh_muc WHERE LOWER(ten_danh_muc) = LOWER($1)',
-        [exp.categoryName]
-      );
-      
-      // Nếu không tìm thấy → dùng category "Khác" hoặc category đầu tiên
-      const categoryId = catRes.rows.length > 0 ? catRes.rows[0].id : fallbackCategoryId;
-      
-      if (!categoryId) continue; // Không có category nào → bỏ qua
+    // Xóa các ngân sách cố định cũ (không thuộc 6 lọ mặc định) để cập nhật mới hoàn toàn
+    const jarNames = ['ăn uống', 'đầu tư', 'giáo dục', 'giải trí', 'sức khỏe', 'tổng quát'];
+    await client.query(
+      `DELETE FROM ngan_sach 
+       WHERE nguoi_dung_id = $1 AND thang = $2 AND nam = $3
+       AND danh_muc_id NOT IN (SELECT id FROM danh_muc WHERE LOWER(ten_danh_muc) = ANY($4))`,
+      [userId, month, year, jarNames]
+    );
 
-      // Upsert budget – tìm theo danh_muc_id + thang + nam
+    for (const exp of expenses) {
+      // Sử dụng category (Nhà ở, Tiện ích...) để tìm đúng danh_muc
+      const categoryAliasMap: Record<string, string[]> = {
+        'Nhà ở':    ['nhà ở', 'nhà ở', 'housing', 'nhà'],
+        'Tiện ích':  ['tiện ích', 'utilities', 'công ích', 'điện', 'nước'],
+        'Giải trí': ['giải trí', 'entertainment'],
+        'Học tập':  ['học tập', 'giáo dục', 'education'],
+        'Bảo hiểm': ['bảo hiểm', 'insurance'],
+        'Khác':     ['khác', 'other'],
+      };
+
+      const searchTerms = [
+        exp.category,
+        exp.categoryName,
+        ...(categoryAliasMap[exp.category] || []),
+      ].filter(Boolean);
+
+      let categoryId = fallbackCategoryId;
+      for (const term of searchTerms) {
+        const catRes = await client.query(
+          'SELECT id FROM danh_muc WHERE LOWER(ten_danh_muc) LIKE LOWER($1) LIMIT 1',
+          [`%${term}%`]
+        );
+        if (catRes.rows.length > 0) {
+          categoryId = catRes.rows[0].id;
+          break;
+        }
+      }
+      
+      if (!categoryId) continue;
+
+      // Upsert budget – Sử dụng tieu_de để phân biệt các khoản trong cùng 1 danh mục
       await client.query(
-        `INSERT INTO ngan_sach (nguoi_dung_id, danh_muc_id, gioi_han_chi_tieu, da_chi_tieu, thang, nam)
-         VALUES ($1, $2, $3, 0, $4, $5)
-         ON CONFLICT (nguoi_dung_id, danh_muc_id, thang, nam)
+        `INSERT INTO ngan_sach (nguoi_dung_id, danh_muc_id, tieu_de, gioi_han_chi_tieu, da_chi_tieu, thang, nam)
+         VALUES ($1, $2, $3, $4, 0, $5, $6)
+         ON CONFLICT (nguoi_dung_id, danh_muc_id, thang, nam, tieu_de)
          DO UPDATE SET gioi_han_chi_tieu = EXCLUDED.gioi_han_chi_tieu`,
-        [userId, categoryId, exp.amount, month, year]
+        [userId, categoryId, exp.categoryName || '', exp.amount, month, year]
       );
     }
 
     await client.query('COMMIT');
 
+    // Fetch updated user to return
+    const updatedUserRes = await client.query(
+      'SELECT id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed FROM nguoi_dung WHERE id = $1',
+      [userId]
+    );
+
     res.json({
       success: true,
       message: 'Onboarding completed successfully',
-      user: { ...req.user, onboarding_completed: true }
+      user: updatedUserRes.rows[0]
     });
   } catch (err) {
     await client.query('ROLLBACK');

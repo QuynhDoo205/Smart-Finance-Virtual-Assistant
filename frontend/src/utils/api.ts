@@ -125,6 +125,12 @@ export const dashboardApi = {
       method: 'POST',
       body: JSON.stringify(goalData),
     }),
+    
+  fundSavingsGoal: (id: number, amount: number) =>
+    apiFetch<{ success: boolean; message: string }>(`/dashboard/savings-goals/${id}/fund`, {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    }),
   
   getChartData: () =>
     apiFetch<{ success: boolean; data: { chartData: ChartDataPoint[] } }>('/dashboard/chart-data'),
