@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { motion } from 'framer-motion';
 import './store/themeStore'; // initialize theme on load
+import Landing from './pages/Landing';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import OnboardingSurvey from './pages/Onboarding/OnboardingSurvey';
@@ -23,6 +24,7 @@ import AdminSettings from './pages/Admin/AdminSettings';
 import AdminLayout from './components/layout/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Maintenance from './pages/Maintenance';
+import FloatingAI from './components/ai/FloatingAI';
 
 function App() {
   const GOOGLE_CLIENT_ID = '509981311672-d3g4gkko1ir0qmritmdpvquh01gvnvso.apps.googleusercontent.com';
@@ -67,7 +69,7 @@ function App() {
         
         <div className="relative z-10 min-h-screen flex flex-col">
           <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/onboarding" element={<OnboardingSurvey />} />
@@ -103,6 +105,7 @@ function App() {
               <Route path="settings" element={<AdminSettings />} />
             </Route>
           </Routes>
+          <FloatingAI />
         </div>
       </div>
     </BrowserRouter>

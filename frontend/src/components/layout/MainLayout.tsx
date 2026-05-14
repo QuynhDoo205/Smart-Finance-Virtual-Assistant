@@ -6,7 +6,6 @@ import { API_ROOT, authApi, adminApi } from '../../utils/api';
 import ThemeSidebar from './ThemeSidebar';
 import authStore from '../../store/authStore';
 import { setTheme } from '../../store/themeStore';
-import FloatingAI from '../ai/FloatingAI';
 const NAV_ITEMS = [
   { path: '/app/admin', label: 'Hệ thống Admin', icon: Shield, adminOnly: true },
   { path: '/app', label: 'Tổng quan', icon: LayoutDashboard },
@@ -246,7 +245,6 @@ export default function MainLayout() {
       </main>
 
       <ThemeSidebar isOpen={isThemeOpen} onClose={() => setIsThemeOpen(false)} />
-      <FloatingAI />
     </div>
   );
 }

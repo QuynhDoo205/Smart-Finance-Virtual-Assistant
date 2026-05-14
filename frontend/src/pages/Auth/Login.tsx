@@ -1,27 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, LogIn, Sparkles, AlertCircle, Loader2, ArrowRight, CheckCircle2, Eye, EyeOff, X } from 'lucide-react';
+import { Mail, Lock, LogIn, Sparkles, AlertCircle, Loader2, ArrowRight, CheckCircle2, Eye, EyeOff, X, Globe, MessageSquare } from 'lucide-react';
 import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
 import { authApi } from '../../utils/api';
 import type { UserProfile } from '../../utils/api';
 import authStore from '../../store/authStore';
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
-};
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -40,7 +24,6 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
       const response = await authApi.login(email, password);
       if (response.success && response.data) {
@@ -57,7 +40,6 @@ export default function Login() {
   const handleGoogleSuccess = async (credentialResponse: any) => {
     const token = credentialResponse.credential || credentialResponse;
     if (!token) return;
-    
     setLoading(true);
     setError('');
     try {
@@ -80,11 +62,8 @@ export default function Login() {
 
   const proceedToApp = () => {
     if (!successUser) return;
-    if (successUser.onboarding_completed) {
-      navigate('/app');
-    } else {
-      navigate('/onboarding');
-    }
+    if (successUser.onboarding_completed) navigate('/app');
+    else navigate('/onboarding');
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -93,9 +72,7 @@ export default function Login() {
     setForgotMessage('');
     try {
       const response = await authApi.forgotPassword(forgotEmail);
-      if (response.success) {
-        setForgotMessage(response.message);
-      }
+      if (response.success) setForgotMessage(response.message);
     } catch (err) {
       setForgotMessage(err instanceof Error ? err.message : 'Lỗi khi gửi yêu cầu');
     } finally {
@@ -104,302 +81,177 @@ export default function Login() {
   };
 
   return (
-    <div className="flex-1 flex min-h-screen relative shadow-2xl">
-      
-      {/* LEFT SIDE: Brand & Graphic */}
-      <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-12 overflow-hidden border-r border-[var(--theme-subtle-border)]">
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="/hero-bg.png" 
-            alt="Futuristic Finance" 
-            className="w-full h-full object-cover opacity-80 mix-blend-lighten"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#030712]/10 via-[#030712]/40 to-[#030712] z-10" />
-        </div>
-        
-        <div className="relative z-20 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary-500 to-accent-400 flex items-center justify-center shadow-[0_0_20px_rgba(56,189,248,0.5)]">
-            <Sparkles className="text-theme-text-primary w-6 h-6" />
-          </div>
-          <span className="text-2xl font-bold tracking-tight text-theme-text-primary drop-shadow-md">
-            Nova<span className="text-primary-400">Finance</span>
-          </span>
-        </div>
+    <div className="relative min-h-screen bg-[#010828] overflow-hidden text-[#EFF4FF] font-sans selection:bg-[#00D1FF]/30">
+      {/* Texture Overlay */}
+      <div className="texture-overlay opacity-25" />
 
-        <motion.div 
-          initial={{ opacity: 0, x: -30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 1, delay: 0.5 }}
-          className="relative z-20 max-w-lg"
+      {/* Video Background */}
+      <div className="fixed inset-0 z-0">
+        <video
+          autoPlay loop muted playsInline
+          className="w-full h-full object-cover opacity-50"
         >
-          <div className="p-8 rounded-[2rem] bg-[var(--theme-subtle-bg)] backdrop-blur-md border border-[var(--theme-subtle-border)] shadow-2xl">
-            <h2 className="text-4xl font-extrabold text-theme-text-primary leading-tight mb-4 drop-shadow-lg">
-              Quản trị dòng tiền,<br/>
-              Kiến tạo tương lai.
-            </h2>
-            <p className="text-theme-text-muted text-lg">
-              Hệ sinh thái tài chính AI siêu thực giúp bạn tối ưu hóa từng đồng thu nhập. Trải nghiệm ngay báo cáo thông minh và tự động hóa chia ngân sách.
-            </p>
-          </div>
-        </motion.div>
+          <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260331_045634_e1c98c76-1265-4f5c-882a-4276f2080894.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-gradient-to-b from-[#010828]/80 via-transparent to-[#010828]" />
       </div>
 
-      {/* RIGHT SIDE: Content Area */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden">
-        {/* Premium Background Elements */}
-        <div className="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] bg-primary-500/10 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[350px] h-[350px] bg-accent-500/10 rounded-full blur-[100px] pointer-events-none" />
+      <main className="relative z-10 max-w-[1831px] mx-auto px-6 py-8 min-h-screen flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-16">
+        
+        {/* Left Side: Hero Content */}
+        <div className="w-full lg:w-[45%] relative text-center lg:text-left">
+          <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8 }}>
+            <div className="relative inline-block mb-6">
+               <div className="flex items-center gap-2 mb-8 justify-center lg:justify-start">
+                  <div className="w-8 h-8 rounded-lg bg-[#00D1FF] flex items-center justify-center text-[#010828] font-grotesk text-xl shadow-[0_0_15px_rgba(0,209,255,0.4)]">N</div>
+                  <span className="font-grotesk text-xl uppercase tracking-tighter text-white">Nova.Finance</span>
+               </div>
+              <h1 className="font-grotesk text-4xl sm:text-6xl md:text-7xl lg:text-[75px] uppercase leading-[0.85] tracking-tighter text-white drop-shadow-2xl">
+                KHÁM PHÁ<br/>
+                KỶ NGUYÊN<br/>
+                <span className="text-[#00D1FF]">TÀI CHÍNH AI</span>
+              </h1>
+              <span className="absolute -right-4 lg:-right-16 top-0 lg:top-4 font-condiment text-[#00D1FF] text-2xl sm:text-4xl md:text-5xl -rotate-6 opacity-95 drop-shadow-[0_0_15px_rgba(0,209,255,0.6)]">Trợ lý ảo</span>
+            </div>
+            <p className="mt-6 text-sm sm:text-base text-[#EFF4FF] font-bold max-w-md leading-relaxed uppercase tracking-[0.15em] opacity-80 mx-auto lg:mx-0">
+              Công nghệ trí tuệ nhân tạo tối ưu hóa dòng tiền và kiến tạo tương lai vững chắc.
+            </p>
+          </motion.div>
+        </div>
 
-        <AnimatePresence mode="wait">
-          {!successUser ? (
-            <motion.div 
-              key="login-form"
-              className="w-full max-w-md"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit={{ opacity: 0, scale: 0.95 }}
-            >
-              {/* Mobile Logo */}
-              <div className="lg:hidden text-center mb-10 flex flex-col items-center">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary-500 to-accent-400 flex items-center justify-center shadow-[0_0_30px_rgba(56,189,248,0.5)] mb-4">
-                  <Sparkles className="text-theme-text-primary w-7 h-7" />
+        {/* Right Side: Auth Panel */}
+        <div className="w-full lg:w-[380px] relative">
+          <AnimatePresence mode="wait">
+            {!successUser ? (
+              <motion.div 
+                key="login-form" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }}
+                className="liquid-glass bg-[#010828]/60 backdrop-blur-[30px] rounded-[40px] p-8 sm:p-10 border border-white/20 shadow-[0_30px_100px_rgba(0,0,0,0.7)]"
+              >
+                <div className="mb-8 text-center lg:text-left">
+                  <h2 className="font-grotesk text-4xl uppercase tracking-tighter leading-none mb-2 text-white">Đăng nhập</h2>
+                  <div className="flex items-center gap-2 justify-center lg:justify-start">
+                     <div className="h-[2px] w-10 bg-[#00D1FF]" />
+                     <p className="text-[#00D1FF] font-black text-[10px] tracking-[0.4em] uppercase">Truy cập hệ thống</p>
+                  </div>
                 </div>
-                <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
-                  Nova<span className="text-primary-400">Finance</span>
-                </h1>
-              </div>
 
-              <motion.div variants={itemVariants} className="mb-6 text-center lg:text-left">
-                <h2 className="text-2xl font-bold text-theme-text-primary mb-1">Đăng nhập</h2>
-                <p className="text-xs text-theme-text-muted">Chào mừng bạn quay lại hệ thống</p>
-              </motion.div>
-              
-              <motion.div variants={itemVariants} className="glass-panel p-6 sm:p-8 max-w-[400px] mx-auto lg:ml-0">
                 {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-2"
-                  >
-                    <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                    <p className="text-[12px] text-rose-300">{error}</p>
-                  </motion.div>
+                  <div className="mb-6 p-4 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-100 text-[11px] font-bold flex items-center gap-2 animate-shake shadow-lg">
+                    <AlertCircle className="w-5 h-5 text-rose-400" /> {error}
+                  </div>
                 )}
 
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[12px] text-theme-text-muted font-medium ml-1">Email</label>
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white uppercase tracking-[0.4em] ml-3">Địa chỉ Email</label>
                     <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
-                        <Mail className="h-4 w-4" />
-                      </div>
+                      <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-white/40 group-focus-within:text-[#00D1FF] transition-all" />
                       <input
-                        type="email"
-                        className="glass-input pl-10 py-2.5 text-sm"
-                        placeholder="name@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        disabled={loading}
+                        type="email" placeholder="NGUYEN@EXAMPLE.COM" value={email}
+                        onChange={(e) => setEmail(e.target.value)} required
+                        className="w-full bg-black/50 border border-white/10 rounded-full py-4 pl-14 pr-6 text-sm focus:outline-none focus:bg-black/70 focus:border-[#00D1FF]/40 transition-all placeholder:text-white/10 font-bold tracking-wider text-white"
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="flex justify-between items-center text-[12px] ml-1">
-                      <span className="text-theme-text-muted font-medium">Mật khẩu</span>
-                      <button 
-                        type="button"
-                        onClick={() => setShowForgotModal(true)} 
-                        className="text-primary-400 hover:text-primary-300 transition-colors font-bold"
-                      >
-                        Quên mật khẩu?
-                      </button>
-                    </label>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center px-3">
+                      <label className="text-[10px] font-black text-white uppercase tracking-[0.4em]">Mật khẩu</label>
+                      <button type="button" onClick={() => setShowForgotModal(true)} className="text-[10px] font-black text-[#00D1FF] hover:text-white uppercase tracking-widest transition-all">Quên mật khẩu?</button>
+                    </div>
                     <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
-                        <Lock className="h-4 w-4" />
-                      </div>
+                      <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-white/40 group-focus-within:text-[#00D1FF] transition-all" />
                       <input
-                        type={showPassword ? "text" : "password"}
-                        className={`glass-input pl-10 pr-10 py-2.5 text-sm ${password.length > 0 && password.length < 6 ? 'border-rose-500/50 bg-rose-500/5' : ''}`}
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        disabled={loading}
+                        type={showPassword ? "text" : "password"} placeholder="••••••••"
+                        value={password} onChange={(e) => setPassword(e.target.value)} required
+                        className="w-full bg-black/50 border border-white/10 rounded-full py-4 pl-14 pr-12 text-sm focus:outline-none focus:bg-black/70 focus:border-[#00D1FF]/40 transition-all placeholder:text-white/10 font-bold text-white"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-theme-text-muted hover:text-primary-400 transition-colors"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
 
-                  <motion.button 
-                    whileHover={{ scale: loading ? 1 : 1.01 }}
-                    whileTap={{ scale: loading ? 1 : 0.99 }}
-                    type="submit" 
-                    className="btn-primary w-full flex justify-center items-center gap-2 py-3 mt-2 disabled:opacity-60 text-sm shadow-lg shadow-primary-500/20"
-                    disabled={loading}
+                  <button 
+                    disabled={loading} type="submit"
+                    className="group relative w-full py-4 rounded-full bg-[#00D1FF] text-[#010828] font-grotesk text-base uppercase tracking-[0.2em] hover:bg-white transition-all duration-300 flex items-center justify-center gap-3 mt-6 overflow-hidden shadow-xl shadow-[#00D1FF]/10"
                   >
-                    {loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <LogIn className="w-4 h-4" />
-                        <span>Truy cập hệ thống</span>
-                      </>
-                    )}
-                  </motion.button>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-shine" />
+                    {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <><LogIn size={20} /> Đăng nhập ngay</>}
+                  </button>
                 </form>
 
-                <div className="mt-6">
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-[var(--theme-subtle-border)]"></div>
-                    </div>
-                    <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold">
-                      <span className="px-3 bg-[#030712] text-theme-text-muted">Hoặc tiếp tục với</span>
-                    </div>
+                <div className="mt-8">
+                  <div className="relative flex items-center justify-center mb-6">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+                    <span className="relative px-4 bg-[#010828] text-[9px] font-black text-white/40 uppercase tracking-[0.5em]">Hoặc đăng nhập với</span>
                   </div>
-
-                  <div className="mt-5 flex flex-col items-center">
-                    <motion.button
-                      whileHover={{ scale: 1.02, backgroundColor: 'rgba(255, 255, 255, 0.08)' }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => loginWithGoogle()}
-                      className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-[var(--theme-subtle-border)] bg-white/5 transition-all group"
-                      type="button"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20px" height="20px" className="group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] transition-all">
-                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
-                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
-                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
-                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
-                      </svg>
-                      <span className="text-sm font-semibold text-theme-text-primary tracking-tight">Tiếp tục bằng Google</span>
-                    </motion.button>
-                  </div>
+                  
+                  <button
+                    onClick={() => loginWithGoogle()}
+                    className="w-full py-4 rounded-full bg-black/50 border border-white/10 text-white font-bold text-[10px] hover:bg-black/70 hover:border-[#00D1FF]/30 transition-all flex items-center justify-center gap-3 group"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+                    Tiếp tục bằng Google
+                  </button>
                 </div>
                 
-                <p className="mt-6 text-center text-[13px] text-theme-text-muted">
-                  Chưa có tài khoản?{' '}
-                  <Link to="/register" className="text-primary-400 hover:text-primary-300 font-bold transition-colors">
-                    Đăng ký ngay
-                  </Link>
+                <p className="mt-8 text-center text-white/50 font-bold text-[11px] tracking-widest uppercase">
+                  Chưa có tài khoản? <Link to="/register" className="text-[#00D1FF] hover:text-white transition-colors underline underline-offset-4 decoration-2 font-black">Đăng ký ngay</Link>
                 </p>
               </motion.div>
-
-            </motion.div>
-          ) : (
-            <motion.div 
-              key="success-screen"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="w-full max-w-md text-center p-8 glass-panel border-primary-500/20"
-            >
-              <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(16,185,129,0.3)]">
-                <CheckCircle2 className="w-10 h-10 text-emerald-400" />
-              </div>
-              <h2 className="text-3xl font-extrabold text-theme-text-primary mb-2">Xác thực thành công</h2>
-              <p className="text-theme-text-muted mb-8">
-                Chào mừng bạn quay lại, <span className="text-primary-400 font-bold text-lg">{successUser.full_name}</span>. Tài khoản của bạn đã sẵn sàng.
-              </p>
-              
-              <motion.button
-                whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(56,189,248,0.4)' }}
-                whileTap={{ scale: 0.95 }}
-                onClick={proceedToApp}
-                className="btn-primary w-full flex items-center justify-center gap-3 py-5 text-xl font-bold bg-gradient-to-r from-primary-600 to-sky-400"
-              >
-                Tiếp tục vào Dashboard
-                <ArrowRight className="w-6 h-6" />
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+            ) : (
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="liquid-glass bg-[#010828]/70 backdrop-blur-[35px] rounded-[40px] p-16 text-center border border-[#00D1FF]/30 shadow-2xl">
+                <div className="w-20 h-20 rounded-full bg-[#00D1FF]/20 flex items-center justify-center mx-auto mb-8 border border-[#00D1FF]/40 shadow-inner">
+                  <CheckCircle2 className="w-12 h-12 text-[#00D1FF]" />
+                </div>
+                <h2 className="font-grotesk text-5xl uppercase tracking-tighter mb-4 text-white">Thành công</h2>
+                <p className="text-[#00D1FF] text-xl mb-12 uppercase tracking-[0.2em] font-grotesk">Chào mừng trở lại</p>
+                <button onClick={proceedToApp} className="group relative w-full py-4 rounded-full bg-[#00D1FF] text-[#010828] font-grotesk text-lg uppercase tracking-widest hover:bg-white transition-all flex items-center justify-center gap-4 shadow-2xl">
+                   Bắt đầu <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </main>
 
       {/* Forgot Password Modal */}
       <AnimatePresence>
         {showForgotModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowForgotModal(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md glass-panel p-8 shadow-2xl border-[var(--theme-subtle-border)]"
-            >
-              <button 
-                onClick={() => setShowForgotModal(false)}
-                className="absolute top-4 right-4 p-2 text-theme-text-muted hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <h3 className="text-2xl font-bold text-theme-text-primary mb-2">Quên mật khẩu?</h3>
-              <p className="text-theme-text-muted mb-6 text-sm">Nhập email của bạn, chúng tôi sẽ gửi mật khẩu mới về Gmail của bạn.</p>
-
-              {forgotMessage ? (
-                <div className="text-center space-y-4">
-                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium">
-                    {forgotMessage}
-                  </div>
-                  <button 
-                    onClick={() => setShowForgotModal(false)}
-                    className="btn-primary w-full"
-                  >
-                    Đã hiểu
-                  </button>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-[#010828]/95 backdrop-blur-[30px]" onClick={() => setShowForgotModal(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 30 }} className="relative w-full max-w-lg liquid-glass bg-[#010828]/80 rounded-[40px] p-10 border border-white/20 shadow-2xl">
+              <button onClick={() => setShowForgotModal(false)} className="absolute top-8 right-8 text-white/30 hover:text-white transition-colors p-2"><X size={24} /></button>
+              <h3 className="font-grotesk text-4xl uppercase tracking-tighter mb-4 leading-none text-white">Khôi phục</h3>
+              <p className="text-white/50 mb-8 uppercase text-xs font-black tracking-[0.4em] leading-relaxed">Nhập email để nhận hướng dẫn khôi phục mật khẩu.</p>
+              <form onSubmit={handleForgotPassword} className="space-y-6">
+                <div className="space-y-3">
+                   <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em] ml-3">Email bảo mật</label>
+                   <input
+                    type="email" placeholder="VD: NGUYEN@EXAMPLE.COM" value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)} required
+                    className="w-full bg-black/50 border border-white/10 rounded-full py-4 px-8 text-white text-lg focus:outline-none focus:border-[#00D1FF] transition-all font-bold tracking-widest"
+                  />
                 </div>
-              ) : (
-                <form onSubmit={handleForgotPassword} className="space-y-6">
-                  <div className="space-y-1.5">
-                    <label className="text-sm text-theme-text-muted font-medium ml-1">Email</label>
-                    <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary-400 text-theme-text-muted">
-                        <Mail className="h-5 w-5" />
-                      </div>
-                      <input
-                        type="email"
-                        className="glass-input pl-11"
-                        placeholder="name@example.com"
-                        value={forgotEmail}
-                        onChange={(e) => setForgotEmail(e.target.value)}
-                        required
-                        disabled={forgotLoading}
-                      />
-                    </div>
-                  </div>
-                  <button 
-                    type="submit" 
-                    className="btn-primary w-full flex justify-center items-center gap-2"
-                    disabled={forgotLoading}
-                  >
-                    {forgotLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      'Gửi mật khẩu mới'
-                    )}
-                  </button>
-                </form>
-              )}
+                <button type="submit" disabled={forgotLoading} className="w-full py-4 rounded-full bg-[#00D1FF] text-[#010828] font-grotesk text-lg uppercase tracking-widest hover:bg-white transition-all shadow-2xl">
+                  {forgotLoading ? <Loader2 className="animate-spin mx-auto w-8 h-8" /> : 'Gửi yêu cầu'}
+                </button>
+              </form>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes shine { 0% { transform: translateX(-150%) skewX(-20deg); } 100% { transform: translateX(250%) skewX(-20deg); } }
+        .animate-shine { animation: shine 3s infinite; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
+        ::placeholder { color: rgba(255, 255, 255, 0.1) !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+        .w-4.5 { width: 1.125rem; }
+        .h-4.5 { height: 1.125rem; }
+      `}} />
     </div>
   );
 }

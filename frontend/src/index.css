@@ -8,25 +8,69 @@
    VIP PRO THEME SYSTEM - CSS CUSTOM PROPERTIES
    ============================================ */
 
-/* NOVA DARK (Replaces Cyberpunk) */
+/* NOVA ELITE - THE FUTURE OF FINANCE */
 :root,
 [data-theme="cyberpunk"] {
-  --theme-bg-deep:       #0A0A0A;
-  --theme-bg-surface:    #111111;
-  --theme-bg-panel:      rgba(17, 17, 17, 0.85);
-  --theme-neon-primary:  #3B82F6;
-  --theme-neon-accent:   #8B5CF6;
-  --theme-neon-green:    #10B981;
-  --theme-text-primary:  #F8FAFC;
-  --theme-text-muted:    #94A3B8;
-  --theme-border:        rgba(255, 255, 255, 0.08);
-  --theme-border-glow:   0 0 10px rgba(59, 130, 246, 0.1);
-  --theme-glass-bg:      rgba(17, 17, 17, 0.7);
-  --theme-glass-blur:    24px;
-  --theme-subtle-bg:     rgba(255, 255, 255, 0.05);
-  --theme-subtle-border: rgba(255, 255, 255, 0.1);
-  --theme-scrollbar:     rgba(59, 130, 246, 0.2);
-  --theme-ai-color:      #A855F7;
+  --theme-bg-deep:       #030305;
+  --theme-bg-surface:    #0D0D12;
+  --theme-bg-panel:      rgba(13, 13, 18, 0.7);
+  --theme-neon-primary:  #00F5FF; /* Cyan Electric */
+  --theme-neon-accent:   #7000FF; /* Cyber Purple */
+  --theme-neon-green:    #00FF85; /* Neo Green */
+  --theme-text-primary:  #FFFFFF;
+  --theme-text-muted:    #8B8B9E;
+  --theme-border:        rgba(255, 255, 255, 0.05);
+  --theme-border-glow:   0 0 20px rgba(0, 245, 255, 0.05);
+  --theme-glass-bg:      rgba(13, 13, 18, 0.6);
+  --theme-glass-blur:    20px;
+  --theme-subtle-bg:     rgba(255, 255, 255, 0.03);
+  --theme-subtle-border: rgba(255, 255, 255, 0.08);
+  --theme-scrollbar:     rgba(112, 0, 255, 0.3);
+  --theme-ai-color:      #7000FF;
+}
+
+/* BENTO SYSTEM */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: minmax(160px, auto);
+  gap: 1.5rem;
+}
+
+.bento-card {
+  @apply relative overflow-hidden rounded-[2.5rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl p-8 transition-all duration-500;
+  box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
+}
+
+.bento-card:hover {
+  @apply bg-white/[0.04] border-white/10 scale-[1.01];
+  box-shadow: 0 20px 60px -15px rgba(0,0,0,0.6);
+}
+
+.bento-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(800px circle at var(--mouse-x) var(--mouse-y), rgba(255,255,255,0.06), transparent 40%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.bento-shine {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  transform: skewX(-20deg);
+  animation: bento-shine 6s infinite;
+}
+
+@keyframes bento-shine {
+  0% { left: -100%; }
+  20% { left: 200%; }
+  100% { left: 200%; }
 }
 
 /* NOVA LIGHT (Replaces Light Tech) */
@@ -374,8 +418,49 @@
   filter: drop-shadow(0 0 6px currentColor);
 }
 
-/* AI Loading overlay */
-.ai-loading-overlay {
-  background: var(--theme-glass-bg);
-  backdrop-filter: blur(12px);
+/* ============================================
+   ORBIS NFT - LIQUID GLASS SYSTEM
+   ============================================ */
+
+.font-grotesk { font-family: 'Anton', sans-serif !important; }
+.font-condiment { font-family: 'Condiment', cursive !important; }
+
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.01);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%,
+    rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%,
+    rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Texture Overlay */
+.texture-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background-image: url('https://grainy-gradients.vercel.app/noise.svg');
+  mix-blend-mode: lighten;
+  opacity: 0.6;
+  background-size: cover;
 }
