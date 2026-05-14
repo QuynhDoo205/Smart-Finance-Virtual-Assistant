@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } 
 import { Link, useNavigate } from 'react-router-dom';
 import LinkedSliders, { type Jar } from './components/LinkedSliders';
 import { dashboardApi, authApi, transactionsApi, userApi } from '../../utils/api';
+import Skeleton from '../../components/common/Skeleton';
 
 const INIT_JARS: Jar[] = [
   { id:'1', name:'Thiết yếu',  emoji:'🛒', percentage:40, locked:false, color:'#0EA5E9', neonColor:'#22d3ee', description:'Ăn uống, đi lại, hóa đơn' },
@@ -57,6 +58,7 @@ export default function BudgetManager() {
   const [aiLoading, setAiLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
@@ -97,6 +99,8 @@ export default function BudgetManager() {
         }
       } catch (err) {
         console.error('Failed to load budget data:', err);
+      } finally {
+        setLoading(false);
       }
     };
     loadData();
@@ -186,6 +190,35 @@ export default function BudgetManager() {
     setNewJarName('');
     setShowAddJarModal(false);
   };
+
+  if (loading) {
+    return (
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6 pb-20">
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <Skeleton width="250px" height="32px" />
+            <Skeleton width="450px" height="16px" variant="text" />
+          </div>
+          <Skeleton width="48px" height="48px" className="rounded-xl" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Skeleton height="160px" className="rounded-[2rem]" />
+          <Skeleton height="160px" className="rounded-[2rem]" />
+          <Skeleton height="160px" className="rounded-[2rem]" />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
+          <Skeleton height="600px" className="lg:col-span-7 rounded-[2.5rem]" />
+          <div className="lg:col-span-5 space-y-6">
+            <Skeleton height="80px" className="rounded-[2rem]" />
+            <Skeleton height="300px" className="rounded-[3rem]" />
+            <Skeleton height="350px" className="rounded-[3rem]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6 pb-20">

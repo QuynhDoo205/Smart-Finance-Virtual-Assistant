@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { dashboardApi, incomeApi, transactionsApi, userApi } from "../../utils/api";
 import { calculateMonthlyForecast } from "../../utils/salaryCalculator";
 import { numberToVietnameseWords } from "../../utils/numberToWords";
+import Skeleton from "../../components/common/Skeleton";
 
 type IncomeType = "fixed" | "variable" | "scheduled";
 type SourceCategory = "salary" | "allowance" | "other";
@@ -81,6 +82,7 @@ export default function IncomeManager() {
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
   const [isEditingIncome, setIsEditingIncome] = useState(false);
   const [newIncomeValue, setNewIncomeValue] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   // Load data from Backend
   useEffect(() => {
@@ -123,8 +125,11 @@ export default function IncomeManager() {
         if (transRes.success) {
           const mappedRecords: IncomeRecord[] = transRes.data.transactions
             .filter(
-              (t: any) =>
-                t.type === "income" || t.loai_giao_dich === "thu_nhap",
+              (t: any) => {
+                const isIncomeType = t.type === "income" || t.loai_giao_dich === "thu_nhap";
+                const isInternalTransfer = (t.ghi_chu || t.note || "").includes("INTERNAL_TRANSFER");
+                return isIncomeType && !isInternalTransfer;
+              }
             )
             .map((t: any) => {
               // Tìm sourceId từ note hoặc title nếu có (format: "Thu nhập từ [Tên Nguồn]")
@@ -155,6 +160,8 @@ export default function IncomeManager() {
         }
       } catch (err) {
         console.error("Failed to load income data:", err);
+      } finally {
+        setLoading(false);
       }
     };
     loadData();
@@ -502,13 +509,39 @@ export default function IncomeManager() {
     { label: '+Bán đồ', amount: 0 },
   ];
 
+  if (loading) {
+    return (
+      <div className="space-y-8 max-w-5xl mx-auto pb-20 p-6">
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <Skeleton width="200px" height="32px" />
+            <Skeleton width="350px" height="16px" variant="text" />
+          </div>
+          <Skeleton width="150px" height="40px" className="rounded-xl" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton height="120px" className="rounded-[24px]" />
+          <Skeleton height="120px" className="rounded-[24px]" />
+          <Skeleton height="120px" className="rounded-[24px]" />
+        </div>
+
+        <Skeleton width="400px" height="50px" className="rounded-[1.5rem]" />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Skeleton height="400px" className="rounded-[32px]" />
+          <Skeleton height="400px" className="rounded-[32px]" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
     <motion.div
       variants={containerVars}
       initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, amount: 0.05 }}
+      animate="show"
       className="space-y-8 max-w-5xl mx-auto pb-20 p-6"
     >
       {/* Notification Toast */}

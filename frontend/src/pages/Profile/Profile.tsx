@@ -9,6 +9,7 @@ import {
 import { userApi, dashboardApi, incomeApi, API_ROOT } from '../../utils/api';
 import authStore from '../../store/authStore';
 import { useSearchParams } from 'react-router-dom';
+import Skeleton from '../../components/common/Skeleton';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface FixedExpense {
@@ -647,6 +648,23 @@ export default function Profile() {
     hidden: { opacity: 0, scale: 0.96 },
     show: { opacity: 1, scale: 1, transition: { type: 'spring' as const, stiffness: 220, damping: 22 } },
   };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-8 relative pb-20">
+        <Skeleton height="300px" className="rounded-[2.5rem]" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-3 space-y-2">
+            <Skeleton height="60px" className="rounded-2xl" />
+            <Skeleton height="60px" className="rounded-2xl" />
+          </div>
+          <div className="lg:col-span-9">
+            <Skeleton height="600px" className="rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div variants={containerVars} initial="hidden" animate="show" className="max-w-6xl mx-auto space-y-8 relative pb-20">

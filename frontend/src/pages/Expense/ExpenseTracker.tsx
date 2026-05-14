@@ -29,6 +29,7 @@ import {
   type ExpenseCategory,
   type ParsedExpense,
 } from "../../utils/mockAiServices";
+import Skeleton from "../../components/common/Skeleton";
 
 const CATEGORY_MAP: Record<ExpenseCategory, number> = {
   food: 4,
@@ -179,6 +180,7 @@ export default function ExpenseTracker() {
   const [activeTab, setActiveTab] = useState<Tab>("scanner");
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const getLocalDateStr = (d: Date | string = new Date()) => {
     let date: Date;
@@ -223,6 +225,8 @@ export default function ExpenseTracker() {
         }
       } catch (err) {
         console.error("Failed to load transactions:", err);
+      } finally {
+        setLoading(false);
       }
     };
     loadData();
@@ -589,11 +593,35 @@ export default function ExpenseTracker() {
     0,
   );
 
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto pb-28 space-y-6">
+        <div className="flex items-center gap-4 mb-8">
+          <Skeleton width="48px" height="48px" className="rounded-xl" />
+          <div className="space-y-2">
+            <Skeleton width="250px" height="32px" />
+            <Skeleton width="400px" height="16px" variant="text" />
+          </div>
+        </div>
+        
+        <div className="flex gap-4 mb-8">
+          <Skeleton width="140px" height="48px" className="rounded-2xl" />
+          <Skeleton width="140px" height="48px" className="rounded-2xl" />
+          <Skeleton width="140px" height="48px" className="rounded-2xl" />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-7">
+          <Skeleton height="500px" className="lg:col-span-3 rounded-2xl" />
+          <Skeleton height="500px" className="lg:col-span-2 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, amount: 0.05 }}
+      animate="show"
       variants={{
         hidden: { opacity: 0 },
         show: { opacity: 1, transition: { staggerChildren: 0.05 } }

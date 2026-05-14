@@ -166,24 +166,33 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Verify token with google-auth-library
-    // Ignore audience validation if NO client ID provided yet (For dev test only)
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: process.env['GOOGLE_CLIENT_ID'] || 'YOUR_GOOGLE_CLIENT_ID', 
-    }).catch(() => null);
+    let payload: any;
 
-    // If verification fail locally due to bad client_id, we can also decode payload directly using jwt (but less secure)
-    // Here we assume it passes or we fallback to jwt decode for demo.
-    let payload = ticket?.getPayload();
-    
-    // NẾU CẤU HÌNH TRÊN CHƯA THIẾT LẬP CLIENT ID, decode jwt thủ công (Chỉ dùng trên dev)
-    if (!payload) {
-      payload = jwt.decode(token) as any;
+    try {
+      // Verify token with google-auth-library (ID Token flow)
+      const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: process.env['GOOGLE_CLIENT_ID'] || 'YOUR_GOOGLE_CLIENT_ID',
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      // If verification fails, it might be an access token from custom login button
+      try {
+        const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          payload = await response.json();
+        } else {
+          console.error('Google userinfo fetch failed:', await response.text());
+        }
+      } catch (fetchErr) {
+        console.error('Failed to fetch userinfo with access token:', fetchErr);
+      }
     }
 
     if (!payload || !payload.email) {
-      res.status(401).json({ success: false, message: 'Token từ Google không hợp lệ hoặc không có email' });
+      res.status(401).json({ success: false, message: 'Xác thực Google thất bại hoặc không có email' });
       return;
     }
 

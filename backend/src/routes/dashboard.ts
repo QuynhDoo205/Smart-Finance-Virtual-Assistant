@@ -1,9 +1,9 @@
-import { Router } from 'express';
-import type { Response } from 'express';
-import pool from '../db.js';
-import { authMiddleware } from '../middleware/auth.js';
-import type { AuthRequest } from '../middleware/auth.js';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { Response } from 'express';
+import { Router } from 'express';
+import pool from '../db.js';
+import type { AuthRequest } from '../middleware/auth.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
 const genAI = new GoogleGenerativeAI((process.env.GOOGLE_AI_KEY || "").trim());
@@ -21,25 +21,43 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
 
-    // Thu nhập tháng này (Chấp nhận cả 'thu_nhap' và 'income')
+    // Thu nhập tháng này (CHỈ TÍNH TIỀN THỰC TẾ, KHÔNG TÍNH ĐIỀU CHUYỂN NỘI BỘ)
     const incomeResult = await pool.query(
       `SELECT COALESCE(SUM(so_tien), 0) as total
        FROM giao_dich 
-       WHERE nguoi_dung_id = $1 AND loai_giao_dich IN ('thu_nhap', 'income') 
+       WHERE nguoi_dung_id = $1 
+       AND loai_giao_dich IN ('thu_nhap', 'income') 
+       AND (ghi_chu IS NULL OR ghi_chu NOT LIKE 'INTERNAL_TRANSFER%')
        AND EXTRACT(MONTH FROM ngay_giao_dich) = $2 
        AND EXTRACT(YEAR FROM ngay_giao_dich) = $3`,
       [userId, month, year]
     );
 
-    // Chi tiêu tháng này (Chấp nhận cả 'chi_phi' và 'expense')
+    // Chi tiêu tháng này
     const expenseResult = await pool.query(
       `SELECT COALESCE(SUM(so_tien), 0) as total
        FROM giao_dich 
-       WHERE nguoi_dung_id = $1 AND loai_giao_dich IN ('chi_phi', 'expense') 
+       WHERE nguoi_dung_id = $1 
+       AND loai_giao_dich IN ('chi_phi', 'expense') 
+       AND (ghi_chu IS NULL OR ghi_chu NOT LIKE 'INTERNAL_TRANSFER%')
        AND EXTRACT(MONTH FROM ngay_giao_dich) = $2 
        AND EXTRACT(YEAR FROM ngay_giao_dich) = $3`,
       [userId, month, year]
     );
+
+    // Tổng số dư thực tế (Cũng phải loại bỏ điều chuyển để không bị x2 số tiền khi tính balance)
+    const balanceResult = await pool.query(
+      `SELECT 
+         COALESCE(SUM(CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN so_tien ELSE -so_tien END), 0) as balance
+       FROM giao_dich 
+       WHERE nguoi_dung_id = $1 
+       AND (ghi_chu IS NULL OR ghi_chu NOT LIKE 'INTERNAL_TRANSFER%')`,
+      [userId]
+    );
+
+    const totalIncome = parseFloat(incomeResult.rows[0]?.total ?? '0');
+    const totalExpense = parseFloat(expenseResult.rows[0]?.total ?? '0');
+    const totalBalance = parseFloat(balanceResult.rows[0]?.balance ?? '0');
 
     // Thu nhập tháng trước (để tính % thay đổi)
     const prevMonth = month === 1 ? 12 : month - 1;
@@ -47,24 +65,13 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
     const prevIncomeResult = await pool.query(
       `SELECT COALESCE(SUM(so_tien), 0) as total
        FROM giao_dich 
-       WHERE nguoi_dung_id = $1 AND loai_giao_dich IN ('thu_nhap', 'income') 
+       WHERE nguoi_dung_id = $1 
+       AND loai_giao_dich IN ('thu_nhap', 'income') 
+       AND (ghi_chu IS NULL OR ghi_chu NOT LIKE 'INTERNAL_TRANSFER%')
        AND EXTRACT(MONTH FROM ngay_giao_dich) = $2 
        AND EXTRACT(YEAR FROM ngay_giao_dich) = $3`,
       [userId, prevMonth, prevYear]
     );
-
-    // Tổng số dư = tất cả thu nhập - tất cả chi tiêu
-    const balanceResult = await pool.query(
-      `SELECT 
-         COALESCE(SUM(CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN so_tien ELSE -so_tien END), 0) as balance
-       FROM giao_dich 
-       WHERE nguoi_dung_id = $1`,
-      [userId]
-    );
-
-    const totalIncome = parseFloat(incomeResult.rows[0]?.total ?? '0');
-    const totalExpense = parseFloat(expenseResult.rows[0]?.total ?? '0');
-    const totalBalance = parseFloat(balanceResult.rows[0]?.balance ?? '0');
     const prevIncome = parseFloat(prevIncomeResult.rows[0]?.total ?? '0');
 
     const incomeChange = prevIncome > 0 

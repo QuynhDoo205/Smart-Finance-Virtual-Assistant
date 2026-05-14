@@ -209,6 +209,12 @@ export const transactionsApi = {
     apiFetch<{ success: boolean; message: string }>(`/transactions/${id}`, {
       method: 'DELETE',
     }),
+
+  emergencyWithdrawal: (amount: number, reason?: string) =>
+    apiFetch<{ success: boolean; message: string; data: { transaction: Transaction } }>('/transactions/emergency-withdrawal', {
+      method: 'POST',
+      body: JSON.stringify({ amount, reason }),
+    }),
 };
 
 // AI API

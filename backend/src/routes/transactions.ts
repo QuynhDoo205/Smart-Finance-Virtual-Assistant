@@ -154,4 +154,48 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
   }
 });
 
+// ============================================================
+// POST /api/transactions/emergency-withdrawal
+// ============================================================
+router.post('/emergency-withdrawal', async (req: AuthRequest, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    const userId = req.user?.id;
+    const { amount, reason } = req.body;
+
+    if (!amount || amount <= 0) {
+      res.status(400).json({ success: false, message: 'Số tiền rút không hợp lệ' });
+      return;
+    }
+
+    await client.query('BEGIN');
+
+    // 1. Tạo giao dịch điều chuyển (không phải thu nhập mới, chỉ là lấy từ quỹ dự phòng)
+    const transResult = await client.query(
+      `INSERT INTO giao_dich (nguoi_dung_id, danh_muc_id, tieu_de, so_tien, loai_giao_dich, ghi_chu, ngay_giao_dich)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [userId, 13, `Điều chuyển Quỹ dự phòng: ${reason || 'Khẩn cấp'}`, amount, 'thu_nhap', 'INTERNAL_TRANSFER: Khẩn cấp từ quỹ dự phòng', new Date()]
+    );
+    // Lưu ý: Chúng ta vẫn để là 'thu_nhap' để ví có tiền, nhưng ở dashboard summary chúng ta sẽ lọc bỏ các INTERNAL_TRANSFER
+
+    // 2. Tặng XP cho hành động (mặc dù là rút tiền nhưng là để cứu vãn tài chính)
+    await addXP(userId as number, 100);
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Đã rút tiền từ quỹ dự phòng thành công!',
+      data: { transaction: transResult.rows[0] }
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Emergency withdrawal error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ khi rút quỹ' });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;

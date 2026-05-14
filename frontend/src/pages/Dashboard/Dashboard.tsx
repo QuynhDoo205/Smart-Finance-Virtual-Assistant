@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { dashboardApi, incomeApi } from '../../utils/api';
 import type { DashboardSummary, Transaction, Budget, IncomeSourceRecord } from '../../utils/api';
 import authStore from '../../store/authStore';
+import Skeleton from '../../components/common/Skeleton';
 
 export default function Dashboard() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -175,12 +176,39 @@ export default function Dashboard() {
     return list.sort((a, b) => b.limit_amount - a.limit_amount);
   })();
 
+  if (loading) {
+    return (
+      <div className="space-y-6 pb-16 p-2 sm:p-0">
+        <div className="flex justify-between items-end mb-2 px-2">
+          <div className="space-y-2">
+            <Skeleton width="100px" height="12px" variant="text" />
+            <Skeleton width="250px" height="40px" />
+            <Skeleton width="300px" height="16px" variant="text" />
+          </div>
+          <Skeleton width="48px" height="48px" className="rounded-2xl" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} height="140px" className="rounded-2xl" />
+          ))}
+        </div>
+
+        <Skeleton height="300px" className="rounded-[2rem]" />
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <Skeleton height="520px" className="rounded-[2.5rem] lg:col-span-1" />
+          <Skeleton height="520px" className="rounded-[2.5rem] lg:col-span-2" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div 
       variants={containerVars} 
       initial="hidden" 
-      whileInView="show" 
-      viewport={{ once: true, amount: 0.05 }} 
+      animate="show" 
       className="space-y-6 pb-16 p-2 sm:p-0"
     >
       
