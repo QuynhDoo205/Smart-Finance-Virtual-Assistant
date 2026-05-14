@@ -242,4 +242,69 @@ router.put('/ai-config', (async (req: Request, res: Response) => {
   }
 }) as any);
 
+// ============================================================
+// SYSTEM SETTINGS – Cài đặt hệ thống tổng thể
+// ============================================================
+router.get('/settings', (async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query("SELECT * FROM system_settings WHERE key = 'app_settings'");
+    if (result.rows.length === 0) {
+      const defaultSettings = { 
+        appName: 'NovaFinance', 
+        slogan: 'Quản lý tài chính thông minh hơn với AI',
+        maintenanceMode: false,
+        allowRegistration: true,
+        twoFactor: false,
+        defaultTheme: 'cyberpunk'
+      };
+      return res.json({ success: true, data: defaultSettings });
+    }
+    res.json({ success: true, data: JSON.parse(result.rows[0].value) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi lấy cài đặt hệ thống' });
+  }
+}) as any);
+
+router.put('/settings', (async (req: Request, res: Response) => {
+  try {
+    const settings = JSON.stringify(req.body);
+    await pool.query(`
+      INSERT INTO system_settings (key, value) 
+      VALUES ('app_settings', $1)
+      ON CONFLICT (key) DO UPDATE SET value = $1
+    `, [settings]);
+    res.json({ success: true, message: 'Đã cập nhật cài đặt hệ thống' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi cập nhật cài đặt' });
+  }
+}) as any);
+
+// ============================================================
+// POST /api/admin/maintenance – Kích hoạt bảo trì tức thì
+// ============================================================
+router.post('/maintenance', (async (req: Request, res: Response) => {
+  const { enabled, message, durationMinutes } = req.body;
+  try {
+    const settingsRes = await pool.query("SELECT * FROM system_settings WHERE key = 'app_settings'");
+    let settings = settingsRes.rows.length > 0 ? JSON.parse(settingsRes.rows[0].value) : {};
+    
+    settings.maintenanceMode = enabled;
+    if (enabled) {
+      settings.maintenanceMessage = message || 'Hệ thống đang được nâng cấp định kỳ.';
+      settings.maintenanceUntil = new Date(Date.now() + (durationMinutes || 60) * 60000).toISOString();
+    } else {
+      settings.maintenanceUntil = null;
+    }
+
+    await pool.query(`
+      INSERT INTO system_settings (key, value) VALUES ('app_settings', $1)
+      ON CONFLICT (key) DO UPDATE SET value = $1
+    `, [JSON.stringify(settings)]);
+
+    res.json({ success: true, message: enabled ? 'Hệ thống đã chuyển sang chế độ bảo trì' : 'Hệ thống đã hoạt động trở lại' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi điều khiển bảo trì' });
+  }
+}) as any);
+
 export default router;

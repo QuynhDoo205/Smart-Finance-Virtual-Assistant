@@ -333,7 +333,20 @@ export default function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(value) => `${value / 1000000}tr`} />
+                <YAxis 
+                  stroke="#64748b" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickFormatter={(value) => {
+                    if (value === 0) return '0tr';
+                    const millions = value / 1000000;
+                    // Nếu số quá nhỏ (dưới 0.01 triệu = 10k), hiển thị 0 để tránh số thập phân loằng ngoằng
+                    if (Math.abs(millions) < 0.01) return '0tr';
+                    // Hiển thị tối đa 2 chữ số thập phân, dùng toLocaleString để có số 0 ở trước
+                    return `${millions.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}tr`;
+                  }} 
+                />
                 <RechartsTooltip 
                   formatter={(value: any) => formatCurrency(Number(value)) + ' đ'}
                   contentStyle={{ backgroundColor: '#0f172a', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '1rem', fontSize: '12px' }}

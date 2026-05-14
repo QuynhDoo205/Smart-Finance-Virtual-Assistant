@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Wallet, PieChart, MessageSquare, Award, LogOut, Menu, X, Sparkles, Target, AlertTriangle, ShoppingBag, Settings, User, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { API_ROOT, authApi } from '../../utils/api';
+import { API_ROOT, authApi, adminApi } from '../../utils/api';
 import ThemeSidebar from './ThemeSidebar';
 import authStore from '../../store/authStore';
+import { setTheme } from '../../store/themeStore';
+import FloatingAI from '../ai/FloatingAI';
 const NAV_ITEMS = [
   { path: '/app/admin', label: 'Hệ thống Admin', icon: Shield, adminOnly: true },
   { path: '/app', label: 'Tổng quan', icon: LayoutDashboard },
@@ -32,21 +34,45 @@ export default function MainLayout() {
       setUser(updatedUser);
     });
 
-    // Đồng bộ thông tin mới nhất từ máy chủ (để cập nhật quyền Admin, Badge, v.v.)
+    // Đồng bộ cài đặt hệ thống (Theme mặc định & Bảo trì)
+    const syncSystem = async () => {
+      try {
+        const res = await fetch(`${API_ROOT}/api/status`);
+        const data = await res.json();
+        
+        // 1. Áp dụng Theme mặc định nếu người dùng chưa chọn
+        if (data.defaultTheme && !localStorage.getItem('app-theme')) {
+          setTheme(data.defaultTheme);
+        }
+
+        // 2. Kiểm tra bảo trì (Bỏ qua nếu là Admin)
+        const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'levanteolvt12@gmail.com';
+        if (data.maintenance === true && !isAdmin) {
+          const msg = encodeURIComponent(data.message || '');
+          const until = data.until ? encodeURIComponent(data.until) : '';
+          window.location.href = `/maintenance?msg=${msg}&until=${until}`;
+        }
+      } catch (err) {
+        console.error("Failed to sync system status:", err);
+      }
+    };
+    syncSystem();
+    const maintenanceInterval = setInterval(syncSystem, 15000); // Tăng lên 15s để nhẹ máy hơn
+
+    // Đồng bộ thông tin người dùng
     const syncUser = async () => {
       try {
         const res = await authApi.me();
-        if (res.success) {
-          authStore.setUser(res.data.user);
-        }
-      } catch (err) {
-        console.error("Failed to sync user data:", err);
-      }
+        if (res.success) authStore.setUser(res.data.user);
+      } catch (err) {}
     };
     syncUser();
 
-    return unsubscribe;
-  }, []);
+    return () => {
+      unsubscribe();
+      clearInterval(maintenanceInterval);
+    };
+  }, []); // Chỉ chạy 1 lần khi mount layout
 
   const toggleMobileMenu = () => setIsMobileOpen(!isMobileOpen);
 
@@ -220,6 +246,7 @@ export default function MainLayout() {
       </main>
 
       <ThemeSidebar isOpen={isThemeOpen} onClose={() => setIsThemeOpen(false)} />
+      <FloatingAI />
     </div>
   );
 }

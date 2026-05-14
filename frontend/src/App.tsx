@@ -22,6 +22,7 @@ import AdminAIConfig from './pages/Admin/AdminAIConfig';
 import AdminSettings from './pages/Admin/AdminSettings';
 import AdminLayout from './components/layout/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import Maintenance from './pages/Maintenance';
 
 function App() {
   const GOOGLE_CLIENT_ID = '509981311672-d3g4gkko1ir0qmritmdpvquh01gvnvso.apps.googleusercontent.com';
@@ -70,6 +71,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/onboarding" element={<OnboardingSurvey />} />
+            <Route path="/maintenance" element={<Maintenance />} />
             
             {/* Protected Main App Routes */}
             <Route path="/app" element={

@@ -25,6 +25,16 @@ const transporter = nodemailer.createTransport({
 // ============================================================
 router.post('/register', async (req: Request, res: Response): Promise<void> => {
   try {
+    // Kiểm tra cài đặt hệ thống
+    const settingsRes = await pool.query("SELECT * FROM system_settings WHERE key = 'app_settings'");
+    if (settingsRes.rows.length > 0) {
+      const settings = JSON.parse(settingsRes.rows[0].value);
+      if (settings.allowRegistration === false) {
+        res.status(403).json({ success: false, message: 'Chức năng đăng ký hiện đang tạm khóa bởi Admin.' });
+        return;
+      }
+    }
+    
     const { full_name, email, password } = req.body;
 
     // Validate input

@@ -10,6 +10,7 @@ import transactionsRouter from './routes/transactions.js';
 import aiRouter from './routes/ai.js';
 import incomeRouter from './routes/income.js';
 import adminRouter from './routes/admin.js';
+import statusRouter from './routes/status.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001; // Force 5001 as primary fallback
@@ -81,6 +82,7 @@ app.use('/api/transactions', transactionsRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/income', incomeRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/status', statusRouter);
 
 // ============================================================
 // 404 Handler

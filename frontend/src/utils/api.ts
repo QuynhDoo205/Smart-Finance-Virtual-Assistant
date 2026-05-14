@@ -49,6 +49,14 @@ async function apiFetch<T>(
   }
   
   if (!response.ok) {
+    // Xử lý Chế độ bảo trì Real-time
+    if (response.status === 503 && data && data.maintenance) {
+      const msg = encodeURIComponent(data.message || '');
+      const until = data.until ? encodeURIComponent(data.until) : '';
+      window.location.href = `/maintenance?msg=${msg}&until=${until}`;
+      return data as T;
+    }
+
     const errorMessage = (typeof data === 'object' ? data.message : data) || `Lỗi HTTP ${response.status}`;
     throw new Error(errorMessage);
   }
@@ -409,6 +417,21 @@ export const adminApi = {
     apiFetch<{ success: boolean; message: string }>('/admin/ai-config', {
       method: 'PUT',
       body: JSON.stringify(config),
+    }),
+
+  getSettings: () =>
+    apiFetch<{ success: boolean; data: any }>('/admin/settings'),
+
+  updateSettings: (settings: any) =>
+    apiFetch<{ success: boolean; message: string }>('/admin/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
+
+  toggleMaintenance: (payload: { enabled: boolean; message?: string; durationMinutes?: number }) =>
+    apiFetch<{ success: boolean; message: string }>('/admin/maintenance', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
 
   updateUserRole: (userId: number, isAdmin: boolean) =>
