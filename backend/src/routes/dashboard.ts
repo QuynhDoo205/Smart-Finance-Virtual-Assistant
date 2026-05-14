@@ -94,12 +94,36 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
       [userId, month, year]
     );
 
+    // 5. Quỹ dự phòng thực tế (10% TỔNG thu nhập từ trước đến nay - tiền đã rút khẩn cấp)
+    const allTimeIncomeRes = await pool.query(
+      `SELECT COALESCE(SUM(so_tien), 0) as total
+       FROM giao_dich 
+       WHERE nguoi_dung_id = $1 
+       AND loai_giao_dich IN ('thu_nhap', 'income') 
+       AND (ghi_chu IS NULL OR ghi_chu NOT LIKE 'INTERNAL_TRANSFER%')`,
+      [userId]
+    );
+    const cumulativeIncome = parseFloat(allTimeIncomeRes.rows[0]?.total ?? '0');
+    const emergencyLimit = cumulativeIncome * 0.1;
+
+    const emergencyTransResult = await pool.query(
+      `SELECT COALESCE(SUM(so_tien), 0) as total
+       FROM giao_dich 
+       WHERE nguoi_dung_id = $1 
+       AND ghi_chu LIKE 'INTERNAL_TRANSFER%'`,
+      [userId]
+    );
+    const totalWithdrawn = parseFloat(emergencyTransResult.rows[0]?.total ?? '0');
+    const remainingEmergency = Math.max(0, emergencyLimit - totalWithdrawn);
+
     res.json({
       success: true,
       data: {
         totalBalance,
         totalIncome,
         totalExpense,
+        remainingEmergency,
+        emergencyLimit,
         netSavings: totalIncome - totalExpense,
         incomeChangePercent: incomeChange,
         isSurvivalMode,
@@ -173,7 +197,8 @@ router.get('/budget', async (req: AuthRequest, res: Response): Promise<void> => 
             WHEN COALESCE(b.gioi_han_chi_tieu, 0) > 0 
             THEN ROUND((COALESCE(s.total_spent, b.da_chi_tieu, 0) / b.gioi_han_chi_tieu * 100)::numeric, 1)
             ELSE 0 
-          END as usage_percent
+          END as usage_percent,
+          c.id as category_id
         FROM ngan_sach b
         JOIN danh_muc c ON b.danh_muc_id = c.id
         LEFT JOIN actual_spending s ON c.id = s.danh_muc_id
@@ -361,9 +386,9 @@ router.post('/setup-budget', async (req: AuthRequest, res: Response): Promise<vo
 
     for (const b of budgets) {
       await client.query(
-        `INSERT INTO ngan_sach (nguoi_dung_id, danh_muc_id, gioi_han_chi_tieu, thang, nam)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (nguoi_dung_id, danh_muc_id, thang, nam) 
+        `INSERT INTO ngan_sach (nguoi_dung_id, danh_muc_id, tieu_de, gioi_han_chi_tieu, thang, nam)
+         VALUES ($1, $2, '', $3, $4, $5)
+         ON CONFLICT (nguoi_dung_id, danh_muc_id, thang, nam, tieu_de) 
          DO UPDATE SET gioi_han_chi_tieu = EXCLUDED.gioi_han_chi_tieu`,
         [userId, b.categoryId, b.limit, month, year]
       );

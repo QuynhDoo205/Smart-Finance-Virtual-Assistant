@@ -126,6 +126,8 @@ export default function Dashboard() {
     totalBalance: 0,
     totalIncome: 0,
     totalExpense: 0,
+    remainingEmergency: 0,
+    emergencyLimit: 0,
     incomeChangePercent: 0,
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
@@ -242,19 +244,43 @@ export default function Dashboard() {
 
       {/* Summary Cards - Smaller & Harmonious */}
       <motion.div variants={itemVars} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="glass-panel p-5 rounded-2xl border border-[var(--theme-subtle-border)] relative group bg-gradient-to-br from-primary-500/5 to-transparent">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-primary-500/10 flex items-center justify-center">
-              <Wallet className="text-primary-400 w-5 h-5" />
+        <div className="glass-panel p-6 rounded-2xl border border-[var(--theme-subtle-border)] bg-gradient-to-br from-primary-500/10 via-transparent to-transparent shadow-lg relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center border border-primary-500/20 shadow-[0_0_15px_rgba(56,189,248,0.2)]">
+                <Wallet className="text-primary-400 w-5 h-5" />
+              </div>
+              <h3 className="text-theme-text-muted font-black text-[10px] uppercase tracking-[0.15em]">Tổng tài sản</h3>
             </div>
-            <h3 className="text-theme-text-muted font-black text-[9px] uppercase tracking-widest">Số dư</h3>
+            <div className="flex items-center text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
+              <TrendingUp className="w-3 h-3 mr-1" />
+              <span>+{displaySummary.incomeChangePercent}%</span>
+            </div>
           </div>
-          <p className="text-3xl font-black text-theme-text-primary tracking-tighter">
+
+          <p className="text-3xl font-black text-theme-text-primary tracking-tighter mb-5">
             {formatCurrency(displaySummary.totalBalance)}
           </p>
-          <div className="mt-2 flex items-center text-[10px] font-bold text-emerald-400">
-            <TrendingUp className="w-3.5 h-3.5 mr-1" />
-            <span>+{displaySummary.incomeChangePercent}% so với trước</span>
+          
+          <div className="space-y-2.5 pt-4 border-t border-white/5">
+            <div className="flex justify-between items-center group/item">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] text-theme-text-muted font-bold uppercase tracking-tight">Tiền có thể tiêu</span>
+              </div>
+              <span className="text-[13px] font-black text-emerald-400">
+                {formatCurrency(displaySummary.totalBalance - (displaySummary.remainingEmergency || 0))}
+              </span>
+            </div>
+            <div className="flex justify-between items-center group/item">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                <span className="text-[10px] text-theme-text-muted font-bold uppercase tracking-tight">Quỹ dự phòng còn</span>
+              </div>
+              <span className="text-[13px] font-black text-sky-400">
+                {formatCurrency(displaySummary.remainingEmergency || 0)}
+              </span>
+            </div>
           </div>
         </div>
 

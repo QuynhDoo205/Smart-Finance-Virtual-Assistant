@@ -15,6 +15,12 @@ import Badges from './pages/Gamification/Badges';
 import InsightsGoals from './pages/Insights/InsightsGoals';
 import CrisisManager from './pages/Crisis/CrisisManager';
 import ExpenseTracker from './pages/Expense/ExpenseTracker';
+import AdminDashboard from './pages/Admin/AdminDashboard';
+import AdminUserList from './pages/Admin/AdminUserList';
+import AdminDatabase from './pages/Admin/AdminDatabase';
+import AdminAIConfig from './pages/Admin/AdminAIConfig';
+import AdminSettings from './pages/Admin/AdminSettings';
+import AdminLayout from './components/layout/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -80,6 +86,19 @@ function App() {
               <Route path="crisis" element={<CrisisManager />} />
               <Route path="expense" element={<ExpenseTracker />} />
               <Route path="profile" element={<Profile />} />
+            </Route>
+
+            {/* Dedicated Admin Portal Routes */}
+            <Route path="/app/admin" element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="users" element={<AdminUserList />} />
+              <Route path="database" element={<AdminDatabase />} />
+              <Route path="ai-config" element={<AdminAIConfig />} />
+              <Route path="settings" element={<AdminSettings />} />
             </Route>
           </Routes>
         </div>

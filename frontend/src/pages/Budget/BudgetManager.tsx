@@ -59,6 +59,9 @@ export default function BudgetManager() {
   const [saved, setSaved] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [toastError, setToastError] = useState<string | null>(null);
+  const [toastLimitWarning, setToastLimitWarning] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -83,12 +86,48 @@ export default function BudgetManager() {
         
         setIncome(detectedIncome);
 
-        if (dashBudgetRes.success) {
-          const actualBudgets = dashBudgetRes.data.budgets;
-          // Cố định là những khoản KHÔNG thuộc 6 lọ chuẩn
-          const jarCategories = [4, 3, 9, 7, 8]; // IDs của các lọ chuẩn
-          const mappedFixed = actualBudgets
-            .filter((b: any) => b.limit_amount > 0 && !jarCategories.includes(Number(b.category_id)))
+        // 2. Fetch Budgets
+        const budgetRes = await dashboardApi.getBudget();
+        
+        // Calculate availableToBudget based on current logic to align with mapping
+        const initialFixed = budgetRes.success 
+          ? budgetRes.data.budgets.filter((b: any) => b.limit_amount > 0 && (b.budget_title && b.budget_title.trim() !== '')).reduce((s: number, e: any) => s + parseFloat(e.limit_amount), 0)
+          : 0;
+        const availableToBudget = Math.max(0, detectedIncome - initialFixed);
+
+        if (budgetRes.success) {
+          const budgets = budgetRes.data.budgets;
+          
+          // IDs của các lọ chuẩn (Thiết yếu:4, Tiết kiệm:3, Phát triển:9, Hưởng thụ:7, Đầu tư:8)
+          // LƯU Ý: Lọ chuẩn là những budget có tieu_de rỗng hoặc null
+          const jarCategories = [4, 3, 9, 7, 8]; 
+          
+          setJars(prev => prev.map(j => {
+            const mapping: Record<string, number> = { '1': 4, '2': 3, '3': 9, '4': 7, '5': 8 };
+            const catId = mapping[j.id];
+            
+            // Tìm budget tương ứng với category và có tieu_de rỗng (loại trừ các phí cố định cùng category)
+            const matched = budgets.find((b: any) => 
+              Number(b.category_id) === catId && 
+              (!b.budget_title || b.budget_title.trim() === '')
+            );
+
+            if (matched && availableToBudget > 0) {
+              const pct = Math.round((Number(matched.limit_amount) / availableToBudget) * 100);
+              return { ...j, percentage: pct };
+            }
+            return j;
+          }));
+
+          // Đồng thời load các chi phí cố định (những cái KHÔNG phải lọ chuẩn)
+          const mappedFixed = budgets
+            .filter((b: any) => {
+               // Nếu cùng category với jar nhưng có tiêu đề thì vẫn là phí cố định
+               const isJarCat = jarCategories.includes(Number(b.category_id));
+               const hasTitle = b.budget_title && b.budget_title.trim() !== '';
+               return !isJarCat || hasTitle;
+            })
+            .filter((b: any) => b.limit_amount > 0)
             .map((b: any) => ({
               name: b.budget_title || b.category_name,
               emoji: getSmartIcon(b.budget_title || b.category_name, b.category_icon || '💰'),
@@ -125,6 +164,11 @@ export default function BudgetManager() {
     }
   };
 
+  const handleLimitWarning = (msg: string) => {
+    setToastLimitWarning(msg);
+    setTimeout(() => setToastLimitWarning(null), 5000);
+  };
+
   const handleSyncReality = async () => {
     try {
       const summaryRes = await dashboardApi.getSummary();
@@ -150,6 +194,24 @@ export default function BudgetManager() {
   };
 
   const handleSave = async () => {
+    console.log('--- Handle Save ---');
+    console.log('Unallocated:', unallocated);
+    console.log('Is Over Budget:', isOverBudget);
+    console.log('Available to Budget:', availableToBudget);
+
+    if (Math.abs(unallocated) > 0.01) {
+      setToastError(`Chưa phân bổ hết 100% (còn thiếu ${Math.round(unallocated)}%)`);
+      setTimeout(() => setToastError(null), 3000);
+      return;
+    }
+    
+    if (isOverBudget) {
+      setToastError("Bạn đang thâm hụt ngân sách, hãy giảm phí cố định trước.");
+      setTimeout(() => setToastError(null), 3000);
+      return;
+    }
+    
+    setSaveLoading(true);
     const categoryMapping: Record<string, number> = { '1': 4, '2': 3, '3': 9, '4': 7, '5': 8 };
     const budgetsToSave = jars
       .filter(j => categoryMapping[j.id])
@@ -163,9 +225,16 @@ export default function BudgetManager() {
       if (res.success) {
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
+      } else {
+        setToastError(res.message || "Lỗi không xác định khi lưu");
+        setTimeout(() => setToastError(null), 3000);
       }
-    } catch {
-      // Error handling
+    } catch (err: any) {
+      console.error('Save budget failed:', err);
+      setToastError(err.message || "Lỗi kết nối server");
+      setTimeout(() => setToastError(null), 3000);
+    } finally {
+      setSaveLoading(false);
     }
   };
 
@@ -294,20 +363,40 @@ export default function BudgetManager() {
         )}
       </AnimatePresence>
 
+      {/* --- LIMIT WARNING TOAST (Top Center) --- */}
+      <AnimatePresence>
+        {toastLimitWarning && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20, scale: 0.95 }} 
+            animate={{ opacity: 1, y: 0, scale: 1 }} 
+            exit={{ opacity: 0, y: -20, scale: 0.95 }} 
+            className="fixed top-10 left-1/2 -translate-x-1/2 z-[300] flex items-center gap-3 px-6 py-4 rounded-[2rem] bg-rose-500 text-white shadow-2xl shadow-rose-500/40 border border-white/20"
+          >
+             <div className="p-2 bg-white/20 rounded-xl">
+               <AlertCircle className="w-5 h-5" />
+             </div>
+             <div>
+               <p className="text-xs font-black uppercase tracking-wider">Không thể tăng thêm!</p>
+               <p className="text-[10px] font-medium opacity-90">{toastLimitWarning}</p>
+             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* --- TOAST NOTIFICATION (Top Right) --- */}
       <AnimatePresence>
-        {saved && (
+        {(saved || toastError) && (
           <motion.div 
             initial={{ opacity: 0, x: 50, y: 20 }} 
             animate={{ opacity: 1, x: 0, y: 0 }} 
             exit={{ opacity: 0, x: 50 }} 
-            className="fixed top-6 right-6 z-[100]"
+            className="fixed top-6 right-6 z-[250]"
           >
-            <div className="bg-emerald-500/90 backdrop-blur-xl text-white px-6 py-4 rounded-2xl shadow-[0_20px_50px_rgba(16,185,129,0.3)] border border-emerald-400/30 flex items-center gap-3 font-black uppercase tracking-widest text-[10px]">
+            <div className={`${toastError ? 'bg-rose-500/90 shadow-rose-500/30' : 'bg-emerald-500/90 shadow-emerald-500/30'} backdrop-blur-xl text-white px-6 py-4 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-3 font-black uppercase tracking-widest text-[10px]`}>
                <div className="p-1.5 bg-white/20 rounded-lg">
-                <Sparkles className="w-4 h-4" />
+                {toastError ? <AlertCircle className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
                </div>
-               Thao tác thành công!
+               {toastError || "Thao tác thành công!"}
             </div>
           </motion.div>
         )}
@@ -407,14 +496,28 @@ export default function BudgetManager() {
                 <PieIcon className="w-4 h-4 text-primary-400" />
                 Cấu trúc các lọ (Trên {fmtVND(availableToBudget)})
               </h2>
-              <button 
-                onClick={() => setShowAddJarModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-bold text-theme-text-muted hover:text-theme-text-primary transition-all uppercase tracking-wider"
-              >
-                <PlusCircle className="w-3 h-3" /> Thêm lọ
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setJars(jars.map(j => ({ ...j, percentage: 0 })))}
+                  className="px-3 py-1.5 rounded-lg text-[9px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-all uppercase tracking-wider"
+                >
+                  Đặt lại (0%)
+                </button>
+                <button 
+                  onClick={() => setShowAddJarModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-bold text-theme-text-muted hover:text-theme-text-primary transition-all uppercase tracking-wider"
+                >
+                  <PlusCircle className="w-3 h-3" /> Thêm lọ
+                </button>
+              </div>
             </div>
-            <LinkedSliders jars={jars} totalBudget={availableToBudget} onJarsChange={setJars} formatCurrency={fmtVND} />
+            <LinkedSliders 
+              jars={jars} 
+              totalBudget={availableToBudget} 
+              onJarsChange={setJars} 
+              onWarning={handleLimitWarning}
+              formatCurrency={fmtVND} 
+            />
           </div>
         </div>
 
@@ -500,15 +603,21 @@ export default function BudgetManager() {
               <div className="pt-6 border-t border-[var(--theme-subtle-border)] mt-4">
                 <button 
                   onClick={handleSave} 
-                  disabled={unallocated !== 0 || isOverBudget} 
+                  disabled={Math.abs(unallocated) > 0.01 || isOverBudget || saveLoading} 
                   className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-xs font-black uppercase tracking-[0.2em] transition-all shadow-xl ${
-                    unallocated === 0 && !isOverBudget
+                    Math.abs(unallocated) <= 0.01 && !isOverBudget
                       ? 'bg-primary-500 text-white hover:bg-primary-600 hover:scale-[1.02] active:scale-[0.98]' 
                       : 'bg-[var(--theme-subtle-bg)] text-theme-text-muted cursor-not-allowed'
-                  }`}
+                  } ${saveLoading ? 'opacity-70 cursor-wait' : ''}`}
                 >
-                  {unallocated === 0 ? 'Lưu thiết lập' : `Cần thêm ${unallocated}%`}
-                  <ChevronRight className="w-4 h-4" />
+                  {saveLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      {Math.abs(unallocated) <= 0.01 ? 'Lưu thiết lập' : `Cần thêm ${Math.round(unallocated)}%`}
+                      <ChevronRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>

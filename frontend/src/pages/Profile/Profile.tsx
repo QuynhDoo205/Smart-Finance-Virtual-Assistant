@@ -448,22 +448,25 @@ export default function Profile() {
           userApi.getProfile(),
         ]);
 
-        // Build a map of existing budgets by name (Filtering out the 5 Jars mapped to DB categories)
-        const jarNames = ['ăn uống', 'đầu tư', 'giáo dục', 'giải trí', 'sức khỏe'];
+        // Cố định là tất cả những khoản KHÔNG phải là 5 lọ tài chính chuẩn (loại trừ các bản ghi có tiêu đề trống và thuộc 5 ID lọ)
+        const jarCategories = [4, 3, 9, 7, 8]; 
         const merged: FixedExpense[] = [];
         
         if (budgetRes.success) {
-          budgetRes.data.budgets
-            .filter((b: any) => b.limit_amount > 0 && !jarNames.includes(b.category_name.toLowerCase()))
-            .forEach((b: any) => {
+          budgetRes.data.budgets.forEach((b: any) => {
+            const isStandardJar = jarCategories.includes(Number(b.category_id)) && (!b.budget_title || b.budget_title.trim() === '');
+            
+            // Nếu KHÔNG phải lọ chuẩn và có số tiền > 0 thì cho hiện hết để quản lý/xóa
+            if (!isStandardJar && parseFloat(b.limit_amount) > 0) {
               merged.push({
                 id: `budget-${b.id}`,
-                name: b.budget_title || b.category_name,
+                name: b.budget_title || b.category_name || 'Khoản chi không tên',
                 amount: parseFloat(b.limit_amount),
                 category: b.category_name,
-                icon: getSmartIcon(b.budget_title || b.category_name),
+                icon: getSmartIcon(b.budget_title || b.category_name || ''),
               });
-            });
+            }
+          });
         }
 
         setExpenses(merged);
@@ -501,7 +504,7 @@ export default function Profile() {
 
   const handleSave = async (name: string, amount: number, category: string) => {
     let updated: FixedExpense[];
-    const payload: { categoryName: string; amount: number }[] = [];
+    const payload: { categoryName: string; amount: number; category?: string }[] = [];
 
     if (modalData?.id) {
       updated = expenses.map(e => e.id === modalData.id ? { ...e, name, amount, category } : e);
@@ -518,7 +521,13 @@ export default function Profile() {
     setModalData(null);
 
     // Add all current expenses to payload – include category so backend maps correctly
-    updated.forEach(e => payload.push({ categoryName: e.name, amount: e.amount, category: e.category } as any));
+    updated.forEach(e => {
+      payload.push({ 
+        categoryName: e.name, 
+        amount: e.amount, 
+        category: e.category || 'Khác' 
+      });
+    });
 
     // Persist to Backend
     try {
@@ -543,7 +552,7 @@ export default function Profile() {
 
   const handleUpdateIncome = async () => {
     try {
-      const payload = expenses.map(e => ({ categoryName: e.name, amount: e.amount, category: e.category } as any));
+      const payload = expenses.map(e => ({ categoryName: e.name, amount: e.amount, category: e.category }));
       const res = await userApi.updateOnboarding(newIncome, payload);
       if (res.success) {
         if (user) {
@@ -568,11 +577,11 @@ export default function Profile() {
     setExpenses(updated);
     setDeleteTarget(null);
 
-    const payload = updated.map(e => ({ categoryName: e.name, amount: e.amount, category: e.category } as any));
+    const payload = updated.map(e => ({ categoryName: e.name, amount: e.amount, category: e.category }));
     
     // Crucial: Send the deleted item with amount 0 to zero out its limit in the database
     if (deletedItem) {
-      payload.push({ categoryName: deletedItem.name, amount: 0 } as any);
+      payload.push({ categoryName: deletedItem.name, amount: 0, category: deletedItem.category });
     }
 
     // Persist to Backend
@@ -696,7 +705,6 @@ export default function Profile() {
       <motion.div variants={itemVars} className="group relative rounded-[2.5rem] overflow-hidden p-px bg-gradient-to-br from-white/10 to-transparent shadow-2xl">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl" />
         <div className="relative bg-[var(--theme-bg-panel)] backdrop-blur-3xl rounded-[2.3rem] p-8 md:p-12 border border-[var(--theme-border)] flex flex-col md:flex-row items-center md:items-start gap-8 overflow-hidden">
-          <Compass className="absolute -bottom-10 -right-10 w-64 h-64 text-theme-text-primary/[0.02] -rotate-12 group-hover:rotate-12 transition-transform duration-[10s]" />
           <div className="relative group/avatar">
             <div className="w-24 h-24 rounded-[1.5rem] bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 flex items-center justify-center text-4xl font-extrabold text-theme-text-primary shadow-[0_0_30px_rgba(99,102,241,0.3)] transition-all duration-300 group-hover/avatar:scale-105 overflow-hidden">
               {avatarLoading ? (
@@ -814,21 +822,21 @@ export default function Profile() {
               >
                 <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-sky-400 to-transparent" />
 
-                <div className="p-8">
+                <div className="p-5 sm:p-8">
                   {/* Section header */}
-                  <div className="flex items-start justify-between mb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <div>
-                      <h2 className="text-2xl font-bold text-theme-text-primary">Chi phí Cố định Hàng tháng</h2>
-                      <p className="text-theme-text-muted text-sm mt-1">
-                        Thay đổi danh sách này sẽ cập nhật trực tiếp vào ngân sách AI của bạn.
+                      <h2 className="text-xl sm:text-2xl font-bold text-theme-text-primary">Chi phí Cố định Hàng tháng</h2>
+                      <p className="text-theme-text-muted text-[11px] sm:text-sm mt-1">
+                        Dữ liệu sẽ được đồng bộ trực tiếp vào ngân sách AI.
                       </p>
                     </div>
                     <motion.button
                       onClick={openAddModal}
                       whileHover={{ scale: 1.04, boxShadow: '0 0 25px rgba(56,189,248,0.5)' }}
                       whileTap={{ scale: 0.96 }}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-500 text-theme-text-primary text-sm font-bold flex-shrink-0"
-                      style={{ boxShadow: '0 0 18px rgba(56,189,248,0.35)' }}
+                      className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-500 text-theme-text-primary text-sm font-bold w-full sm:w-auto"
+                      style={{ boxShadow: '0 0-18px rgba(56,189,248,0.35)' }}
                     >
                       <Plus className="w-4 h-4" /> Thêm mới
                     </motion.button>
@@ -838,82 +846,78 @@ export default function Profile() {
                   <motion.div
                     key={totalFixed}
                     initial={{ scale: 1.02 }} animate={{ scale: 1 }}
-                    className="flex items-center justify-between p-4 rounded-xl mb-6 mt-5"
+                    className="flex items-center justify-between p-4 rounded-xl mb-6"
                     style={{ background: 'rgba(56,189,248,0.05)', border: '1px solid rgba(56,189,248,0.12)' }}
                   >
-                    <div className="flex items-center gap-2 text-theme-text-muted text-sm">
+                    <div className="flex items-center gap-2 text-theme-text-muted text-[11px] sm:text-sm">
                       <TrendingDown className="w-4 h-4 text-sky-400" />
-                      Tổng chi phí cố định tháng này
+                      Tổng chi phí cố định
                     </div>
-                    <span className="text-xl font-extrabold text-sky-400">{fmt(totalFixed)}<span className="text-sm font-normal text-sky-600 ml-1">đ</span></span>
+                    <span className="text-lg sm:text-xl font-extrabold text-sky-400">{fmt(totalFixed)}<span className="text-xs font-normal text-sky-600 ml-1">đ</span></span>
                   </motion.div>
 
                   {/* Expense list */}
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <AnimatePresence initial={false}>
                       {expenses.map(exp => {
                         const catColor = CATEGORY_COLORS[exp.category] ?? CATEGORY_COLORS['Khác'];
                         return (
                           <motion.div
-                            key={exp.id}
-                            layout
+                            key={exp.id} layout
                             initial={{ opacity: 0, y: -14, scale: 0.97 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.92, height: 0, marginBottom: 0 }}
                             transition={{ type: 'spring', stiffness: 340, damping: 28 }}
-                            className="group overflow-hidden"
+                            className="group"
                           >
-                            <motion.div
-                              whileHover={{ x: 3, borderColor: 'rgba(255,255,255,0.12)' }}
-                              className="flex items-center gap-4 p-4 rounded-xl transition-colors"
-                              style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}
+                            <div
+                              className="flex items-center gap-3 sm:gap-4 p-4 rounded-2xl transition-all border border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"
                             >
                               {/* Icon */}
-                              <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border ${catColor}`}>
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border shadow-sm ${catColor}`}>
                                 <IconRenderer category={exp.category} className="w-5 h-5" />
                               </div>
 
                               {/* Info */}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-theme-text-primary">{exp.name}</p>
-                                <span className={`inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${catColor}`}>
-                                  <Tag className="w-2.5 h-2.5" /> {exp.category}
-                                </span>
-                              </div>
-
-                              {/* Amount */}
-                              <span className="text-base font-bold text-theme-text-primary mr-2 flex-shrink-0">
-                                {fmt(exp.amount)}<span className="text-xs font-normal text-theme-text-muted ml-0.5">đ</span>
-                              </span>
-
-                              {/* Actions */}
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {exp.id.startsWith('income-') ? (
-                                  <span className="px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 whitespace-nowrap">
-                                    ✓ Từ Thu nhập
+                              <div className="flex-1 min-w-0 pr-2">
+                                <p className="text-[13px] sm:text-sm font-bold text-theme-text-primary truncate">{exp.name}</p>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tight border ${catColor}`}>
+                                    {exp.category}
                                   </span>
-                                ) : (
-                                  <>
-                                    <motion.button
-                                      whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                                      onClick={() => openEditModal(exp)}
-                                      className="p-2 rounded-lg text-theme-text-muted hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
-                                      title="Chỉnh sửa"
-                                    >
-                                      <Pencil className="w-4 h-4" />
-                                    </motion.button>
-                                    <motion.button
-                                      whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                                      onClick={() => setDeleteTarget(exp)}
-                                      className="p-2 rounded-lg text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                      title="Xóa"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </motion.button>
-                                  </>
-                                )}
+                                </div>
                               </div>
-                            </motion.div>
+
+                              {/* Amount & Actions Container */}
+                              <div className="flex flex-col items-end gap-2">
+                                <span className="text-sm sm:text-base font-black text-theme-text-primary whitespace-nowrap">
+                                  {fmt(exp.amount)}<span className="text-[10px] font-normal text-theme-text-muted ml-0.5">đ</span>
+                                </span>
+                                
+                                <div className="flex items-center gap-1 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {exp.id.startsWith('income-') ? (
+                                    <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                      AUTO
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => openEditModal(exp)}
+                                        className="p-1.5 rounded-lg text-theme-text-muted hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => setDeleteTarget(exp)}
+                                        className="p-1.5 rounded-lg text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           </motion.div>
                         );
                       })}

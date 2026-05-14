@@ -17,10 +17,11 @@ interface LinkedSlidersProps {
   jars: Jar[];
   totalBudget: number;
   onJarsChange: (jars: Jar[]) => void;
+  onWarning?: (msg: string) => void;
   formatCurrency: (val: number) => string;
 }
 
-export default function LinkedSliders({ jars, totalBudget, onJarsChange, formatCurrency }: LinkedSlidersProps) {
+export default function LinkedSliders({ jars, totalBudget, onJarsChange, onWarning, formatCurrency }: LinkedSlidersProps) {
 
   /* ── Inline edit-name state ─────────────────────────────────────── */
   const [editingId, setEditingId]     = useState<string | null>(null);
@@ -51,13 +52,15 @@ export default function LinkedSliders({ jars, totalBudget, onJarsChange, formatC
    *  If increasing breaks the 100% total, block it, shake, show toast.
    * ───────────────────────────────────────────────────────────────── */
   const handleSliderChange = (targetId: string, rawValue: number) => {
-    const newPct = Math.max(0, Math.min(100, Math.round(rawValue)));
+    // Snap to steps of 5 for cleaner numbers
+    const steppedValue = Math.round(rawValue / 5) * 5;
+    const newPct = Math.max(0, Math.min(100, steppedValue));
     const targetJar = jars.find(j => j.id === targetId);
     
     if (!targetJar || targetJar.percentage === newPct) return;
     
     const delta = newPct - targetJar.percentage;
-    const currentTotal = jars.reduce((s, j) => s + j.percentage, 0);
+    const currentTotal = Math.round(jars.reduce((s, j) => s + j.percentage, 0));
 
     // If decreasing, always allow
     if (delta < 0) {
@@ -69,13 +72,15 @@ export default function LinkedSliders({ jars, totalBudget, onJarsChange, formatC
     if (currentTotal + delta <= 100) {
       onJarsChange(jars.map(j => j.id === targetId ? { ...j, percentage: newPct } : j));
     } else {
-      // OVER LIMIT! Trigger Shake & Toast
-      setShakingId(targetId);
-      setToastVisible(true);
-      
-      // Cleanup after animation
-      setTimeout(() => setShakingId(null), 500);
-      setTimeout(() => setToastVisible(false), 3000); // Hide toast after 3s
+      // Snap to max remaining instead of just blocking
+      const maxPossible = 100 - (currentTotal - targetJar.percentage);
+      if (maxPossible > targetJar.percentage) {
+        onJarsChange(jars.map(j => j.id === targetId ? { ...j, percentage: maxPossible } : j));
+      } else {
+        setShakingId(targetId);
+        onWarning?.("Vui lòng giảm hũ khác trước khi tăng hũ này.");
+        setTimeout(() => setShakingId(null), 500);
+      }
     }
   };
 
@@ -226,32 +231,6 @@ export default function LinkedSliders({ jars, totalBudget, onJarsChange, formatC
           </motion.div>
         );
       })}
-
-      {/* Warning Toast Notification */}
-      <AnimatePresence>
-        {toastVisible && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl"
-            style={{ 
-              background: 'var(--theme-glass-bg)', 
-              border: '1px solid #ef444450', 
-              backdropFilter: 'blur(20px)', 
-              boxShadow: '0 0 20px rgba(239, 68, 68, 0.2)' 
-            }}
-          >
-            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: '#ef4444', boxShadow: '0 0 12px #ef4444' }}>
-              <AlertTriangle className="w-4 h-4 text-theme-text-primary" />
-            </div>
-            <div>
-              <p className="font-bold text-sm" style={{ color: '#ef4444' }}>Không thể tăng thêm!</p>
-              <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Vui lòng giảm hũ khác trước khi tăng hũ này.</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
     </div>
   );

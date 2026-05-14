@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Wallet, PieChart, MessageSquare, Award, LogOut, Menu, X, Sparkles, Target, AlertTriangle, ShoppingBag, Settings } from 'lucide-react';
+import { LayoutDashboard, Wallet, PieChart, MessageSquare, Award, LogOut, Menu, X, Sparkles, Target, AlertTriangle, ShoppingBag, Settings, User, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { API_ROOT } from '../../utils/api';
+import { API_ROOT, authApi } from '../../utils/api';
 import ThemeSidebar from './ThemeSidebar';
 import authStore from '../../store/authStore';
 const NAV_ITEMS = [
+  { path: '/app/admin', label: 'Hệ thống Admin', icon: Shield, adminOnly: true },
   { path: '/app', label: 'Tổng quan', icon: LayoutDashboard },
   { path: '/app/income', label: 'Thu nhập', icon: Wallet },
   { path: '/app/budget', label: 'Ngân sách', icon: PieChart },
@@ -13,7 +14,7 @@ const NAV_ITEMS = [
   { path: '/app/chat', label: 'AI Trợ lý', icon: MessageSquare },
   { path: '/app/badges', label: 'Huy hiệu', icon: Award },
   { path: '/app/insights', label: 'Mục tiêu', icon: Target },
-  { path: '/app/crisis', label: 'Khủng hoảng', icon: AlertTriangle },
+  { path: '/app/crisis', label: 'Khẩn cấp', icon: AlertTriangle },
 ];
 
 export default function MainLayout() {
@@ -30,6 +31,20 @@ export default function MainLayout() {
     const unsubscribe = authStore.subscribe((updatedUser) => {
       setUser(updatedUser);
     });
+
+    // Đồng bộ thông tin mới nhất từ máy chủ (để cập nhật quyền Admin, Badge, v.v.)
+    const syncUser = async () => {
+      try {
+        const res = await authApi.me();
+        if (res.success) {
+          authStore.setUser(res.data.user);
+        }
+      } catch (err) {
+        console.error("Failed to sync user data:", err);
+      }
+    };
+    syncUser();
+
     return unsubscribe;
   }, []);
 
@@ -56,6 +71,8 @@ export default function MainLayout() {
 
       <nav className="flex-1 space-y-1.5 overflow-y-auto pr-2 custom-scrollbar">
         {NAV_ITEMS.map((item) => {
+          const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'levanteolvt12@gmail.com';
+          if (item.adminOnly && !isAdmin) return null;
           const isActive = item.path === '/app' 
             ? location.pathname === '/app' 
             : (location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
@@ -148,8 +165,36 @@ export default function MainLayout() {
       </AnimatePresence>
 
 
-      {/* Main Content Area - Cố định hoàn toàn chiều cao */}
-      <main className={`flex-1 flex flex-col h-screen overflow-hidden relative pt-16 lg:pt-0`}>
+      {/* Bottom Navigation for Mobile - App Experience */}
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 h-16 z-50 flex items-center justify-around px-2 border-t border-[var(--theme-subtle-border)] backdrop-blur-2xl" style={{ backgroundColor: 'var(--theme-bg-panel)' }}>
+        {[
+          { path: '/app', icon: LayoutDashboard, label: 'Tổng quan' },
+          { path: '/app/expense', icon: ShoppingBag, label: 'Chi tiêu' },
+          { path: '/app/chat', icon: MessageSquare, label: 'AI Trợ lý' },
+          (user?.is_admin || user?.email?.toLowerCase() === 'levanteolvt12@gmail.com') ? { path: '/app/admin', icon: Shield, label: 'Admin' } : { path: '/app/crisis', icon: AlertTriangle, label: 'Khẩn cấp' },
+          { path: '/app/profile', icon: User, label: 'Cá nhân' },
+        ].map((item) => {
+          const isActive = item.path === '/app' ? location.pathname === '/app' : location.pathname.startsWith(item.path);
+          const Icon = item.icon;
+          return (
+            <Link key={item.path} to={item.path} className={`flex flex-col items-center gap-1 flex-1 py-1 transition-all relative ${isActive ? 'text-primary-400' : 'text-theme-text-muted'}`}>
+              <div className="relative">
+                <Icon className={`w-5.5 h-5.5 transition-all duration-300 ${isActive ? 'scale-110' : 'opacity-70'}`} />
+                {isActive && (
+                  <motion.div 
+                    layoutId="bottom-nav-glow"
+                    className="absolute inset-0 bg-primary-500/20 blur-md rounded-full -z-10"
+                  />
+                )}
+              </div>
+              <span className={`text-[9px] font-black uppercase tracking-tighter transition-all ${isActive ? 'opacity-100 scale-105' : 'opacity-60'}`}>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Main Content Area */}
+      <main className={`flex-1 flex flex-col h-screen overflow-hidden relative pt-16 lg:pt-0 pb-16 lg:pb-0`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
@@ -160,12 +205,10 @@ export default function MainLayout() {
             className="flex-1 flex flex-col overflow-hidden"
           >
             {isChatPage ? (
-              // Layout đặc biệt cho Chat: Không có padding, không có scroll ngoài
               <div className="flex-1 flex flex-col overflow-hidden relative">
                 <Outlet />
               </div>
             ) : (
-              // Layout thường cho các trang khác
               <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-8">
                 <div className="max-w-7xl mx-auto">
                   <Outlet />

@@ -147,7 +147,7 @@ export const dashboardApi = {
 
 // User API
 export const userApi = {
-  updateOnboarding: (monthlyIncome: number, expenses: { categoryName: string; amount: number }[]) =>
+  updateOnboarding: (monthlyIncome: number, expenses: { categoryName: string; amount: number; category?: string }[]) =>
     apiFetch<{ success: boolean; message: string }>('/user/onboarding', {
       method: 'PUT',
       body: JSON.stringify({ monthlyIncome, expenses }),
@@ -322,12 +322,15 @@ export interface UserProfile {
   currency?: string;
   xp: number;
   level: number;
+  is_admin?: boolean;
 }
 
 export interface DashboardSummary {
   totalBalance: number;
   totalIncome: number;
   totalExpense: number;
+  remainingEmergency?: number;
+  emergencyLimit?: number;
   netSavings: number;
   incomeChangePercent: number;
   isSurvivalMode: boolean;
@@ -376,3 +379,46 @@ export interface ChartDataPoint {
   type: 'income' | 'expense' | 'thu_nhap' | 'chi_phi';
   total: number;
 }
+
+// Admin API
+export const adminApi = {
+  getStats: () =>
+    apiFetch<{
+      success: boolean;
+      data: {
+        totalUsers: number;
+        totalTransactions: number;
+        totalVolume: number;
+        activityRate: number;
+        userGrowth: number;
+        latestUsers: any[];
+        dailyStats: any[];
+      }
+    }>('/admin/stats'),
+    
+  getUsers: () =>
+    apiFetch<{ success: boolean; data: { users: any[] } }>('/admin/users'),
+
+  getDatabaseStats: () =>
+    apiFetch<{ success: boolean; data: any }>('/admin/database'),
+
+  getAIConfig: () =>
+    apiFetch<{ success: boolean; data: any }>('/admin/ai-config'),
+
+  updateAIConfig: (config: any) =>
+    apiFetch<{ success: boolean; message: string }>('/admin/ai-config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
+
+  updateUserRole: (userId: number, isAdmin: boolean) =>
+    apiFetch<{ success: boolean; message: string }>('/admin/users/' + userId + '/role', {
+      method: 'PUT',
+      body: JSON.stringify({ isAdmin }),
+    }),
+
+  deleteUser: (userId: number) =>
+    apiFetch<{ success: boolean; message: string }>('/admin/users/' + userId, {
+      method: 'DELETE',
+    }),
+};

@@ -106,13 +106,17 @@ router.put('/onboarding', async (req: AuthRequest, res: Response): Promise<void>
     );
     const fallbackCategoryId = khaCategory?.id || allCategories[0]?.id;
 
-    // Xóa các ngân sách cố định cũ (không thuộc 6 lọ mặc định) để cập nhật mới hoàn toàn
-    const jarNames = ['ăn uống', 'đầu tư', 'giáo dục', 'giải trí', 'sức khỏe', 'tổng quát'];
+    // Xóa các ngân sách cố định cũ để cập nhật mới hoàn toàn
+    // Giữ lại: các bản ghi có tiêu đề TRỐNG và thuộc 5 ID lọ chuẩn
+    const jarIds = [4, 3, 9, 7, 8]; 
     await client.query(
       `DELETE FROM ngan_sach 
        WHERE nguoi_dung_id = $1 AND thang = $2 AND nam = $3
-       AND danh_muc_id NOT IN (SELECT id FROM danh_muc WHERE LOWER(ten_danh_muc) = ANY($4))`,
-      [userId, month, year, jarNames]
+       AND (
+         danh_muc_id NOT IN (SELECT unnest($4::int[]))
+         OR (tieu_de IS NOT NULL AND tieu_de <> '')
+       )`,
+      [userId, month, year, jarIds]
     );
 
     for (const exp of expenses) {

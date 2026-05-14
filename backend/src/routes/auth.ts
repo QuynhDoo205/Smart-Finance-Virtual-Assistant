@@ -59,7 +59,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     const result = await pool.query(
       `INSERT INTO nguoi_dung (ho_ten, email, mat_khau, ngay_tao, ngay_cap_nhat) 
        VALUES ($1, $2, $3, NOW(), NOW()) 
-       RETURNING id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, ngay_tao AS created_at`,
+       RETURNING id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, is_admin, ngay_tao AS created_at`,
       [full_name, email, password_hash]
     );
 
@@ -107,7 +107,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     // Tim user theo email
     const result = await pool.query(
-      'SELECT id, ho_ten AS full_name, email, mat_khau AS password_hash, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url FROM nguoi_dung WHERE email = $1',
+      'SELECT id, ho_ten AS full_name, email, mat_khau AS password_hash, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, is_admin FROM nguoi_dung WHERE email = $1',
       [email]
     );
 
@@ -145,6 +145,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
           monthly_income: user.monthly_income,
           onboarding_completed: user.onboarding_completed,
           avatar_url: user.avatar_url,
+          is_admin: user.is_admin,
         }
       }
     });
@@ -200,7 +201,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
 
     // Check if user exists
     const existingUserRes = await pool.query(
-      'SELECT id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url FROM nguoi_dung WHERE email = $1',
+      'SELECT id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, is_admin FROM nguoi_dung WHERE email = $1',
       [email]
     );
 
@@ -215,7 +216,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       const result = await pool.query(
         `INSERT INTO nguoi_dung (ho_ten, email, mat_khau, hinh_anh, ngay_tao, ngay_cap_nhat) 
          VALUES ($1, $2, $3, $4, NOW(), NOW()) 
-         RETURNING id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, ngay_tao AS created_at`,
+         RETURNING id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, is_admin, ngay_tao AS created_at`,
         [name, email, password_hash, picture]
       );
       user = result.rows[0];
@@ -252,6 +253,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
           monthly_income: user.monthly_income,
           onboarding_completed: user.onboarding_completed,
           avatar_url: user.avatar_url,
+          is_admin: user.is_admin,
         }
       }
     });
@@ -268,7 +270,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promi
   try {
     const userId = req.user?.id;
     const result = await pool.query(
-      'SELECT id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, tien_te AS currency, ngay_tao AS created_at FROM nguoi_dung WHERE id = $1',
+      'SELECT id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, tien_te AS currency, is_admin, ngay_tao AS created_at FROM nguoi_dung WHERE id = $1',
       [userId]
     );
 
