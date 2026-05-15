@@ -219,6 +219,8 @@ export default function Dashboard() {
   // --- CARD STATS ---
   const topExpenseCategory = [...mergedBudgets].filter(b => b.spent_amount > 0).sort((a, b) => b.spent_amount - a.spent_amount)[0];
   const incomeAchievement = forecastedIncome > 0 ? (displaySummary.totalIncome / forecastedIncome) * 100 : 0;
+  const savingsRate = displayIncome > 0 ? Math.max(0, Math.round(((displayIncome - displaySummary.totalExpense) / displayIncome) * 100)) : 0;
+  const expenseRatio = displayIncome > 0 ? Math.min(100, Math.round((displaySummary.totalExpense / displayIncome) * 100)) : 0;
 
   if (loading) {
     return (
@@ -416,10 +418,12 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="glass-panel p-5 rounded-2xl border border-[var(--theme-subtle-border)] flex flex-col justify-between">
+        <div className="glass-panel p-5 rounded-2xl border border-[var(--theme-subtle-border)] flex flex-col justify-between relative overflow-hidden">
+          {/* Subtle glow */}
+          <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-emerald-500/8 blur-2xl" />
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/15">
                 <ArrowDownRight className="text-emerald-400 w-5 h-5" />
               </div>
               <div>
@@ -432,32 +436,83 @@ export default function Dashboard() {
             </p>
           </div>
           
-          <div className="mt-4 pt-3 border-t border-[var(--theme-subtle-border)] flex justify-between items-center text-[10px]">
-            <div className="flex flex-col">
-              <span className="text-theme-text-muted font-bold mb-0.5">Tiến độ thu nhập</span>
-              <span className="text-emerald-400 font-black">{forecastedIncome > 0 ? Math.min(100, Math.round(incomeAchievement)) : 0}%</span>
+          {/* Progress bar thu nhập */}
+          <div className="mt-3">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[9px] text-theme-text-muted font-bold">Tiến độ thu nhập</span>
+              <span className="text-[9px] font-black text-emerald-400">{forecastedIncome > 0 ? Math.min(100, Math.round(incomeAchievement)) : 100}%</span>
             </div>
-            <div className="flex flex-col text-right">
+            <div className="h-1.5 bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${forecastedIncome > 0 ? Math.min(100, Math.round(incomeAchievement)) : 100}%` }}
+                transition={{ duration: 1, delay: 0.4, ease: 'easeOut' }}
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-[var(--theme-subtle-border)] flex justify-between items-center text-[10px]">
+            <div className="flex flex-col">
               <span className="text-theme-text-muted font-bold mb-0.5">Mục tiêu</span>
               <span className="text-theme-text-primary font-black">{formatCurrency(forecastedIncome)}</span>
+            </div>
+            <div className="flex flex-col text-right">
+              <span className="text-theme-text-muted font-bold mb-0.5">Nguồn thu</span>
+              <span className="text-emerald-400 font-black">{incomeSources.length} nguồn</span>
             </div>
           </div>
         </div>
 
-        <div className="glass-panel p-5 rounded-2xl border border-[var(--theme-subtle-border)] flex flex-col justify-between">
+        <div className="glass-panel p-5 rounded-2xl border border-[var(--theme-subtle-border)] flex flex-col justify-between relative overflow-hidden">
+          {/* Subtle glow */}
+          <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-rose-500/8 blur-2xl" />
           <div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
-                <ArrowUpRight className="text-rose-400 w-5 h-5" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/15">
+                  <ArrowUpRight className="text-rose-400 w-5 h-5" />
+                </div>
+                <h3 className="text-theme-text-muted font-black text-[9px] uppercase tracking-widest">Chi tiêu</h3>
               </div>
-              <h3 className="text-theme-text-muted font-black text-[9px] uppercase tracking-widest">Chi tiêu</h3>
+              {/* Savings rate badge */}
+              <div className={`text-[9px] font-black px-2 py-1 rounded-lg ${
+                savingsRate >= 30 ? 'bg-emerald-500/15 text-emerald-400' :
+                savingsRate >= 10 ? 'bg-amber-500/15 text-amber-400' :
+                'bg-rose-500/15 text-rose-400'
+              }`}>
+                Tiết kiệm {savingsRate}%
+              </div>
             </div>
             <p className="text-3xl font-black text-theme-text-primary tracking-tighter">
               {formatCurrency(displaySummary.totalExpense)}
             </p>
           </div>
-          
-          <div className="mt-4 pt-3 border-t border-[var(--theme-subtle-border)] flex justify-between items-center text-[10px]">
+
+          {/* Expense ratio bar */}
+          <div className="mt-3">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[9px] text-theme-text-muted font-bold">Tỷ lệ chi / thu nhập</span>
+              <span className={`text-[9px] font-black ${
+                expenseRatio <= 60 ? 'text-emerald-400' :
+                expenseRatio <= 80 ? 'text-amber-400' : 'text-rose-400'
+              }`}>{expenseRatio}%</span>
+            </div>
+            <div className="h-1.5 bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${expenseRatio}%` }}
+                transition={{ duration: 1, delay: 0.5, ease: 'easeOut' }}
+                className={`h-full rounded-full ${
+                  expenseRatio <= 60 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' :
+                  expenseRatio <= 80 ? 'bg-gradient-to-r from-amber-500 to-orange-400' :
+                  'bg-gradient-to-r from-rose-500 to-red-400'
+                }`}
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-[var(--theme-subtle-border)] flex justify-between items-center text-[10px]">
             <div className="flex flex-col">
               <span className="text-theme-text-muted font-bold mb-0.5">Chi nhiều nhất</span>
               <span className="text-rose-400 font-black truncate max-w-[100px]">
@@ -621,14 +676,19 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="space-y-2 overflow-y-auto custom-scrollbar pr-2 max-h-[160px]">
-            {pieData.map((item: any) => (
-              <div key={item.name} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.02]">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+          <div className="space-y-1.5 overflow-y-auto custom-scrollbar pr-1 max-h-[160px]">
+            {pieData.length === 0 ? (
+              <p className="text-[11px] text-theme-text-muted text-center py-4">Chưa có dữ liệu chi tiêu</p>
+            ) : pieData.map((item: any) => (
+              <div key={item.name} className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-[var(--theme-subtle-bg)] transition-all">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color, boxShadow: `0 0 6px ${item.color}80` }} />
                   <span className="text-[11px] font-bold text-theme-text-muted">{item.name}</span>
                 </div>
-                <span className="text-[11px] font-black text-theme-text-primary">{formatCurrency(item.value)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-theme-text-muted font-bold opacity-50">{displaySummary.totalExpense > 0 ? Math.round((item.value / displaySummary.totalExpense) * 100) : 0}%</span>
+                  <span className="text-[11px] font-black text-theme-text-primary">{formatCurrency(item.value)}</span>
+                </div>
               </div>
             ))}
           </div>

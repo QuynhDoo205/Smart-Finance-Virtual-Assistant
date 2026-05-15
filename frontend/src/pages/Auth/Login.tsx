@@ -138,7 +138,7 @@ export default function Login() {
             {!successUser ? (
               <motion.div 
                 key="login-form" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }}
-                className="liquid-glass bg-[#010828]/60 backdrop-blur-[30px] rounded-[40px] p-8 sm:p-10 border border-white/20 shadow-[0_30px_100px_rgba(0,0,0,0.7)]"
+                className="liquid-glass bg-white/[0.03] backdrop-blur-[20px] rounded-[40px] p-8 sm:p-10 border border-white/10 shadow-2xl"
               >
                 <div className="mb-8 text-center lg:text-left">
                   <h2 className="font-grotesk text-4xl uppercase tracking-tighter leading-none mb-2 text-white">Đăng nhập</h2>
@@ -190,7 +190,7 @@ export default function Login() {
 
                   <button 
                     disabled={loading} type="submit"
-                    className="group relative w-full py-4 rounded-full bg-gradient-to-r from-[#00D1FF] to-[#0077FF] text-white font-grotesk text-base uppercase tracking-widest hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-3 mt-6 shadow-[0_10px_30px_rgba(0,209,255,0.3)]"
+                    className="group relative overflow-hidden w-full py-4 rounded-full bg-gradient-to-r from-[#00D1FF] to-[#0077FF] text-white font-grotesk text-base uppercase tracking-widest hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-3 mt-6"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-shine" />
                     {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <><LogIn size={20} /> Đăng nhập ngay</>}
@@ -251,7 +251,7 @@ export default function Login() {
         {showForgotModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-[#010828]/40 backdrop-blur-md" onClick={() => setShowForgotModal(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 30 }} className="relative w-full max-w-[420px] liquid-glass bg-[#010828]/70 backdrop-blur-[25px] rounded-[35px] p-8 sm:p-10 border border-white/20 shadow-[0_25px_80px_rgba(0,0,0,0.7)]">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 30 }} className="relative w-full max-w-[420px] liquid-glass bg-white/[0.03] backdrop-blur-[20px] rounded-[35px] p-8 sm:p-10 border border-white/10 shadow-2xl">
               <button onClick={() => setShowForgotModal(false)} className="absolute top-6 right-6 text-white/30 hover:text-white transition-colors bg-white/5 hover:bg-rose-500 rounded-full p-2"><X size={16} /></button>
               
               <div className="mb-8 text-center">

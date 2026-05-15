@@ -158,7 +158,7 @@ export default function Register() {
               step === 'form' ? (
               <motion.div 
                 key="register-form" initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }}
-                className="liquid-glass bg-[#010828]/60 backdrop-blur-[25px] rounded-[35px] p-8 sm:p-10 border border-white/20 shadow-[0_25px_80px_rgba(0,0,0,0.7)]"
+                className="liquid-glass bg-white/[0.03] backdrop-blur-[20px] rounded-[35px] p-8 sm:p-10 border border-white/10 shadow-2xl"
               >
                 <div className="mb-8 text-center lg:text-left">
                   <h2 className="font-grotesk text-3xl uppercase tracking-tighter leading-none mb-2 text-white">Tạo tài khoản</h2>
@@ -240,7 +240,7 @@ export default function Register() {
 
                   <button 
                     disabled={loading} type="submit"
-                    className="group relative w-full py-4 rounded-full bg-gradient-to-r from-[#00D1FF] to-[#0077FF] text-white font-grotesk text-base uppercase tracking-widest hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-3 mt-4 shadow-[0_10px_30px_rgba(0,209,255,0.3)]"
+                    className="group relative overflow-hidden w-full py-4 rounded-full bg-gradient-to-r from-[#00D1FF] to-[#0077FF] text-white font-grotesk text-base uppercase tracking-widest hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-3 mt-4"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-shine" />
                     {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <><UserPlus size={18} /> Đăng ký ngay</>}
@@ -269,7 +269,7 @@ export default function Register() {
               ) : (
               <motion.div 
                 key="otp-form" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
-                className="liquid-glass bg-[#010828]/60 backdrop-blur-[25px] rounded-[35px] p-8 sm:p-10 border border-white/20 shadow-[0_25px_80px_rgba(0,0,0,0.7)]"
+                className="liquid-glass bg-white/[0.03] backdrop-blur-[20px] rounded-[35px] p-8 sm:p-10 border border-white/10 shadow-2xl"
               >
                 <div className="mb-8 text-center">
                   <div className="w-16 h-16 mx-auto bg-[#00D1FF]/10 rounded-full flex items-center justify-center border border-[#00D1FF]/30 mb-4 shadow-[0_0_20px_rgba(0,209,255,0.2)]">
