@@ -1,16 +1,78 @@
 import { motion } from 'framer-motion';
-import { Lock, Star, Trophy, Zap, Map, Code, Shield, Award, Crown } from 'lucide-react';
-
-const badges = [
-  { id: 1, name: 'Người Khởi Đầu', description: 'Hoàn thành Onboarding & thiết lập ngân sách đầu tiên.', icon: <Map className="w-8 h-8" />, unlocked: true, rarity: 'common', color: 'from-blue-400 to-blue-600' },
-  { id: 2, name: 'Chi Tiêu Thông Thái', description: 'Giữ chi tiêu dưới mức ngân sách trong 7 ngày liên tiếp.', icon: <Shield className="w-8 h-8" />, unlocked: true, rarity: 'uncommon', color: 'from-emerald-400 to-emerald-600' },
-  { id: 3, name: 'Kỷ Luật Thép', description: 'Không chi tiêu vượt quá mức cho phép trong 1 tháng.', icon: <Award className="w-8 h-8" />, unlocked: false, rarity: 'rare', color: 'from-purple-400 to-purple-600' },
-  { id: 4, name: 'Bậc Thầy AI', description: 'Sử dụng Nova AI để trích xuất 50 hóa đơn tự động.', icon: <Zap className="w-8 h-8" />, unlocked: true, rarity: 'epic', color: 'from-fuchsia-400 to-pink-600' },
-  { id: 5, name: 'Tự Do Tài Chính', description: 'Đạt mục tiêu tiết kiệm khổng lồ (Trên 100M VND).', icon: <Crown className="w-8 h-8" />, unlocked: false, rarity: 'legendary', color: 'from-amber-300 to-orange-500' },
-  { id: 6, name: 'Người Bắt Bugs', description: 'Tham gia sửa lỗi hệ thống (Beta Tester).', icon: <Code className="w-8 h-8" />, unlocked: true, rarity: 'mythic', color: 'from-gray-300 to-gray-500' },
-];
+import { Lock, Star, Trophy, Zap, Map, Code, Shield, Award, Crown, Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { authApi, dashboardApi, transactionsApi, userApi } from '../../utils/api';
 
 export default function Badges() {
+  const [data, setData] = useState<{
+    xp: number;
+    level: number;
+    nextLevelXp: number;
+    badges: any[];
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const res = await userApi.getBadges();
+        if (res.success) {
+          setData(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to load gamification data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const badges = useMemo(() => {
+    if (!data) return [];
+    
+    const iconMap: Record<string, any> = {
+      'map': <Map className="w-8 h-8" />,
+      'shield': <Shield className="w-8 h-8" />,
+      'zap': <Zap className="w-8 h-8" />,
+      'lock': <Crown className="w-8 h-8" />,
+      'code': <Code className="w-8 h-8" />,
+    };
+
+    const colorMap: Record<string, string> = {
+      'common': 'from-blue-400 to-blue-600',
+      'uncommon': 'from-emerald-400 to-emerald-600',
+      'rare': 'from-purple-400 to-purple-600',
+      'epic': 'from-fuchsia-400 to-pink-600',
+      'legendary': 'from-amber-300 to-orange-500',
+      'mythic': 'from-gray-300 to-gray-500',
+    };
+
+    return data.badges.map(b => ({
+      id: b.id,
+      name: b.ten_danh_hieu,
+      description: b.mo_ta,
+      icon: iconMap[b.icon] || <Award className="w-8 h-8" />,
+      unlocked: b.isUnlocked,
+      rarity: b.loai,
+      color: colorMap[b.loai] || 'from-gray-400 to-gray-600'
+    }));
+  }, [data]);
+
+  const unlockedCount = badges.filter(b => b.unlocked).length;
+  const currentXP = data?.xp || 0;
+  const level = data?.level || 1;
+  const nextLevelXp = data?.nextLevelXp || 1000;
+  const progressPercent = (currentXP / nextLevelXp) * 100;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
+      </div>
+    );
+  }
+
   const containerVars = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.1 } }
@@ -34,7 +96,7 @@ export default function Badges() {
             </div>
           </div>
           <div className="absolute -bottom-2 -right-2 bg-gradient-to-br from-rose-500 to-pink-600 w-12 h-12 rounded-full border-4 border-[#0F172A] flex items-center justify-center shadow-lg">
-            <span className="font-extrabold text-theme-text-primary text-sm">Lv.5</span>
+            <span className="font-extrabold text-theme-text-primary text-sm">Lv.{level}</span>
           </div>
         </div>
 
@@ -42,7 +104,7 @@ export default function Badges() {
           <h1 className="text-4xl font-extrabold text-theme-text-primary mb-2 flex flex-col md:flex-row items-center gap-3">
             Hành Trình Gamification
             <span className="px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-1">
-              <Star className="w-3 h-3" /> Hạng Vàng
+              <Star className="w-3 h-3" /> {level > 3 ? 'Hạng Vàng' : level > 1 ? 'Hạng Bạc' : 'Hạng Đồng'}
             </span>
           </h1>
           <p className="text-lg text-theme-text-muted mb-6 max-w-2xl">
@@ -51,13 +113,13 @@ export default function Badges() {
 
           <div className="space-y-2 max-w-xl">
             <div className="flex justify-between items-end text-sm">
-              <span className="font-semibold text-theme-text-muted">Tiến trình Level 6</span>
-              <span className="font-bold text-amber-500">2400 / 5000 XP</span>
+              <span className="font-semibold text-theme-text-muted">Tiến trình Level {level + 1}</span>
+              <span className="font-bold text-amber-500">{currentXP} / {nextLevelXp} XP</span>
             </div>
             <div className="h-3 w-full bg-gray-800 rounded-full overflow-hidden shadow-inner">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: '48%' }}
+                animate={{ width: `${progressPercent}%` }}
                 transition={{ duration: 1.5, delay: 0.5, ease: "easeOut" }}
                 className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full relative"
               >
@@ -72,18 +134,18 @@ export default function Badges() {
       <div>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-theme-text-primary">Tủ Huy Hiệu Tâm Huyết</h2>
-          <span className="text-theme-text-muted font-medium">Đã mở khóa: 4/6</span>
+          <span className="text-theme-text-muted font-medium">Đã mở khóa: {unlockedCount}/{badges.length}</span>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {badges.map((badge) => (
+          {badges.map((badge: any) => (
             <motion.div 
               key={badge.id}
               variants={itemVars}
               className={`relative overflow-hidden rounded-[2rem] p-1 transition-all duration-300 group ${
                 badge.unlocked 
                   ? 'bg-gradient-to-br border-transparent' 
-                  : 'bg-gray-800 border border-white/5 opacity-80 hover:opacity-100'
+                  : 'bg-gray-800 border border-[var(--theme-subtle-border)] opacity-80 hover:opacity-100'
               }`}
             >
               {badge.unlocked && (
@@ -91,14 +153,14 @@ export default function Badges() {
               )}
               
               <div className={`relative h-full flex flex-col items-center text-center p-8 rounded-[1.9rem] ${
-                badge.unlocked ? 'bg-[#0F172A]/90 backdrop-blur-xl border border-white/10' : 'bg-[#111827]'
+                badge.unlocked ? 'bg-[#0F172A]/90 backdrop-blur-xl border border-[var(--theme-subtle-border)]' : 'bg-[#111827]'
               }`}>
                 
                 {/* Icon Container */}
                 <div className={`w-24 h-24 mb-6 rounded-[2rem] flex items-center justify-center relative ${
                   badge.unlocked 
                     ? `bg-gradient-to-br ${badge.color} shadow-lg rotate-3 group-hover:rotate-0 transition-transform duration-300` 
-                    : 'bg-gray-800 border border-white/5 grayscale'
+                    : 'bg-gray-800 border border-[var(--theme-subtle-border)] grayscale'
                 }`}>
                   <div className="text-theme-text-primary">
                     {badge.unlocked ? badge.icon : <Lock className="w-8 h-8 text-theme-text-muted" />}
@@ -112,7 +174,7 @@ export default function Badges() {
 
                 <div className="space-y-2 relative z-10 w-full">
                   <span className={`text-[10px] uppercase font-black tracking-widest px-3 py-1 rounded-full ${
-                    badge.unlocked ? 'bg-white/10 text-theme-text-primary' : 'bg-gray-800 text-theme-text-muted'
+                    badge.unlocked ? 'bg-[var(--theme-bg-surface)] text-theme-text-primary' : 'bg-gray-800 text-theme-text-muted'
                   }`}>
                     {badge.rarity}
                   </span>
@@ -126,7 +188,7 @@ export default function Badges() {
 
                 {/* Status indicator */}
                 {!badge.unlocked && (
-                  <div className="mt-6 pt-4 border-t border-white/5 w-full">
+                  <div className="mt-6 pt-4 border-t border-[var(--theme-subtle-border)] w-full">
                     <p className="text-xs text-amber-500/80 font-medium flex items-center justify-center gap-1">
                       <Lock className="w-3 h-3" /> Yêu cầu chưa đạt
                     </p>

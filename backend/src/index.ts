@@ -1,34 +1,49 @@
+import 'dotenv/config';
 import express from 'express';
 import type { Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import pool from './db.js';
 import authRouter from './routes/auth.js';
 import dashboardRouter from './routes/dashboard.js';
 import userRouter from './routes/user.js';
-
-dotenv.config();
+import transactionsRouter from './routes/transactions.js';
+import aiRouter from './routes/ai.js';
+import incomeRouter from './routes/income.js';
+import adminRouter from './routes/admin.js';
+import statusRouter from './routes/status.js';
 
 const app = express();
-const PORT = process.env['PORT'] || 5000;
+const PORT = process.env.PORT || 5001; // Force 5001 as primary fallback
 
 // ============================================================
 // Middleware
 // ============================================================
+// Extreme permissive CORS for debugging tunnel issues
 app.use(cors({
-  origin: true, // Allow all origins for local development (reflects request origin)
+  origin: (origin, callback) => {
+    // Allow all origins
+    callback(null, true);
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning']
 }));
+
+// Request Logger
+app.use((req, _res, next) => {
+  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url} - Origin: ${req.headers.origin}`);
+  next();
+});
 
 // Fix Google Auth popup cross-origin issues
 app.use((_req, res, next) => {
   res.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-  // res.header('Cross-Origin-Embedder-Policy', 'require-corp'); // Only if needed, can break some CDN images
   next();
 });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 // ============================================================
 // Routes
@@ -63,6 +78,11 @@ app.get('/api/health', async (_req: Request, res: Response) => {
 app.use('/api/auth', authRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/user', userRouter);
+app.use('/api/transactions', transactionsRouter);
+app.use('/api/ai', aiRouter);
+app.use('/api/income', incomeRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/status', statusRouter);
 
 // ============================================================
 // 404 Handler

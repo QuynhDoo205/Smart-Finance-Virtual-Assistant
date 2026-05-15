@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Share+Tech+Mono&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -8,59 +8,169 @@
    VIP PRO THEME SYSTEM - CSS CUSTOM PROPERTIES
    ============================================ */
 
-/* DEFAULT / CYBERPUNK THEME */
+/* NOVA ELITE - THE FUTURE OF FINANCE */
 :root,
 [data-theme="cyberpunk"] {
-  --theme-bg-deep:       #030712;
-  --theme-bg-surface:    #0B0F19;
-  --theme-bg-panel:      rgba(15, 23, 42, 0.75);
-  --theme-neon-primary:  #00f5ff;
-  --theme-neon-accent:   #ff00c8;
-  --theme-neon-green:    #39ff14;
-  --theme-text-primary:  #f0f9ff;
-  --theme-text-muted:    #94a3b8;
-  --theme-border:        rgba(0, 245, 255, 0.15);
-  --theme-border-glow:   0 0 8px rgba(0,245,255,0.4), 0 0 24px rgba(0,245,255,0.15);
-  --theme-glass-bg:      rgba(15, 23, 42, 0.70);
+  --theme-bg-deep:       #030305;
+  --theme-bg-surface:    #0D0D12;
+  --theme-bg-panel:      rgba(13, 13, 18, 0.7);
+  --theme-neon-primary:  #00F5FF; /* Cyan Electric */
+  --theme-neon-accent:   #7000FF; /* Cyber Purple */
+  --theme-neon-green:    #00FF85; /* Neo Green */
+  --theme-text-primary:  #FFFFFF;
+  --theme-text-muted:    #8B8B9E;
+  --theme-border:        rgba(255, 255, 255, 0.05);
+  --theme-border-glow:   0 0 20px rgba(0, 245, 255, 0.05);
+  --theme-glass-bg:      rgba(13, 13, 18, 0.6);
   --theme-glass-blur:    20px;
-  --theme-scrollbar:     rgba(0, 245, 255, 0.2);
-  --theme-ai-color:      #a855f7;
+  --theme-subtle-bg:     rgba(255, 255, 255, 0.03);
+  --theme-subtle-border: rgba(255, 255, 255, 0.08);
+  --theme-scrollbar:     rgba(112, 0, 255, 0.3);
+  --theme-ai-color:      #7000FF;
 }
 
-/* LIGHT TECH THEME */
+/* BENTO SYSTEM */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: minmax(160px, auto);
+  gap: 1.5rem;
+}
+
+.bento-card {
+  @apply relative overflow-hidden rounded-[2.5rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl p-8 transition-all duration-500;
+  box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
+}
+
+.bento-card:hover {
+  @apply bg-white/[0.04] border-white/10 scale-[1.01];
+  box-shadow: 0 20px 60px -15px rgba(0,0,0,0.6);
+}
+
+.bento-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(800px circle at var(--mouse-x) var(--mouse-y), rgba(255,255,255,0.06), transparent 40%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.bento-shine {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  transform: skewX(-20deg);
+  animation: bento-shine 6s infinite;
+}
+
+@keyframes bento-shine {
+  0% { left: -100%; }
+  20% { left: 200%; }
+  100% { left: 200%; }
+}
+
+/* NOVA LIGHT (Replaces Light Tech) */
 [data-theme="light-tech"] {
-  --theme-bg-deep:       #e8edf5;
-  --theme-bg-surface:    #f0f4fb;
-  --theme-bg-panel:      rgba(255, 255, 255, 0.65);
-  --theme-neon-primary:  #0ea5e9;
-  --theme-neon-accent:   #6366f1;
-  --theme-neon-green:    #10b981;
-  --theme-text-primary:  #0f172a;
+  --theme-bg-deep:       #EEF2F7;
+  --theme-bg-surface:    #FFFFFF;
+  --theme-bg-panel:      rgba(255, 255, 255, 0.98);
+  --theme-neon-primary:  #2563EB;
+  --theme-neon-accent:   #6366F1;
+  --theme-neon-green:    #059669;
+  --theme-text-primary:  #0F172A;
   --theme-text-muted:    #475569;
-  --theme-border:        rgba(14, 165, 233, 0.30);
-  --theme-border-glow:   0 0 12px rgba(14,165,233,0.25), 0 2px 8px rgba(0,0,0,0.08);
-  --theme-glass-bg:      rgba(255, 255, 255, 0.60);
-  --theme-glass-blur:    24px;
-  --theme-scrollbar:     rgba(14, 165, 233, 0.3);
-  --theme-ai-color:      #6366f1;
+  --theme-border:        rgba(15, 23, 42, 0.14);
+  --theme-border-glow:   0 2px 8px rgba(0,0,0,0.06);
+  --theme-glass-bg:      rgba(255, 255, 255, 0.97);
+  --theme-glass-blur:    12px;
+  --theme-subtle-bg:     rgba(15, 23, 42, 0.05);
+  --theme-subtle-border: rgba(15, 23, 42, 0.12);
+  --theme-scrollbar:     rgba(37, 99, 235, 0.2);
+  --theme-ai-color:      #7C3AED;
 }
 
-/* MATRIX THEME */
+/* MIDNIGHT EMERALD (Replaces Matrix) */
 [data-theme="matrix"] {
-  --theme-bg-deep:       #000500;
-  --theme-bg-surface:    #010d01;
-  --theme-bg-panel:      rgba(0, 20, 0, 0.80);
-  --theme-neon-primary:  #00ff41;
-  --theme-neon-accent:   #39ff14;
-  --theme-neon-green:    #00ff41;
-  --theme-text-primary:  #00ff41;
-  --theme-text-muted:    #00a82a;
-  --theme-border:        rgba(0, 255, 65, 0.25);
-  --theme-border-glow:   0 0 10px rgba(0,255,65,0.5), 0 0 30px rgba(0,255,65,0.2);
-  --theme-glass-bg:      rgba(0, 15, 0, 0.75);
-  --theme-glass-blur:    16px;
-  --theme-scrollbar:     rgba(0, 255, 65, 0.3);
-  --theme-ai-color:      #00ff41;
+  --theme-bg-deep:       #000000;
+  --theme-bg-surface:    #050505;
+  --theme-bg-panel:      rgba(5, 5, 5, 0.9);
+  --theme-neon-primary:  #10B981;
+  --theme-neon-accent:   #059669;
+  --theme-neon-green:    #34D399;
+  --theme-text-primary:  #ECFDF5;
+  --theme-text-muted:    #6EE7B7;
+  --theme-border:        rgba(16, 185, 129, 0.15);
+  --theme-border-glow:   0 0 15px rgba(16, 185, 129, 0.1);
+  --theme-glass-bg:      rgba(5, 5, 5, 0.8);
+  --theme-glass-blur:    20px;
+  --theme-subtle-bg:     rgba(16, 185, 129, 0.05);
+  --theme-subtle-border: rgba(16, 185, 129, 0.1);
+  --theme-scrollbar:     rgba(16, 185, 129, 0.2);
+  --theme-ai-color:      #10B981;
+}
+
+/* SAKURA PINK (Cute & Girly Theme) */
+[data-theme="sakura"] {
+  --theme-bg-deep:       #FCE4EC;
+  --theme-bg-surface:    #FFFFFF;
+  --theme-bg-panel:      rgba(255, 255, 255, 0.98);
+  --theme-neon-primary:  #EC4899;
+  --theme-neon-accent:   #F43F5E;
+  --theme-neon-green:    #F472B6;
+  --theme-text-primary:  #500724;
+  --theme-text-muted:    #9D174D;
+  --theme-border:        rgba(236, 72, 153, 0.25);
+  --theme-border-glow:   0 2px 10px rgba(236, 72, 153, 0.08);
+  --theme-glass-bg:      rgba(255, 255, 255, 0.97);
+  --theme-glass-blur:    12px;
+  --theme-subtle-bg:     rgba(236, 72, 153, 0.07);
+  --theme-subtle-border: rgba(236, 72, 153, 0.2);
+  --theme-scrollbar:     rgba(236, 72, 153, 0.2);
+  --theme-ai-color:      #DB2777;
+}
+
+/* OCEAN BLUE (Refreshing & Calm Theme) */
+[data-theme="ocean"] {
+  --theme-bg-deep:       #DBEAFE;
+  --theme-bg-surface:    #FFFFFF;
+  --theme-bg-panel:      rgba(255, 255, 255, 0.98);
+  --theme-neon-primary:  #0EA5E9;
+  --theme-neon-accent:   #0284C7;
+  --theme-neon-green:    #38BDF8;
+  --theme-text-primary:  #0C2340;
+  --theme-text-muted:    #0369A1;
+  --theme-border:        rgba(14, 165, 233, 0.25);
+  --theme-border-glow:   0 2px 10px rgba(14, 165, 233, 0.08);
+  --theme-glass-bg:      rgba(255, 255, 255, 0.97);
+  --theme-glass-blur:    12px;
+  --theme-subtle-bg:     rgba(14, 165, 233, 0.07);
+  --theme-subtle-border: rgba(14, 165, 233, 0.2);
+  --theme-scrollbar:     rgba(14, 165, 233, 0.2);
+  --theme-ai-color:      #0284C7;
+}
+
+/* MIDNIGHT AMETHYST (Elegant Purple Theme) */
+[data-theme="sunset"] {
+  --theme-bg-deep:       #080510;
+  --theme-bg-surface:    #120B25;
+  --theme-bg-panel:      rgba(18, 11, 37, 0.85);
+  --theme-neon-primary:  #A855F7;
+  --theme-neon-accent:   #D8B4FE;
+  --theme-neon-green:    #C084FC;
+  --theme-text-primary:  #FAF5FF;
+  --theme-text-muted:    #C4B5FD;
+  --theme-border:        rgba(168, 85, 247, 0.2);
+  --theme-border-glow:   0 0 15px rgba(168, 85, 247, 0.1);
+  --theme-glass-bg:      rgba(18, 11, 37, 0.7);
+  --theme-glass-blur:    20px;
+  --theme-subtle-bg:     rgba(168, 85, 247, 0.05);
+  --theme-subtle-border: rgba(168, 85, 247, 0.1);
+  --theme-scrollbar:     rgba(168, 85, 247, 0.2);
+  --theme-ai-color:      #A855F7;
 }
 
 /* ============================================
@@ -74,18 +184,19 @@
   body {
     background-color: var(--theme-bg-deep);
     color: var(--theme-text-primary);
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     @apply antialiased overflow-x-hidden;
     transition: background-color 0.4s ease, color 0.4s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Inter', sans-serif;
   }
 
-  [data-theme="matrix"] body,
-  [data-theme="matrix"] * {
-    font-family: 'Share Tech Mono', monospace !important;
+  /* Remove browser default password reveal/clear buttons (Edge/Chrome) */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
   }
 }
 
@@ -93,46 +204,58 @@
    COMPONENT LIBRARY - THEME AWARE
    ============================================ */
 @layer components {
-  /* VIP PRO Glass Panel */
+  /* VIP PRO Glass Panel - Optimized for Mobile & Sharpness */
   .glass-panel {
     background: var(--theme-glass-bg);
-    backdrop-filter: blur(var(--theme-glass-blur));
-    -webkit-backdrop-filter: blur(var(--theme-glass-blur));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid var(--theme-border);
     border-radius: 1.5rem;
-    box-shadow: var(--theme-border-glow), 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.05);
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    box-shadow: var(--theme-border-glow), 0 4px 20px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
     overflow: hidden;
     position: relative;
   }
 
-  /* Neon Jar Card (Budget Jars) */
-  .neon-jar-card {
-    background: var(--theme-glass-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 1.25rem;
+  /* Light themes: stronger card separation */
+  [data-theme="light-tech"] .glass-panel,
+  [data-theme="sakura"] .glass-panel,
+  [data-theme="ocean"] .glass-panel {
+    background: #ffffff;
     border: 1px solid var(--theme-border);
-    box-shadow: var(--theme-border-glow);
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    position: relative;
-    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05);
   }
 
-  .neon-jar-card:hover {
-    transform: scale(1.02) translateY(-2px);
-    box-shadow: var(--theme-border-glow), 0 20px 40px rgba(0,0,0,0.4);
+  /* Jar cards in budget page - light mode */
+  [data-theme="light-tech"] .jar-card,
+  [data-theme="sakura"] .jar-card,
+  [data-theme="ocean"] .jar-card {
+    background: #ffffff !important;
+    border: 1px solid var(--theme-border) !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07) !important;
   }
 
-  /* Input fields */
+  @media (min-width: 1024px) {
+    .glass-panel {
+      backdrop-filter: blur(var(--theme-glass-blur));
+      -webkit-backdrop-filter: blur(var(--theme-glass-blur));
+    }
+  }
+
+  /* Input fields - Sharper on Mobile */
   .glass-input {
-    background: var(--theme-glass-bg);
+    background: var(--theme-bg-surface);
     border: 1px solid var(--theme-border);
-    backdrop-filter: blur(8px);
-    @apply w-full rounded-2xl px-4 py-3.5 placeholder-gray-500 focus:outline-none focus:ring-2 transition-all duration-300;
+    @apply w-full rounded-2xl px-4 py-3 sm:py-3.5 placeholder-gray-500 focus:outline-none focus:ring-2 transition-all duration-300;
     color: var(--theme-text-primary);
-    focus-ring-color: var(--theme-neon-primary);
+    font-size: 16px !important; /* Prevent iOS zoom on focus */
   }
+
+  [data-theme="light-tech"] .glass-input {
+    background: #fff;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+  }
+
 
   .btn-primary {
     @apply relative overflow-hidden font-bold tracking-wide py-3.5 px-6 rounded-2xl transition-all duration-300 active:scale-[0.98];
@@ -141,17 +264,17 @@
     box-shadow: 0 0 20px rgba(0,245,255,0.3);
   }
 
-  [data-theme="cyberpunk"] .btn-primary {
-    color: #000;
-  }
-
-  [data-theme="light-tech"] .btn-primary {
+  [data-theme="sakura"] .btn-primary,
+[data-theme="ocean"] .btn-primary,
+[data-theme="light-tech"] .btn-primary {
     color: #fff;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
   }
 
-  [data-theme="matrix"] .btn-primary {
+[data-theme="sunset"] .btn-primary,
+[data-theme="cyberpunk"] .btn-primary,
+[data-theme="matrix"] .btn-primary {
     color: #000;
-    font-family: 'Share Tech Mono', monospace;
   }
 
   .btn-secondary {
@@ -163,6 +286,7 @@
 
   .btn-secondary:hover {
     color: var(--theme-text-primary);
+    background: var(--theme-bg-surface);
     border-color: var(--theme-neon-primary);
     box-shadow: var(--theme-border-glow);
   }
@@ -291,11 +415,7 @@
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--theme-neon-primary); }
 
-/* Light tech specific background adjustment */
-[data-theme="light-tech"] .min-h-screen,
-[data-theme="light-tech"] #root > div {
-  background-color: var(--theme-bg-deep);
-}
+/* Removed light tech specific background adjustment as body handles it */
 
 /* Matrix theme - monospace everything in budget page */
 [data-theme="matrix"] h1,
@@ -312,8 +432,33 @@
   filter: drop-shadow(0 0 6px currentColor);
 }
 
-/* AI Loading overlay */
-.ai-loading-overlay {
-  background: var(--theme-glass-bg);
-  backdrop-filter: blur(12px);
+/* ============================================
+   THEME SAFETY: AUTH PAGES ALWAYS DARK
+   (Login/Register have fixed dark video backgrounds)
+   ============================================ */
+
+/* Force auth/login pages to always render in dark theme */
+[data-theme="light-tech"] .auth-dark-lock,
+[data-theme="sakura"] .auth-dark-lock,
+[data-theme="ocean"] .auth-dark-lock {
+  background-color: #010828 !important;
 }
+
+/* Removed dangerous theme safety overrides. Components now handle their own colors correctly. */
+
+/* ============================================
+   MISC
+   ============================================ */
+
+/* Texture Overlay */
+.texture-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background-image: url('https://grainy-gradients.vercel.app/noise.svg');
+  mix-blend-mode: lighten;
+  opacity: 0.6;
+  background-size: cover;
+}
+

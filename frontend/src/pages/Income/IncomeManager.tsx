@@ -1,10 +1,13 @@
-import { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Wallet, Calendar, DollarSign, TrendingUp, Settings, Trash2, X, Filter, Zap, Pencil } from 'lucide-react';
-import { calculateMonthlyForecast, getMonthlyHours } from '../../utils/salaryCalculator';
+import { AnimatePresence, motion } from "framer-motion";
+import { Plus, X, Trash2, CheckCircle2, AlertCircle, Info, Settings, Wallet, Banknote, Edit3, TrendingUp, ChevronDown, HelpCircle, Gift, Sparkles, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { dashboardApi, incomeApi, transactionsApi, userApi } from "../../utils/api";
+import { calculateMonthlyForecast } from "../../utils/salaryCalculator";
+import { numberToVietnameseWords } from "../../utils/numberToWords";
+import Skeleton from "../../components/common/Skeleton";
 
-type IncomeType = 'fixed' | 'variable' | 'scheduled';
-type SourceCategory = 'salary' | 'allowance' | 'other';
+type IncomeType = "fixed" | "variable" | "scheduled";
+type SourceCategory = "salary" | "allowance" | "other";
 
 interface IncomeSource {
   id: string;
@@ -21,695 +24,1372 @@ interface IncomeRecord {
   sourceId: string;
   amount: number;
   date: string;
+  category?: SourceCategory;
+  isAi?: boolean;
 }
 
 export default function IncomeManager() {
-  const [amount, setAmount] = useState('');
-  const [sourceId, setSourceId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const getLocalDateStr = (d: Date | string = new Date()) => {
+    let date: Date;
+    if (typeof d === 'string') {
+      if (d.includes('T')) {
+        date = new Date(d);
+      } else {
+        const [y, m, d_part] = d.split('-').map(Number);
+        date = new Date(y, m - 1, d_part);
+      }
+    } else {
+      date = d;
+    }
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
 
-  const [sources, setSources] = useState<IncomeSource[]>([
-    { id: '1', name: 'Lương công ty', type: 'fixed', sourceType: 'salary', expectedAmount: 15000000 },
-    { id: '2', name: 'Làm Freelance', type: 'variable', sourceType: 'other' },
-    { id: '3', name: 'Đầu tư lợi nhuận', type: 'variable', sourceType: 'other' },
-    { id: '4', name: 'Gia đình hỗ trợ', type: 'fixed', sourceType: 'allowance', expectedAmount: 2000000 },
-  ]);
+  const [amount, setAmount] = useState("");
+  const [sourceId, setSourceId] = useState<string>("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedRecordCategory, setSelectedRecordCategory] = useState<SourceCategory>("salary");
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string; type: 'record' | 'source' } | null>(null);
 
+  const todayStr = getLocalDateStr();
+  const [globalFilter, setGlobalFilter] = useState<'all' | SourceCategory | 'ai'>('all');
+
+  const [sources, setSources] = useState<IncomeSource[]>([]);
   const [records, setRecords] = useState<IncomeRecord[]>([]);
-  const [filterCategory, setFilterCategory] = useState<'all' | SourceCategory>('all');
-
   // --- Modal: Add Source ---
   const [showAddSourceModal, setShowAddSourceModal] = useState(false);
-  const [newSourceName, setNewSourceName] = useState('');
-  const [newSourceType, setNewSourceType] = useState<IncomeType>('variable');
-  const [newSourceCategory, setNewSourceCategory] = useState<SourceCategory>('other');
-  const [newSourceAmount, setNewSourceAmount] = useState('');
-  const [newSourceRate, setNewSourceRate] = useState('');
+  const [newSourceName, setNewSourceName] = useState("");
+  const [newSourceType, setNewSourceType] = useState<IncomeType>("variable");
+  const [newSourceCategory, setNewSourceCategory] = useState<SourceCategory>("other");
+  const [newSourceAmount, setNewSourceAmount] = useState("");
+  const [newSourceRate, setNewSourceRate] = useState("");
   const [newWorkSchedule, setNewWorkSchedule] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
-  const [activeDays, setActiveDays] = useState<boolean[]>([false, false, false, false, false, false, false]);
-  const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
+  const [isSelectOpen, setIsSelectOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<"all" | SourceCategory>("all");
+  const [wordsPreview, setWordsPreview] = useState("");
+  const [modalWordsPreview, setModalWordsPreview] = useState("");
 
-  // --- Modal: Quick Add (controlled input — no DOM access) ---
-  const [showQuickAddModal, setShowQuickAddModal] = useState(false);
-  const [quickAddName, setQuickAddName] = useState('');
-  const [quickAddAmount, setQuickAddAmount] = useState('');
+  const [notification, setNotification] = useState<{
+    type: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+  const [showLogicInfo, setShowLogicInfo] = useState(false);
+  const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
+  const [isEditingIncome, setIsEditingIncome] = useState(false);
+  const [newIncomeValue, setNewIncomeValue] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Load data from Backend
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [srcRes, transRes] = await Promise.all([
+          incomeApi.getSources(),
+          transactionsApi.list(50),
+        ]);
+
+        let mappedSources: IncomeSource[] = [];
+        if (srcRes.success) {
+          mappedSources = srcRes.data.sources.map(
+            (s: any) => ({
+              id: s.id.toString(),
+              name: s.ten_nguon,
+              type: s.loai_nguon,
+              sourceType: s.loai_danh_muc as SourceCategory,
+              expectedAmount: s.so_tien_du_kien
+                ? parseFloat(s.so_tien_du_kien.toString())
+                : undefined,
+              hourlyRate: s.luong_theo_gio
+                ? parseFloat(s.luong_theo_gio.toString())
+                : undefined,
+              workSchedule: s.lich_lam_viec,
+            }),
+          );
+          setSources(mappedSources);
+          
+          // Calculate initial forecast for the editor
+          const initialForecast = mappedSources.reduce((sum, s) => {
+            if (s.type === "scheduled" && s.workSchedule && s.hourlyRate) {
+              return sum + calculateMonthlyForecast(s.workSchedule, s.hourlyRate);
+            }
+            return sum + (s.expectedAmount ?? 0);
+          }, 0);
+          setNewIncomeValue(initialForecast);
+        }
+
+        if (transRes.success) {
+          const mappedRecords: IncomeRecord[] = transRes.data.transactions
+            .filter(
+              (t: any) => {
+                const isIncomeType = t.type === "income" || t.loai_giao_dich === "thu_nhap";
+                const isInternalTransfer = (t.ghi_chu || t.note || "").includes("INTERNAL_TRANSFER");
+                return isIncomeType && !isInternalTransfer;
+              }
+            )
+            .map((t: any) => {
+              // Tìm sourceId từ note hoặc title nếu có (format: "Thu nhập từ [Tên Nguồn]")
+              const note = t.ghi_chu || t.note || "";
+              const matchedSource = mappedSources.find(s => note.includes(s.name) || (t.tieu_de || t.title || "").includes(s.name));
+              
+              // Xác định loại dựa trên danh_muc_id (ưu tiên cao nhất)
+              let category: SourceCategory = 'other';
+              const dId = Number(t.danh_muc_id);
+              if (dId === 1) category = 'salary';
+              else if (dId === 2) category = 'allowance';
+              else if (dId === 3) category = 'other';
+              else {
+                // Fallback nếu danh_muc_id không có (giao dịch cũ)
+                if (note.includes('[salary]')) category = 'salary';
+                else if (note.includes('[allowance]')) category = 'allowance';
+                else if (matchedSource) category = matchedSource.sourceType;
+              }
+
+              return {
+                id: t.id.toString(),
+                sourceId: matchedSource ? matchedSource.id : "other",
+                amount: parseFloat(t.so_tien || t.amount),
+                date: t.ngay_giao_dich || t.transaction_date,
+                category,
+                isAi: note.toLowerCase().includes('nova') || note.toLowerCase().includes('ai')
+              };
+            })
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setRecords(mappedRecords);
+        }
+      } catch (err) {
+        console.error("Failed to load income data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
   const containerVars = {
     hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } },
   };
 
   const itemVars = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 300, damping: 24 } }
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { type: "spring" as const, stiffness: 300, damping: 24 },
+    },
   };
 
-  const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val);
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat("vi-VN").format(val);
+  const parseFormattedNumber = (str: string) => Number(str.replace(/\D/g, ""));
 
-  const parseFormattedNumber = (str: string) => Number(str.replace(/\D/g, ''));
-
-  const handleAmountChange = (value: string, setter: (val: string) => void) => {
-    const numeric = value.replace(/\D/g, '');
-    setter(numeric === '' ? '' : formatCurrency(Number(numeric)));
+  const handleAmountChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setter: (val: string) => void,
+  ) => {
+    const rawValue = e.target.value.replace(/\D/g, "");
+    setter(rawValue);
+    if (setter === setAmount) {
+      setWordsPreview(rawValue ? numberToVietnameseWords(parseInt(rawValue)) : "");
+    } else if (setter === setNewSourceAmount || setter === setNewSourceRate) {
+      setModalWordsPreview(rawValue ? numberToVietnameseWords(parseInt(rawValue)) : "");
+    }
   };
 
-  const addRecord = (srcId: string, amt: number, recDate: string) => {
-    setRecords(prev => [
-      { id: Math.random().toString(), sourceId: srcId, amount: amt, date: recDate },
-      ...prev,
-    ]);
-  };
-
-  const handleAddRecord = (e: React.FormEvent) => {
+  const handleAddRecord = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !sourceId) return;
-    addRecord(sourceId, parseFormattedNumber(amount), date);
-    setAmount('');
-  };
-
-  const openQuickAddModal = (sourceName: string, defaultAmount: number) => {
-    setQuickAddName(sourceName);
-    setQuickAddAmount(formatCurrency(defaultAmount));
-    setShowQuickAddModal(true);
-  };
-
-  const confirmQuickAdd = () => {
-    const numericAmount = parseFormattedNumber(quickAddAmount);
-    if (!numericAmount) return;
-
-    let source = sources.find(s => s.name === quickAddName);
-    if (!source) {
-      source = { id: Math.random().toString(), name: quickAddName, type: 'variable', sourceType: 'other' };
-      setSources(prev => [...prev, source!]);
+    if (!amount) {
+      setNotification({ type: 'error', message: 'Vui lòng nhập số tiền' });
+      return;
+    }
+    if (!sourceId) {
+      setNotification({ type: 'error', message: 'Bạn chưa chọn Nguồn tiền (VD: Lương, Thưởng...)' });
+      setIsSelectOpen(true); // Tự động mở để nhắc người dùng
+      return;
     }
 
-    addRecord(source.id, numericAmount, new Date().toISOString().split('T')[0]);
-    setShowQuickAddModal(false);
+    try {
+      const numericAmount = parseFormattedNumber(amount);
+      const source = sources.find((s) => s.id === sourceId);
+
+      const res = await transactionsApi.create({
+        title: source?.name || "Thu nhập",
+        amount: numericAmount,
+        type: "thu_nhap",
+        categoryId: selectedRecordCategory === 'salary' ? 1 : selectedRecordCategory === 'allowance' ? 2 : 3,
+        date: date,
+        note: `Thu nhập [${selectedRecordCategory}] từ ${source?.name}`,
+      });
+
+      if (res.success) {
+        setRecords((prev) => [
+          {
+            id: res.data.transaction.id.toString(),
+            sourceId,
+            amount: numericAmount,
+            date,
+            category: selectedRecordCategory,
+          },
+          ...prev,
+        ]);
+        setAmount("");
+        setNotification({ 
+          type: 'success', 
+          message: `Đã cộng ${formatCurrency(numericAmount)}đ vào ngân sách tháng này! ✓` 
+        });
+      }
+    } catch (err) {
+      console.error("Record income failed:", err);
+    }
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return;
+    const { id, type } = confirmDelete;
+
+    try {
+      if (type === 'record') {
+        const res = await transactionsApi.delete(parseInt(id));
+        if (res.success) {
+          setRecords((prev) => prev.filter((r) => r.id !== id));
+          setNotification({ type: 'success', message: 'Đã xóa giao dịch thành công' });
+        }
+      } else {
+        const res = await incomeApi.deleteSource(parseInt(id));
+        if (res.success) {
+          const deletedSource = sources.find(s => s.id === id);
+          const updatedSources = sources.filter((s) => s.id !== id);
+          setSources(updatedSources);
+          
+          // --- SYNC ON DELETE ---
+          if (deletedSource?.type === 'fixed') {
+            try {
+              const [profileRes, budgetRes] = await Promise.all([
+                userApi.getProfile(),
+                dashboardApi.getBudget()
+              ]);
+
+              const totalFixedIncome = updatedSources
+                .filter(x => x.type === 'fixed')
+                .reduce((sum, x) => sum + (x.expectedAmount || 0), 0);
+
+              const existingBudgets = budgetRes.success 
+                ? budgetRes.data.budgets.map((b: any) => ({ categoryName: b.category_name, amount: b.limit_amount }))
+                : [];
+              
+              // Remove the budget that matches the deleted source name
+              const remainingBudgets = existingBudgets.filter((b: any) => b.categoryName !== deletedSource.name);
+              
+              await userApi.updateOnboarding(totalFixedIncome, remainingBudgets);
+            } catch (syncErr) {
+              console.warn('Sync after delete failed:', syncErr);
+            }
+          }
+
+          setNotification({ type: 'success', message: 'Đã gỡ bỏ nguồn thu này và cập nhật Hồ sơ ✓' });
+        }
+      }
+    } catch (err) {
+      console.error("Delete failed:", err);
+      setNotification({ type: 'error', message: 'Lỗi khi thực hiện xóa' });
+    } finally {
+      setConfirmDelete(null);
+    }
+  };
+
+  const handleDeleteRecord = (record: IncomeRecord) => {
+    const sourceName = sources.find(s => s.id === record.sourceId)?.name || 'Khoản thu này';
+    setConfirmDelete({ id: record.id, title: sourceName, type: 'record' });
   };
 
   const resetSourceForm = () => {
-    setNewSourceName('');
-    setNewSourceType('variable');
-    setNewSourceCategory('other');
-    setNewSourceAmount('');
-    setNewSourceRate('');
+    setNewSourceName("");
+    setNewSourceType("variable");
+    setNewSourceCategory("other");
+    setNewSourceAmount("");
+    setNewSourceRate("");
     setNewWorkSchedule([0, 0, 0, 0, 0, 0, 0]);
-    setActiveDays([false, false, false, false, false, false, false]);
     setEditingSource(null);
   };
 
-  const openEditSourceModal = (source: IncomeSource) => {
+  const handleEditSource = (source: IncomeSource) => {
     setEditingSource(source);
     setNewSourceName(source.name);
     setNewSourceType(source.type);
     setNewSourceCategory(source.sourceType);
-    setNewSourceAmount(source.expectedAmount ? formatCurrency(source.expectedAmount) : '');
-    setNewSourceRate(source.hourlyRate ? formatCurrency(source.hourlyRate) : '');
-    setNewWorkSchedule(source.workSchedule ?? [0, 0, 0, 0, 0, 0, 0]);
-    setActiveDays(source.workSchedule ? source.workSchedule.map(h => h > 0) : [false, false, false, false, false, false, false]);
+    setNewSourceAmount(source.expectedAmount ? formatCurrency(source.expectedAmount) : "");
+    setNewSourceRate(source.hourlyRate ? formatCurrency(source.hourlyRate) : "");
+    setNewWorkSchedule(source.workSchedule || [0, 0, 0, 0, 0, 0, 0]);
     setShowAddSourceModal(true);
   };
 
-  const handleSaveSource = () => {
+  const handleSaveSource = async () => {
     if (!newSourceName) return;
-
-    const sourceData: Omit<IncomeSource, 'id'> = {
+    const sourceData = {
       name: newSourceName,
       type: newSourceType,
-      sourceType: newSourceCategory,
-      expectedAmount: newSourceType === 'fixed'
-        ? parseFormattedNumber(newSourceAmount)
-        : newSourceType === 'scheduled'
-        ? calculateMonthlyForecast(newWorkSchedule, parseFormattedNumber(newSourceRate))
-        : undefined,
-      hourlyRate: newSourceType === 'scheduled' ? parseFormattedNumber(newSourceRate) : undefined,
-      workSchedule: newSourceType === 'scheduled' ? newWorkSchedule : undefined,
+      category: newSourceCategory,
+      expectedAmount:
+        newSourceType === "fixed"
+          ? parseFormattedNumber(newSourceAmount)
+          : undefined,
+      hourlyRate:
+        newSourceType === "scheduled"
+          ? parseFormattedNumber(newSourceRate)
+          : undefined,
+      schedule: newSourceType === "scheduled" ? newWorkSchedule : undefined,
     };
 
-    if (editingSource) {
-      setSources(prev => prev.map(s => s.id === editingSource.id ? { ...s, ...sourceData } : s));
-    } else {
-      setSources(prev => [...prev, { id: Math.random().toString(), ...sourceData }]);
-    }
+    try {
+      let res;
+      if (editingSource) {
+        res = await incomeApi.updateSource(parseInt(editingSource.id), sourceData);
+      } else {
+        res = await incomeApi.createSource(sourceData);
+      }
 
-    setShowAddSourceModal(false);
-    resetSourceForm();
+      if (res.success) {
+        const s = res.data.source;
+        const savedSource: IncomeSource = {
+          id: s.id.toString(),
+          name: s.ten_nguon,
+          type: s.loai_nguon,
+          sourceType: s.loai_danh_muc as SourceCategory,
+          expectedAmount: s.so_tien_du_kien
+            ? parseFloat(s.so_tien_du_kien.toString())
+            : undefined,
+          hourlyRate: s.luong_theo_gio
+            ? parseFloat(s.luong_theo_gio.toString())
+            : undefined,
+          workSchedule: s.lich_lam_viec,
+        };
+
+        // Update local state
+        const updatedSources = editingSource
+          ? sources.map(src => src.id === savedSource.id ? savedSource : src)
+          : [...sources, savedSource];
+        
+        setSources(updatedSources);
+
+        // --- SMART SYNC LOGIC ---
+        // Requirement: Sync fixed income sources -> Profile (Monthly Income ONLY)
+        // We DO NOT sync this as a budget/expense anymore because income is NOT an expense.
+        if (newSourceType === 'fixed' && sourceData.expectedAmount) {
+          try {
+            // 1. Fetch current status to avoid overwriting unrelated data
+            const [profileRes, budgetRes] = await Promise.all([
+              userApi.getProfile(),
+              dashboardApi.getBudget()
+            ]);
+
+            // 2. Calculate new Total Monthly Income (sum of all FIXED sources)
+            const totalFixedIncome = updatedSources
+              .filter(x => x.type === 'fixed')
+              .reduce((sum, x) => sum + (x.expectedAmount || 0), 0);
+
+            // 3. Keep existing budgets exactly as they are
+            const existingBudgets = budgetRes.success 
+              ? budgetRes.data.budgets.map((b: any) => ({ categoryName: b.category_name, amount: b.limit_amount }))
+              : [];
+
+            // 4. Update Onboarding (this updates monthly_income without touching fixed expenses)
+            await userApi.updateOnboarding(totalFixedIncome, existingBudgets);
+
+          } catch (syncErr) {
+            console.warn('Sync to fixed expenses/profile failed:', syncErr);
+          }
+        }
+
+        setNotification({ 
+          type: 'success', 
+          message: `${editingSource ? 'Đã cập nhật' : 'Đã lưu'} nguồn thu: ${newSourceName}${newSourceType === 'fixed' ? ' và đồng bộ vào Hồ sơ ✓' : ''}` 
+        });
+        setShowAddSourceModal(false);
+        resetSourceForm();
+      }
+    } catch (err) {
+      console.error("Save source failed:", err);
+      setNotification({ type: 'error', message: 'Lỗi khi lưu nguồn thu' });
+    }
   };
 
   const handleDeleteSource = (id: string) => {
-    setSources(prev => prev.filter(s => s.id !== id));
-    if (sourceId === id) setSourceId('');
+    const source = sources.find(s => s.id === id);
+    if (source) {
+      setConfirmDelete({ id, title: source.name, type: 'source' });
+    }
+  };
+
+  const handleUpdateGlobalIncome = async () => {
+    try {
+      const budgetRes = await dashboardApi.getBudget();
+      const existingBudgets = budgetRes.success 
+        ? budgetRes.data.budgets.map((b: any) => ({ categoryName: b.budget_title || b.category_name, amount: b.limit_amount, category: b.category_name }))
+        : [];
+      
+      await userApi.updateOnboarding(newIncomeValue, existingBudgets);
+      
+      setNotification({ type: 'success', message: 'Đã cập nhật thu nhập dự tính thành công! Đang tải lại...' });
+      setIsEditingIncome(false);
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      console.error("Update global income failed:", err);
+      setNotification({ type: 'error', message: 'Lỗi khi cập nhật thu nhập' });
+    }
+  };
+
+  const handleQuickSync = (s: IncomeSource) => {
+    const actual = actualBySource[s.id] || 0;
+    const expected = s.expectedAmount || 0;
+    const missing = expected - actual;
+
+    if (missing <= 0) {
+      setNotification({ type: 'info', message: 'Nguồn thu này đã đủ hoặc vượt mức dự tính! ✓' });
+      return;
+    }
+
+    setSourceId(s.id);
+    setAmount(missing.toString());
+    setSelectedRecordCategory(s.sourceType);
+    setWordsPreview(numberToVietnameseWords(missing));
+    
+    // Smooth scroll to entry form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setNotification({ type: 'info', message: `Đã tự động điền ${formatCurrency(missing)}đ còn thiếu cho ${s.name}. Hãy nhấn nút 'Cộng vào Ngân sách' để hoàn tất.` });
   };
 
   // --- Derived State ---
+  const { actualIncomeThisMonth, actualBySource } = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    const monthlyRecords = records.filter(r => {
+      const d = new Date(r.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
 
-  const actualIncomeThisMonth = useMemo(
-    () => records.reduce((sum, r) => sum + r.amount, 0),
-    [records]
-  );
+    const total = monthlyRecords.reduce((sum, r) => sum + r.amount, 0);
+    
+    const bySource: Record<string, number> = {};
+    monthlyRecords.forEach(r => {
+      bySource[r.sourceId] = (bySource[r.sourceId] || 0) + r.amount;
+    });
 
+    return { actualIncomeThisMonth: total, actualBySource: bySource };
+  }, [records]);
+
+  const fixedIncomeStatus = useMemo(() => {
+    const fixedSources = sources.filter(s => s.type === 'fixed');
+    const expected = fixedSources.reduce((sum, s) => sum + (s.expectedAmount || 0), 0);
+    const actual = fixedSources.reduce((sum, s) => sum + (actualBySource[s.id] || 0), 0);
+    return { expected, actual, missing: Math.max(0, expected - actual) };
+  }, [sources, actualBySource]);
   const totalForecasted = useMemo(
-    () => sources.reduce((sum, s) => {
-      if (s.type === 'scheduled' && s.workSchedule && s.hourlyRate) {
-        return sum + calculateMonthlyForecast(s.workSchedule, s.hourlyRate);
+    () =>
+      sources.reduce((sum, s) => {
+        if (s.type === "scheduled" && s.workSchedule && s.hourlyRate) {
+          return sum + calculateMonthlyForecast(s.workSchedule, s.hourlyRate);
+        }
+        return sum + (s.expectedAmount ?? 0);
+      }, 0),
+    [sources],
+  );
+
+
+
+  // --- Breakdown by category (Actual money received this month) ---
+  const incomeBreakdown = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const currentMonthRecords = records.filter(r => {
+      const d = new Date(r.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    let salary = 0;
+    let allowance = 0;
+    let other = 0;
+
+    currentMonthRecords.forEach(r => {
+      // Ưu tiên lấy category trực tiếp từ record (đã được lưu trong note)
+      if (r.category === 'salary') salary += r.amount;
+      else if (r.category === 'allowance') allowance += r.amount;
+      else {
+        // Nếu không có category cụ thể, thử khớp qua Source
+        const source = sources.find(s => s.id === r.sourceId);
+        if (source) {
+          if (source.sourceType === 'salary') salary += r.amount;
+          else if (source.sourceType === 'allowance') allowance += r.amount;
+          else other += r.amount;
+        } else {
+          other += r.amount;
+        }
       }
-      return sum + (s.expectedAmount ?? 0);
-    }, 0),
-    [sources]
-  );
+    });
 
-  const filteredSources = useMemo(() => {
-    if (filterCategory === 'all') return sources;
-    return sources.filter(s => s.sourceType === filterCategory);
-  }, [sources, filterCategory]);
+    return { salary, allowance, other };
+  }, [records, sources]);
 
-  const filteredRecords = useMemo(() => {
-    if (filterCategory === 'all') return records;
-    return records.filter(r => sources.find(s => s.id === r.sourceId)?.sourceType === filterCategory);
-  }, [records, sources, filterCategory]);
+  const QUICK_ADD = [
+    { label: '+Thưởng (1M)', amount: 1000000 },
+    { label: '+Phụ cấp (500k)', amount: 500000 },
+    { label: '+Bán đồ', amount: 0 },
+  ];
 
-  const salaryForecast = useMemo(
-    () => sources
-      .filter(s => s.sourceType === 'salary')
-      .reduce((sum, s) =>
-        sum + (s.type === 'scheduled' && s.workSchedule && s.hourlyRate
-          ? calculateMonthlyForecast(s.workSchedule, s.hourlyRate)
-          : (s.expectedAmount ?? 0)),
-        0),
-    [sources]
-  );
+  if (loading) {
+    return (
+      <div className="space-y-8 max-w-5xl mx-auto pb-20 p-6">
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <Skeleton width="200px" height="32px" />
+            <Skeleton width="350px" height="16px" variant="text" />
+          </div>
+          <Skeleton width="150px" height="40px" className="rounded-xl" />
+        </div>
 
-  const allowanceForecast = useMemo(
-    () => sources
-      .filter(s => s.sourceType === 'allowance')
-      .reduce((sum, s) => sum + (s.expectedAmount ?? 0), 0),
-    [sources]
-  );
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton height="120px" className="rounded-[24px]" />
+          <Skeleton height="120px" className="rounded-[24px]" />
+          <Skeleton height="120px" className="rounded-[24px]" />
+        </div>
 
-  const otherIncomeTotal = useMemo(
-    () => records
-      .filter(r => sources.find(s => s.id === r.sourceId)?.sourceType === 'other')
-      .reduce((sum, r) => sum + r.amount, 0),
-    [records, sources]
-  );
+        <Skeleton width="400px" height="50px" className="rounded-[1.5rem]" />
 
-  const getCategoryName = (cat: SourceCategory) => {
-    if (cat === 'salary') return 'Lương / Việc làm';
-    if (cat === 'allowance') return 'Trợ cấp';
-    return 'Linh tinh / Khác';
-  };
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Skeleton height="400px" className="rounded-[32px]" />
+          <Skeleton height="400px" className="rounded-[32px]" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <motion.div variants={containerVars} initial="hidden" animate="show" className="space-y-8 max-w-5xl mx-auto pb-20">
+    <>
+    <motion.div
+      variants={containerVars}
+      initial="hidden"
+      animate="show"
+      className="space-y-8 max-w-5xl mx-auto pb-20 p-6"
+    >
+      {/* Notification Toast */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            className={`fixed top-6 left-1/2 z-[200] px-6 py-3 rounded-2xl shadow-2xl backdrop-blur-xl border flex items-center gap-3 min-w-[300px] ${
+              notification.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 
+              notification.type === 'error' ? 'bg-rose-500/20 border-rose-500/30 text-rose-400' : 
+              'bg-blue-500/20 border-blue-500/30 text-blue-400'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg ${
+              notification.type === 'success' ? 'bg-emerald-500/20' : 
+              notification.type === 'error' ? 'bg-rose-500/20' : 
+              'bg-blue-500/20'
+            }`}>
+              {notification.type === 'success' && <CheckCircle2 className="w-4 h-4" />}
+              {notification.type === 'error' && <AlertCircle className="w-4 h-4" />}
+              {notification.type === 'info' && <Info className="w-4 h-4" />}
+            </div>
+            <p className="text-sm font-bold tracking-wide">{notification.message}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Header */}
-      <motion.div variants={itemVars} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <motion.div
+        variants={itemVars}
+        className="flex flex-col md:flex-row md:items-center justify-between gap-4"
+      >
         <div>
-          <h1 className="text-3xl font-extrabold text-theme-text-primary mb-2">Quản lý Thu nhập</h1>
-          <p className="text-theme-text-muted">Ghi nhận các khoản thu nhập cố định và biến đổi. Phân tách rạch ròi các luồng tiền.</p>
+          <h1 className="text-3xl font-extrabold text-theme-text-primary mb-2">
+            Quản lý Thu nhập
+          </h1>
+          <p className="text-theme-text-muted">
+            Ghi nhận các khoản thu nhập và theo dõi dự báo tài chính.
+          </p>
         </div>
+        <button 
+          onClick={() => setShowLogicInfo(!showLogicInfo)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] text-theme-text-muted hover:text-theme-text-primary transition-all text-sm font-bold"
+        >
+          <HelpCircle className="w-4 h-4" /> Hướng dẫn & Logic
+        </button>
       </motion.div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <motion.div variants={itemVars} className="glass-panel p-6 rounded-3xl border-t-emerald-500/30">
-          <h3 className="text-theme-text-muted font-medium mb-1 flex items-center justify-between">
-            Dự báo Tổng Thu (Tháng này)
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-          </h3>
-          <div className="text-3xl font-bold text-theme-text-primary mt-2">
-            {formatCurrency(totalForecasted)} đ
-          </div>
-          <p className="text-sm text-theme-text-muted mt-4 leading-relaxed">
-            AI dự báo dựa trên {sources.filter(s => s.type === 'fixed').length} khoản cố định &amp; {sources.filter(s => s.type === 'scheduled').length} lịch làm việc part-time.
-          </p>
-        </motion.div>
+      <AnimatePresence>
+        {showLogicInfo && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="glass-panel p-6 rounded-[24px] border-emerald-500/20 bg-emerald-500/5 mb-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <h4 className="text-emerald-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Cố định (Fixed)
+                  </h4>
+                  <p className="text-[11px] text-theme-text-muted leading-relaxed">
+                    Dùng cho Lương, Học bổng... Nhận đều đặn mỗi tháng. Loại này sẽ <b>tự động tạo 1 khoản "Chi phí cố định"</b> trong Hồ sơ để hệ thống cân đối ngân sách cho bạn.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-sky-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-sky-400" /> Theo lịch (Scheduled)
+                  </h4>
+                  <p className="text-[11px] text-theme-text-muted leading-relaxed">
+                    Dùng cho việc làm thêm tính giờ. Bạn nhập lịch làm, hệ thống <b>tự động tính toán Dự báo (Forecast)</b> thu nhập dựa trên số giờ làm dự kiến trong tháng.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-purple-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400" /> Biến đổi (Variable)
+                  </h4>
+                  <p className="text-[11px] text-theme-text-muted leading-relaxed">
+                    Dùng cho Thưởng, Hoa hồng, Quà tặng... Không có định mức. Bạn chỉ cần <b>Ghi nhận thực tế</b> khi tiền thực sự về tài khoản.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-[var(--theme-subtle-border)] flex items-center gap-3">
+                <div className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">✓ Tự động đồng bộ</div>
+                <p className="text-[10px] text-theme-text-muted italic">Mọi thay đổi ở Nguồn thu "Cố định" sẽ được cập nhật ngay lập tức sang tab "Chi phí Cố định" ở trang Hồ sơ & Dashboard.</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        <motion.div variants={itemVars} className="glass-panel p-6 rounded-3xl border-t-sky-500/30">
-          <h3 className="text-theme-text-muted font-medium mb-1">Thực thu (Đã nhận)</h3>
-          <div className="text-3xl font-bold text-sky-400 mt-2">
-            {formatCurrency(actualIncomeThisMonth)} đ
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <motion.div
+          variants={itemVars}
+          className="glass-panel p-6 rounded-[24px] relative overflow-hidden group hover:border-emerald-500/30 transition-all duration-500"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl -mr-12 -mt-12" />
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-theme-text-muted font-bold text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+                Thu nhập dự tính (Cả tháng)
+                {!isEditingIncome && (
+                  <button onClick={() => setIsEditingIncome(true)} className="p-1 hover:text-emerald-400 transition-colors">
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+                )}
+              </h3>
+              <div className="text-2xl font-black text-theme-text-primary tracking-tight">
+                {isEditingIncome ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="number"
+                      autoFocus
+                      value={newIncomeValue}
+                      onChange={(e) => setNewIncomeValue(Number(e.target.value))}
+                      className="w-32 px-2 py-1 bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded text-sm text-theme-text-primary focus:border-emerald-500 focus:outline-none"
+                    />
+                    <button onClick={handleUpdateGlobalIncome} className="p-1 text-emerald-400 hover:text-emerald-300 transition-colors">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setIsEditingIncome(false)} className="p-1 text-rose-400 hover:text-rose-300 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {formatCurrency(totalForecasted)} <span className="text-sm text-theme-text-muted font-normal uppercase">vnđ</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+              <TrendingUp className="w-5 h-5 text-emerald-400" />
+            </div>
           </div>
           <div className="mt-4 flex items-center gap-2">
-            <div className="flex-1 bg-gray-700/50 h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-sky-400 h-full rounded-full transition-all duration-500"
-                style={{ width: `${Math.min((actualIncomeThisMonth / (totalForecasted || 1)) * 100, 100)}%` }}
+            <div className="h-1 flex-1 bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min((actualIncomeThisMonth / (totalForecasted || 1)) * 100, 100)}%` }}
+                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400"
               />
             </div>
-            <span className="text-xs text-theme-text-muted font-bold">{Math.round((actualIncomeThisMonth / (totalForecasted || 1)) * 100)}%</span>
+            <span className="text-[10px] font-bold text-emerald-400">
+              {Math.round((actualIncomeThisMonth / (totalForecasted || 1)) * 100)}%
+            </span>
           </div>
         </motion.div>
 
-        <motion.div variants={itemVars} className="glass-panel p-6 rounded-3xl md:col-span-2 lg:col-span-1 flex flex-col justify-center">
-          <h3 className="text-theme-text-primary font-bold mb-4 flex items-center justify-between">Phân loại Luồng tiền <Filter className="w-4 h-4 text-theme-text-muted" /></h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-emerald-400 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400" /> Lương</span>
-              <span className="text-theme-text-primary font-medium">{formatCurrency(salaryForecast)} đ</span>
+        <motion.div
+          variants={itemVars}
+          className={`glass-panel p-6 rounded-[24px] relative overflow-hidden group transition-all duration-500 border ${fixedIncomeStatus.missing > 0 ? 'border-amber-500/30 bg-amber-500/5' : 'border-sky-500/30'}`}
+        >
+          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-12 -mt-12 ${fixedIncomeStatus.missing > 0 ? 'bg-amber-500/10' : 'bg-sky-500/10'}`} />
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-theme-text-muted font-bold text-[10px] uppercase tracking-widest mb-1">
+                Thực thu (Đã nhận)
+              </h3>
+              <div className={`text-2xl font-black tracking-tight ${fixedIncomeStatus.missing > 0 ? 'text-amber-400' : 'text-sky-400'}`}>
+                {formatCurrency(actualIncomeThisMonth)} <span className="text-sm text-theme-text-muted font-normal uppercase">vnđ</span>
+              </div>
             </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-amber-400 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-400" /> Trợ cấp</span>
-              <span className="text-theme-text-primary font-medium">{formatCurrency(allowanceForecast)} đ</span>
+            <div className={`p-2 rounded-xl border ${fixedIncomeStatus.missing > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-sky-500/10 border-sky-500/20'}`}>
+              <Wallet className={`w-5 h-5 ${fixedIncomeStatus.missing > 0 ? 'text-amber-400' : 'text-sky-400'}`} />
             </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-theme-text-muted flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-gray-400" /> Khác (thực tế)</span>
-              <span className="text-theme-text-primary font-medium">{formatCurrency(otherIncomeTotal)} đ</span>
-            </div>
+          </div>
+          <div className="mt-3 h-1 bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden">
+            <div className={`h-full ${fixedIncomeStatus.missing > 0 ? 'bg-amber-500' : 'bg-sky-400'}`} style={{ width: `${Math.min((actualIncomeThisMonth / (totalForecasted || 1)) * 100, 100)}%` }} />
+          </div>
+          <div className="mt-1.5 flex items-center justify-between">
+            <p className="text-[10px] text-theme-text-muted italic">{Math.round((actualIncomeThisMonth / (totalForecasted || 1)) * 100)}% dự báo</p>
+            {fixedIncomeStatus.missing > 0 && (
+              <p className="text-[10px] font-black text-amber-500 uppercase tracking-tighter italic">Cần thu thêm {formatCurrency(fixedIncomeStatus.missing)}đ cố định</p>
+            )}
+          </div>
+        </motion.div>
+
+        {/* 3rd card: Phân loại Luồng tiền */}
+        <motion.div
+          variants={itemVars}
+          className="glass-panel p-6 rounded-[24px] relative overflow-hidden group hover:border-purple-500/30 transition-all duration-500"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl -mr-12 -mt-12" />
+          <div className="flex items-start justify-between mb-3">
+            <h3 className="text-theme-text-muted font-bold text-[10px] uppercase tracking-widest">Phân loại Luồng tiền</h3>
+          </div>
+          <div className="space-y-2">
+            {[
+              { label: 'Lương', amount: incomeBreakdown.salary, color: 'bg-emerald-400' },
+              { label: 'Trợ cấp', amount: incomeBreakdown.allowance, color: 'bg-yellow-400' },
+              { label: 'Khác (thực tế)', amount: incomeBreakdown.other, color: 'bg-purple-400' },
+            ].map(item => (
+              <div key={item.label} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${item.color}`} />
+                  <span className="text-xs text-theme-text-muted">{item.label}</span>
+                </div>
+                <span className="text-xs font-bold text-theme-text-primary">{formatCurrency(item.amount)}đ</span>
+              </div>
+            ))}
           </div>
         </motion.div>
       </div>
 
-      {/* Filter Tabs */}
-      <motion.div variants={itemVars} className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-        {[
-          { id: 'all', label: 'Tất cả' },
-          { id: 'salary', label: 'Lương / Job' },
-          { id: 'allowance', label: 'Trợ cấp' },
-          { id: 'other', label: 'Khác' },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setFilterCategory(tab.id as 'all' | SourceCategory)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
-              filterCategory === tab.id
-                ? 'bg-white text-black'
-                : 'bg-[#1F2937]/50 text-theme-text-muted hover:bg-[#1F2937] hover:text-theme-text-primary border border-white/5'
-            }`}
+      {/* --- Global Filter Tabs (Universal Filter) --- */}
+      <motion.div variants={itemVars} className="flex justify-start my-8">
+        <div className="flex p-1.5 rounded-[1.5rem] border border-[var(--theme-subtle-border)] backdrop-blur-xl shadow-2xl">
+          <button 
+            onClick={() => setGlobalFilter('all')} 
+            className={`px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${globalFilter === 'all' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-105' : 'text-theme-text-muted hover:text-white'}`}
           >
-            {tab.label}
+            Tất cả
           </button>
-        ))}
+          <button 
+            onClick={() => setGlobalFilter('salary')} 
+            className={`px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${globalFilter === 'salary' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-105' : 'text-theme-text-muted hover:text-white'}`}
+          >
+            Lương / Job
+          </button>
+          <button 
+            onClick={() => setGlobalFilter('allowance')} 
+            className={`px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${globalFilter === 'allowance' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-105' : 'text-theme-text-muted hover:text-white'}`}
+          >
+            Trợ cấp
+          </button>
+          <button 
+            onClick={() => setGlobalFilter('other')} 
+            className={`px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${globalFilter === 'other' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-105' : 'text-theme-text-muted hover:text-white'}`}
+          >
+            Khác
+          </button>
+        </div>
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <motion.div
+          variants={itemVars}
+          className="glass-panel p-6 rounded-[32px] shadow-xl relative border border-[var(--theme-subtle-border)]"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-black text-theme-text-primary flex items-center gap-2">
+              <div className="p-1.5 bg-emerald-500/20 rounded-lg">
+                <Banknote className="w-5 h-5 text-emerald-400" />
+              </div>
+              Ghi nhận Thu nhập
+            </h2>
+          </div>
 
-        {/* Form: Ghi nhận thu nhập thực tế */}
-        <motion.div variants={itemVars} className="glass-panel p-8 rounded-3xl relative overflow-hidden h-fit">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-          <h2 className="text-2xl font-bold text-theme-text-primary mb-6 flex items-center gap-2">
-            <Plus className="w-6 h-6 text-emerald-400" />
-            Ghi nhận thu nhập thực tế
-          </h2>
-
-          <form className="space-y-6" onSubmit={handleAddRecord}>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-theme-text-muted">Nguồn tiền (Đã lọc)</label>
+          <form className="space-y-5" onSubmit={handleAddRecord}>
+            <div className="space-y-1.5 relative">
+              <label className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest ml-1">Chọn nguồn tiền</label>
+              
+              {/* Custom Select Wrapper */}
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Wallet className="h-5 w-5 text-theme-text-muted" />
-                </div>
-                <select
-                  className="glass-input pl-11 appearance-none cursor-pointer"
-                  value={sourceId}
-                  onChange={(e) => setSourceId(e.target.value)}
-                  required
+                <button
+                  type="button"
+                  onClick={() => setIsSelectOpen(!isSelectOpen)}
+                  className={`glass-input w-full py-3 px-4 text-sm font-bold flex items-center justify-between group transition-all duration-300 ${isSelectOpen ? 'border-emerald-500/50 bg-emerald-500/5 ring-1 ring-emerald-500/20' : ''}`}
                 >
-                  <option value="" disabled className="bg-[#1F2937] text-theme-text-muted">-- Chọn nguồn thu --</option>
-                  {filteredSources.map(s => (
-                    <option key={s.id} value={s.id} className="bg-[#1F2937] text-theme-text-primary">
-                      {s.name} ({getCategoryName(s.sourceType)})
-                    </option>
-                  ))}
-                </select>
+                  <span className={sourceId ? 'text-theme-text-primary' : 'text-theme-text-muted/40'}>
+                    {sourceId ? (sources.find(s => s.id === sourceId)?.name) : '-- Chọn nguồn tiền --'}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-theme-text-muted transition-transform duration-300 ${isSelectOpen ? 'rotate-180 text-emerald-400' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {isSelectOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsSelectOpen(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 8, scale: 1 }}
+                        exit={{ opacity: 0, y: 0, scale: 0.95 }}
+                        className="absolute top-full left-0 w-full z-50 bg-[#0a0f2b] border border-white/10 rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] overflow-hidden py-2"
+                      >
+                        {sources.filter(s => globalFilter === 'all' || s.sourceType === globalFilter).length === 0 ? (
+                          <div className="px-4 py-3 text-xs text-theme-text-muted italic">Chưa có nguồn tiền nào cho mục này</div>
+                        ) : (
+                          sources.filter(s => globalFilter === 'all' || s.sourceType === globalFilter).map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setSourceId(s.id);
+                                setSelectedRecordCategory(s.sourceType);
+                                setIsSelectOpen(false);
+                              }}
+                              className={`w-full px-4 py-3 text-left text-sm font-bold transition-all hover:bg-emerald-500/20 flex items-center justify-between group ${sourceId === s.id ? 'bg-emerald-500/30 text-emerald-400' : 'text-theme-text-muted hover:text-theme-text-primary'}`}
+                            >
+                              <div className="flex flex-col">
+                                <span>{s.name}</span>
+                                <span className="text-[10px] opacity-50 font-medium">Dự kiến: {formatCurrency(s.expectedAmount || 0)}đ</span>
+                              </div>
+                              {sourceId === s.id && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                            </button>
+                          ))
+                        )}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-theme-text-muted">Số tiền nhận được (VNĐ)</label>
+              <label className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest ml-1">Phân loại khoản thu này</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'salary', label: 'Lương', icon: '💼' },
+                  { id: 'allowance', label: 'Trợ cấp', icon: '🎁' },
+                  { id: 'other', label: 'Thưởng/Tips/Khác', icon: '✨' },
+                ].map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedRecordCategory(cat.id as SourceCategory)}
+                    className={`py-2 rounded-xl text-[11px] font-bold border transition-all flex flex-col items-center gap-1 ${selectedRecordCategory === cat.id ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] text-theme-text-muted hover:bg-[var(--theme-bg-surface)]'}`}
+                  >
+                    <span className="text-sm">{cat.icon}</span>
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest ml-1">Số tiền thực nhận (đ)</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <DollarSign className="h-5 w-5 text-emerald-500" />
-                </div>
                 <input
                   type="text"
-                  required
-                  className="glass-input pl-11 text-xl font-bold text-theme-text-primary"
                   placeholder="0"
                   value={amount}
-                  onChange={(e) => handleAmountChange(e.target.value, setAmount)}
+                  onChange={(e) => handleAmountChange(e, setAmount)}
+                  className="w-full pl-5 pr-10 py-4 bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded-2xl text-2xl font-black text-theme-text-primary outline-none focus:border-emerald-500/30 transition-all placeholder:text-theme-text-muted/30"
                 />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-theme-text-muted">đ</span>
               </div>
+              {wordsPreview && (
+                <p className="text-[10px] text-emerald-400/80 font-bold italic ml-2 mt-1.5">
+                  {wordsPreview}
+                </p>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-theme-text-muted">Ngày ghi sổ</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Calendar className="h-5 w-5 text-theme-text-muted" />
-                </div>
-                <input
-                  type="date"
-                  required
-                  className="glass-input pl-11 !text-theme-text-muted"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest ml-1">Ngày nhận</label>
+              <input 
+                type="date" 
+                className="glass-input w-full py-3 px-4 font-bold text-sm" 
+                value={date} 
+                max={todayStr}
+                onChange={(e) => setDate(e.target.value)} 
+                required 
+              />
             </div>
 
-            <button type="submit" className="btn-primary w-full !bg-gradient-to-r !from-emerald-500 !to-teal-400 !shadow-[0_0_20px_rgba(16,185,129,0.3)] mt-4">
+            <button type="submit" className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-sm shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 active:translate-y-0 transition-all uppercase tracking-widest">
               Cộng vào Ngân sách Tháng
             </button>
 
-            <div className="pt-4 border-t border-white/5 mt-6">
-              <p className="text-xs text-theme-text-muted mb-3 uppercase tracking-wider font-semibold flex items-center gap-1">
-                <Zap className="w-3 h-3 text-amber-500" /> Thu nhập phụ (Thêm nhanh)
-              </p>
+            {/* Quick Add */}
+            <div className="pt-2">
+              <p className="text-[9px] font-black text-theme-text-muted uppercase tracking-widest mb-2">✦ Thu nhập phụ (thêm nhanh)</p>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="px-3 py-1.5 rounded-lg bg-[#1F2937]/50 border border-emerald-500/20 text-emerald-400 text-sm hover:bg-emerald-500/10 transition-colors" onClick={() => openQuickAddModal('Thưởng nóng', 1000000)}>+ Thưởng (1M)</button>
-                <button type="button" className="px-3 py-1.5 rounded-lg bg-[#1F2937]/50 border border-sky-500/20 text-sky-400 text-sm hover:bg-sky-500/10 transition-colors" onClick={() => openQuickAddModal('Được cho tặng', 500000)}>+ Phụ cấp thêm (500k)</button>
-                <button type="button" className="px-3 py-1.5 rounded-lg bg-[#1F2937]/50 border border-fuchsia-500/20 text-fuchsia-400 text-sm hover:bg-fuchsia-500/10 transition-colors" onClick={() => openQuickAddModal('Bán đồ cũ', 200000)}>+ Bán đồ</button>
+                {QUICK_ADD.map(q => (
+                  <button
+                    key={q.label}
+                    type="button"
+                    onClick={() => {
+                      if (q.amount > 0) setAmount(q.amount.toString());
+                    }}
+                    className="px-3 py-1.5 text-[10px] font-bold rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/20 transition-all"
+                  >
+                    {q.label}
+                  </button>
+                ))}
               </div>
             </div>
           </form>
         </motion.div>
 
-        {/* Quản lý Nguồn thu & Lịch sử */}
         <motion.div variants={itemVars} className="space-y-6">
-          <div className="glass-panel p-6 rounded-3xl flex flex-col">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-theme-text-primary flex items-center gap-2">
-                <Settings className="w-5 h-5 text-theme-text-muted" />
-                Nguồn Thu &amp; Lịch sử
+          <div className="glass-panel p-6 rounded-3xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-black text-theme-text-primary">
+                Nguồn tiền dự tính trong tháng
               </h3>
               <button
-                onClick={() => setShowAddSourceModal(true)}
-                className="text-emerald-400 text-sm font-semibold hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 px-3 py-1.5 rounded-lg transition-colors"
+                onClick={() => { resetSourceForm(); setShowAddSourceModal(true); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-[10px] font-bold transition-all"
               >
-                <Plus className="w-4 h-4" /> Nguồn thu
+                <Plus className="w-3 h-3" />
+                Thêm nguồn
               </button>
             </div>
+            <div className="space-y-2 mb-8">
+              {sources.filter(s => globalFilter === 'all' || s.sourceType === globalFilter).map(s => {
+                const actual = actualBySource[s.id] || 0;
+                const expected = s.expectedAmount || 0;
+                
+                // Logic Chuyên sâu: Chỉ báo 'Thiếu' cho nguồn Cố định (Fixed)
+                const isFixedUnder = s.type === 'fixed' && actual < expected;
+                const progress = expected > 0 ? Math.min((actual / expected) * 100, 100) : 0;
 
-            <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar mb-6">
-              {filteredSources.map(s => (
-                <div key={s.id} className="group flex items-center justify-between p-3 rounded-2xl bg-[#1F2937]/30 border border-white/5 hover:border-white/10 transition-colors">
+                return (
+                  <div key={s.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all group ${isFixedUnder ? 'bg-amber-500/5 border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.05)]' : 'bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] hover:border-emerald-500/20'}`}>
+                    <div className="flex-1 min-w-0 pr-4">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-xs font-bold text-theme-text-primary truncate">{s.name}</p>
+                        
+                        {/* Cảnh báo chỉ dành cho Fixed */}
+                        {isFixedUnder && (
+                          <div className="px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center gap-1 animate-pulse">
+                            <AlertCircle className="w-2.5 h-2.5 text-amber-500" />
+                            <span className="text-[8px] font-black text-amber-500 uppercase tracking-tighter">Hụt thu {formatCurrency(expected - actual)}</span>
+                          </div>
+                        )}
+
+                        {/* Hoàn thành cho bất kỳ nguồn nào đạt mục tiêu */}
+                        {expected > 0 && actual >= expected && (
+                          <div className="flex items-center gap-1 text-emerald-500">
+                             <CheckCircle2 className="w-3 h-3" />
+                             <span className="text-[8px] font-black uppercase">
+                               {s.type === 'fixed' ? 'Đã nhận đủ' : 'Đạt mục tiêu'}
+                             </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[9px] text-theme-text-muted">
+                          {s.sourceType === 'salary' ? '💼 Lương' : s.sourceType === 'allowance' ? '🎁 Trợ cấp' : '✨ Khác'} • {s.type === 'fixed' ? 'Cố định' : s.type === 'variable' ? 'Linh hoạt' : 'Theo lịch'} • {formatCurrency(expected)}
+                        </p>
+                        {expected > 0 && (
+                          <div className="w-12 h-1 bg-black/20 rounded-full overflow-hidden">
+                             <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} className={`h-full ${isFixedUnder ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {/* Nút Khớp nhanh chỉ dành cho Fixed */}
+                      {isFixedUnder && (
+                        <button 
+                          onClick={() => handleQuickSync(s)}
+                          className="p-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white rounded-lg transition-all shadow-lg shadow-amber-500/10"
+                          title="Khớp nhanh lương cố định còn thiếu"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all ml-1">
+                        <button onClick={() => handleEditSource(s)} className="p-1.5 hover:bg-[var(--theme-bg-surface)] rounded-lg text-theme-text-muted hover:text-emerald-400"><Edit3 className="w-3 h-3" /></button>
+                        <button onClick={() => handleDeleteSource(s.id)} className="p-1.5 hover:bg-rose-500/15 rounded-lg text-theme-text-muted hover:text-rose-400"><Trash2 className="w-3 h-3" /></button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-black text-theme-text-primary">
+                Lịch sử Giao dịch
+              </h3>
+            </div>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {records.filter(r => {
+                if (globalFilter === 'all') return true;
+                const src = sources.find(s => s.id === r.sourceId);
+                return src?.sourceType === globalFilter;
+              }).length === 0 && (
+                <div className="py-10 text-center">
+                  <p className="text-theme-text-muted text-xs font-medium">Chưa có lịch sử thu nhập cho mục này</p>
+                </div>
+              )}
+              {records
+                .filter(r => {
+                  if (globalFilter === 'all') return true;
+                  if (globalFilter === 'ai') return r.isAi;
+                  const src = sources.find(s => s.id === r.sourceId);
+                  return src?.sourceType === globalFilter;
+                })
+                .map((record) => (
+                <motion.div
+                  layout
+                  key={record.id}
+                  className="flex justify-between items-center p-3 rounded-2xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] hover:border-emerald-500/20 transition-all group"
+                >
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      s.sourceType === 'salary' ? 'bg-emerald-500/10 text-emerald-400' :
-                      s.sourceType === 'allowance' ? 'bg-amber-500/10 text-amber-400' :
-                      'bg-sky-500/10 text-sky-400'
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-colors ${
+                      (record.category || sources.find(s => s.id === record.sourceId)?.sourceType) === 'salary' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                      (record.category || sources.find(s => s.id === record.sourceId)?.sourceType) === 'allowance' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+                      'bg-purple-500/10 border-purple-500/20 text-purple-400'
                     }`}>
-                      <Wallet className="w-5 h-5" />
+                      {(record.category || sources.find(s => s.id === record.sourceId)?.sourceType) === 'salary' ? <Banknote className="w-4 h-4" /> :
+                       (record.category || sources.find(s => s.id === record.sourceId)?.sourceType) === 'allowance' ? <Gift className="w-4 h-4" /> :
+                       <Sparkles className="w-4 h-4" />}
                     </div>
                     <div>
-                      <h4 className="text-sm font-semibold text-theme-text-primary">{s.name} <span className="text-[10px] uppercase bg-gray-800 px-1.5 py-0.5 rounded text-theme-text-muted ml-1">{s.sourceType}</span></h4>
-                      <p className="text-xs text-theme-text-muted flex items-center gap-1 mt-1">
-                        {s.type === 'fixed' && (
-                          <><Calendar className="w-3 h-3" /> Cố định: {s.expectedAmount ? `${formatCurrency(s.expectedAmount)}đ` : ''}</>
-                        )}
-                        {s.type === 'scheduled' && s.workSchedule && (
-                          <><Calendar className="w-3 h-3" /> Lịch: {getMonthlyHours(s.workSchedule)}giờ/tháng x {formatCurrency(s.hourlyRate ?? 0)}đ</>
-                        )}
-                        {s.type === 'variable' && 'Biến đổi (Không Cố định)'}
+                      <p className="text-xs font-bold text-theme-text-primary flex items-center gap-1.5">
+                        {sources.find((s) => s.id === record.sourceId)?.name || "Thu nhập"}
+                        {record.isAi && <Sparkles className="w-3 h-3 text-sky-400 animate-pulse" />}
+                      </p>
+                      <p className="text-[9px] font-bold text-theme-text-muted">
+                        {record.category === 'salary' || (!record.category && sources.find(s => s.id === record.sourceId)?.sourceType === 'salary') ? '💼 Lương' : 
+                         record.category === 'allowance' || (!record.category && sources.find(s => s.id === record.sourceId)?.sourceType === 'allowance') ? '🎁 Trợ cấp' : '✨ Khác'} • {getLocalDateStr(record.date)}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => openEditSourceModal(s)}
-                      className="p-2 text-theme-text-muted hover:text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg hover:bg-sky-500/10"
-                      title="Sửa nguồn thu"
+                  <div className="flex items-center gap-3">
+                    <span className="text-base font-black text-emerald-400">
+                      +{formatCurrency(record.amount)}
+                    </span>
+                    <button 
+                      onClick={() => handleDeleteRecord(record)}
+                      className="p-1.5 hover:bg-rose-500/20 rounded-lg text-theme-text-muted hover:text-rose-400 transition-all opacity-0 group-hover:opacity-100"
                     >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSource(s.id)}
-                      className="p-2 text-theme-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg hover:bg-red-500/10"
-                      title="Xóa nguồn thu"
-                    >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                </div>
+                </motion.div>
               ))}
-              {filteredSources.length === 0 && <p className="text-sm text-theme-text-muted text-center py-4">Không có nguồn thu nào thuộc danh mục này.</p>}
-            </div>
-
-            <div className="pt-6 border-t border-white/5">
-              <h4 className="text-sm font-semibold text-theme-text-muted mb-3 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                Biến động thực tế (Tháng này)
-              </h4>
-              <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                <AnimatePresence>
-                  {filteredRecords.length === 0 && <p className="text-sm text-theme-text-muted">Chưa có ghi nhận thực tế.</p>}
-                  {filteredRecords.map(r => {
-                    const source = sources.find(s => s.id === r.sourceId);
-                    return (
-                      <motion.div
-                        key={r.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        className="flex justify-between items-center p-3 rounded-2xl bg-gradient-to-r from-[#1F2937]/50 to-[#111827]/50 border border-white/5 hover:border-emerald-500/30 transition-all group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                            <DollarSign className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-theme-text-primary group-hover:text-emerald-400 transition-colors uppercase">
-                              {source?.name ?? 'Không rõ nguồn'} {source?.sourceType && <span className="text-[10px] text-theme-text-muted lowercase ml-1">({source.sourceType})</span>}
-                            </p>
-                            <p className="text-xs text-theme-text-muted">{r.date}</p>
-                          </div>
-                        </div>
-                        <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-1 rounded-lg">+{formatCurrency(r.amount)}đ</span>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
             </div>
           </div>
         </motion.div>
       </div>
 
-      {/* MODALS */}
-
-      {/* Modal: Quick Add (controlled input) */}
-      <AnimatePresence>
-        {showQuickAddModal && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="glass-panel p-6 rounded-3xl w-full max-w-sm relative !bg-[#111827] border-emerald-500/30"
-            >
-              <button onClick={() => setShowQuickAddModal(false)} className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text-primary">
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <Zap className="w-5 h-5" />
-                </div>
-                <h2 className="text-lg font-bold text-theme-text-primary">Thêm Nhanh</h2>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-theme-text-muted text-sm">Khoản thu nhập</p>
-                  <p className="text-theme-text-primary font-semibold">{quickAddName} <span className="text-xs font-normal text-theme-text-muted bg-gray-800 px-2 py-0.5 rounded">Khác (Other)</span></p>
-                </div>
-                <div>
-                  <label className="text-theme-text-muted text-sm block mb-1">Số tiền (VNĐ)</label>
-                  <input
-                    type="text"
-                    className="glass-input w-full text-xl font-bold text-emerald-400 bg-black/30"
-                    value={quickAddAmount}
-                    onChange={(e) => handleAmountChange(e.target.value, setQuickAddAmount)}
-                  />
-                </div>
-                <div className="pt-2">
-                  <button
-                    onClick={confirmQuickAdd}
-                    className="btn-primary w-full shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                  >
-                    Xác nhận cộng vào {formatCurrency(actualIncomeThisMonth)}đ
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal: Add Source */}
-      <AnimatePresence>
-        {showAddSourceModal && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="glass-panel p-6 rounded-3xl w-full max-w-md relative my-8"
-            >
-              <button
-                onClick={() => { setShowAddSourceModal(false); resetSourceForm(); }}
-                className="absolute top-4 right-4 text-theme-text-muted hover:text-theme-text-primary"
-              >
-                <X className="w-6 h-6" />
-              </button>
-
-              <h2 className="text-xl font-bold text-theme-text-primary mb-6">{editingSource ? 'Chỉnh sửa Nguồn Thu' : 'Đăng ký Nguồn Thu Mới'}</h2>
-
-              <div className="space-y-5">
-                <div>
-                  <label className="text-sm font-semibold text-theme-text-muted block mb-1">Tên nguồn tiền (VD: Tiền làm bếp)</label>
-                  <input
-                    type="text"
-                    className="glass-input w-full"
-                    placeholder="Tên công ty hoặc job"
-                    value={newSourceName}
-                    onChange={(e) => setNewSourceName(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-theme-text-muted block mb-2">Phân loại Dòng tiền (Source Type)</label>
-                  <div className="flex gap-2">
-                    {[
-                      { id: 'salary', label: 'Lương / Đi làm' },
-                      { id: 'allowance', label: 'Trợ cấp' },
-                      { id: 'other', label: 'Linh tinh' },
-                    ].map(cat => (
-                      <button
-                        key={cat.id} type="button"
-                        onClick={() => setNewSourceCategory(cat.id as SourceCategory)}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition-colors border ${
-                          newSourceCategory === cat.id
-                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                          : 'bg-black/30 border-white/5 text-theme-text-muted hover:bg-white/5'
-                        }`}
-                      >
-                        {cat.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-theme-text-muted block mb-2">Tần suất làm việc (Income Type)</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button type="button" onClick={() => setNewSourceType('fixed')} className={`p-2 lg:p-3 rounded-xl border flex items-center justify-center gap-2 transition-colors text-xs lg:text-sm ${newSourceType === 'fixed' ? 'bg-primary-500/20 border-primary-500/50 text-primary-400' : 'bg-[#1F2937]/50 border-white/5 text-theme-text-muted hover:border-white/10'}`}>Cố định</button>
-                    <button type="button" onClick={() => setNewSourceType('scheduled')} className={`p-2 lg:p-3 rounded-xl border flex items-center justify-center gap-2 transition-colors text-xs lg:text-sm ${newSourceType === 'scheduled' ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' : 'bg-[#1F2937]/50 border-white/5 text-theme-text-muted hover:border-white/10'}`}>Theo lịch (Job)</button>
-                    <button type="button" onClick={() => setNewSourceType('variable')} className={`p-2 lg:p-3 rounded-xl border flex items-center justify-center gap-2 transition-colors text-xs lg:text-sm ${newSourceType === 'variable' ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-[#1F2937]/50 border-white/5 text-theme-text-muted hover:border-white/10'}`}>Biến đổi (RV)</button>
-                  </div>
-                </div>
-
-                {newSourceType === 'fixed' && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-4 overflow-hidden pt-2 border-t border-white/5">
-                    <div>
-                      <label className="text-sm font-semibold text-theme-text-muted block mb-1">Số tiền cố định nhận mỗi tháng (VNĐ)</label>
-                      <input
-                        type="text"
-                        className="glass-input w-full text-lg font-bold"
-                        placeholder="0"
-                        value={newSourceAmount}
-                        onChange={(e) => handleAmountChange(e.target.value, setNewSourceAmount)}
-                      />
-                    </div>
-                  </motion.div>
-                )}
-
-                {newSourceType === 'scheduled' && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-4 overflow-hidden pt-2 border-t border-white/5">
-                    <div>
-                      <label className="text-sm font-semibold text-theme-text-muted block mb-3">1. Chọn các ngày đi làm trong tuần</label>
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'].map((dayName, idx) => (
-                          <button
-                            key={idx} type="button"
-                            onClick={() => {
-                              const newActive = [...activeDays];
-                              newActive[idx] = !newActive[idx];
-                              setActiveDays(newActive);
-                              if (!newActive[idx]) {
-                                const newSched = [...newWorkSchedule];
-                                newSched[idx] = 0;
-                                setNewWorkSchedule(newSched);
-                              }
-                            }}
-                            className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
-                              activeDays[idx] ? 'bg-sky-500 text-theme-text-primary shadow-[0_0_10px_rgba(14,165,233,0.5)] border border-sky-400' : 'bg-[#1F2937]/50 text-theme-text-muted border border-white/5 hover:border-white/10'
-                            }`}
-                          >
-                            {dayName}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {activeDays.some(d => d) && (
-                      <div className="space-y-3 bg-[#111827]/50 p-4 rounded-2xl border border-white/5">
-                        <label className="text-sm font-semibold text-sky-400 block mb-2">2. Số giờ làm mỗi ca</label>
-                        {['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'].map((dayName, idx) => (
-                          activeDays[idx] && (
-                            <div key={idx} className="flex items-center justify-between bg-[#1F2937]/30 p-2 rounded-xl border border-white/5">
-                              <span className="text-sm font-medium text-theme-text-muted pl-2">{dayName}</span>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number" min="0.5" step="0.5"
-                                  className="glass-input w-24 text-center py-1.5 text-theme-text-primary"
-                                  placeholder="VD: 4"
-                                  value={newWorkSchedule[idx] || ''}
-                                  onChange={(e) => {
-                                    const newSched = [...newWorkSchedule];
-                                    newSched[idx] = Number(e.target.value);
-                                    setNewWorkSchedule(newSched);
-                                  }}
-                                />
-                                <span className="text-sm text-theme-text-muted pr-2">giờ</span>
-                              </div>
-                            </div>
-                          )
-                        ))}
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="text-sm font-semibold text-theme-text-muted block mb-1">3. Mức lương / giờ (VNĐ)</label>
-                      <input
-                        type="text"
-                        className="glass-input w-full text-lg font-bold"
-                        placeholder="VD: 25000"
-                        value={newSourceRate}
-                        onChange={(e) => handleAmountChange(e.target.value, setNewSourceRate)}
-                      />
-                    </div>
-
-                    {newWorkSchedule.some(h => h > 0) && newSourceRate && (
-                      <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20">
-                        <div className="mt-0.5 p-1 bg-emerald-500/20 rounded-lg text-emerald-400">
-                          <TrendingUp className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-theme-text-muted mb-1">Hệ thống đếm được tổng <strong>{getMonthlyHours(newWorkSchedule)} giờ</strong> làm việc trong tháng này.</p>
-                          <p className="text-emerald-400 font-bold">Dự báo lương sẽ nhận: {formatCurrency(calculateMonthlyForecast(newWorkSchedule, parseFormattedNumber(newSourceRate)))} đ</p>
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-
-                <button
-                  onClick={handleSaveSource}
-                  disabled={!newSourceName || (newSourceType === 'fixed' && !newSourceAmount)}
-                  className="btn-primary w-full mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {editingSource ? 'Lưu thay đổi' : 'Xác nhận Nguồn Thu'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+      <motion.div
+        variants={itemVars}
+        className="glass-panel p-6 rounded-[24px] border border-[var(--theme-subtle-border)] relative overflow-hidden"
+      >
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/0 via-emerald-500/50 to-emerald-500/0" />
+        <h3 className="text-base font-black text-theme-text-primary mb-6 flex items-center gap-2">
+          <Settings className="w-5 h-5 text-emerald-400" />
+          Giải thích thuật ngữ
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-2">
+            <h4 className="text-emerald-400 font-bold text-[10px] uppercase tracking-wider">Thu nhập dự tính là gì?</h4>
+            <p className="text-xs text-theme-text-muted leading-relaxed">
+              Đây là số tiền bạn <b>kỳ vọng</b> nhận được (VD: Lương cố định 15Tr). Nó giúp bạn lập kế hoạch chi tiêu trước khi có tiền mặt.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <h4 className="text-sky-400 font-bold text-[10px] uppercase tracking-wider">Tiền mặt thực tế là gì?</h4>
+            <p className="text-xs text-theme-text-muted leading-relaxed">
+              Đây là số tiền <b>thực sự đã vào túi</b> bạn. Khi nhận tiền, bạn hãy "Ghi nhận" để số dư ngân sách được cập nhật chính xác.
+            </p>
+          </div>
+          <div className="space-y-2 md:col-span-2 pt-2 border-t border-[var(--theme-subtle-border)]">
+            <h4 className="text-purple-400 font-bold text-[10px] uppercase tracking-wider">Tại sao Thực thu có thể cao hơn Dự tính?</h4>
+            <p className="text-xs text-theme-text-muted leading-relaxed">
+              Khi thực thu (70Tr) cao hơn dự tính (15Tr), phần <b>vượt mức (55Tr)</b> thường đến từ các khoản phát sinh như: Thưởng đột xuất, Bán đồ cũ, hoặc các khoản Trợ cấp không nằm trong kế hoạch. Hệ thống sẽ tự động đưa các khoản này vào mục <b>"Khác (thực tế)"</b> để đảm bảo dòng tiền của bạn luôn khớp với thực tế 100%.
+            </p>
+          </div>
+        </div>
+      </motion.div>
     </motion.div>
+
+    {/* --- Modals (Moved outside main container to fix 'fixed' positioning scroll bug) --- */}
+    <AnimatePresence>
+      {showAddSourceModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto"
+          onClick={() => setShowAddSourceModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="glass-panel w-full max-w-lg p-6 rounded-3xl relative max-h-[90vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowAddSourceModal(false)}
+              className="absolute right-6 top-6 p-2 hover:bg-[var(--theme-subtle-bg)] rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-theme-text-muted" />
+            </button>
+            <h2 className="text-xl font-bold text-theme-text-primary mb-5 shrink-0 px-1">{editingSource ? 'Sửa Nguồn Thu' : 'Đăng ký Nguồn Thu'}</h2>
+            
+            <div className="space-y-5 overflow-y-auto px-1 custom-scrollbar flex-1 pb-4 -mx-1">
+              <div>
+                <label className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest block mb-1.5">Tên nguồn tiền (VD: Tiền làm bếp)</label>
+                <input
+                  type="text"
+                  className={`glass-input w-full px-4 py-2.5 text-sm transition-all ${!newSourceName.trim() ? 'border-rose-500/30' : ''}`}
+                  placeholder="Tên công ty hoặc job"
+                  value={newSourceName}
+                  onChange={(e) => setNewSourceName(e.target.value)}
+                />
+                {!newSourceName.trim() && <p className="text-[9px] text-rose-400 mt-1 ml-1">* Bắt buộc nhập tên</p>}
+              </div>
+
+            {/* Source Category */}
+            <div>
+              <p className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest mb-1.5 ml-1">Phân loại Dòng tiền</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'salary', label: 'Lương / Đi làm' },
+                  { id: 'allowance', label: 'Trợ cấp' },
+                  { id: 'other', label: 'Linh tính' },
+                ].map(c => (
+                  <button key={c.id} type="button" onClick={() => setNewSourceCategory(c.id as SourceCategory)}
+                    className={`px-2 py-2 rounded-xl text-[11px] font-bold border transition-all ${newSourceCategory === c.id ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] text-theme-text-muted hover:bg-[var(--theme-bg-surface)]'}`}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Income Type */}
+            <div>
+              <p className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest mb-1.5 ml-1">Tần suất làm việc</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "fixed", label: "Cố định" },
+                  { id: "variable", label: "Biến đổi" },
+                  { id: "scheduled", label: "Theo lịch (Job)" },
+                ].map((t) => (
+                  <button key={t.id} type="button"
+                    onClick={() => setNewSourceType(t.id as IncomeType)}
+                    className={`px-2 py-2 rounded-xl text-[11px] font-bold border transition-all ${newSourceType === t.id ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] text-theme-text-muted hover:bg-[var(--theme-bg-surface)]"}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 bg-emerald-500/5 border border-emerald-500/10 p-2.5 rounded-xl">
+                <p className="text-[10px] text-emerald-400 font-medium leading-relaxed">
+                  {newSourceType === 'fixed' && "💼 Cố định: Lương tháng, học bổng... — nhận đều đặn, không đổi. Tự động cộng vào Tổng thu nhập hàng tháng."}
+                  {newSourceType === 'variable' && "📈 Biến đổi: Thưởng, hoa hồng... — số tiền thay đổi. Ghi nhận khi thực sự nhận được tiền."}
+                  {newSourceType === 'scheduled' && "🕐 Theo lịch: Làm tính giờ — chọn lịch làm, hệ thống tự tính lương dự kiến."}
+                </p>
+              </div>
+            </div>
+
+              {/* FIXED */}
+              {newSourceType === "fixed" && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-theme-text-muted ml-1 uppercase">Số tiền cố định nhận mỗi tháng (VNĐ)</label>
+                  <input type="text" className="glass-input w-full px-4 py-2.5 text-sm"
+                    placeholder="VD: 10.000.000" value={newSourceAmount}
+                    onChange={(e) => handleAmountChange(e, setNewSourceAmount)}
+                    onBlur={() => { if (newSourceAmount) setNewSourceAmount(formatCurrency(parseFormattedNumber(newSourceAmount))); }}
+                  />
+                  {newSourceType === 'fixed' && modalWordsPreview && (
+                    <p className="text-[10px] text-emerald-400/80 font-bold italic ml-2 mt-1">
+                      {modalWordsPreview}
+                    </p>
+                  )}
+                  <p className="text-[9px] text-emerald-400/70 ml-1 mt-1">💡 Sẽ tự động tính vào "Tổng thu nhập" trong hồ sơ.</p>
+                </div>
+              )}
+
+              {/* VARIABLE */}
+              {newSourceType === "variable" && (
+                <div className="p-3 rounded-xl bg-sky-500/5 border border-sky-500/15">
+                  <p className="text-[10px] text-sky-400 leading-relaxed">
+                    ℹ️ Với loại <strong>Biến đổi</strong>, không cần nhập số tiền trước. Khi có tiền, dùng form <strong className="text-emerald-400">"Ghi nhận Thu nhập"</strong> bên trái để cộng vào ngân sách.
+                  </p>
+                </div>
+              )}
+
+              {/* SCHEDULED */}
+              {newSourceType === "scheduled" && (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest mb-2">1. Chọn các ngày đi làm trong tuần</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','CN'].map((day, idx) => {
+                        const isSelected = (newWorkSchedule[idx] ?? 0) > 0;
+                        return (
+                          <button key={day} type="button"
+                            onClick={() => {
+                              const u = [...newWorkSchedule];
+                              u[idx] = isSelected ? 0 : 4;
+                              setNewWorkSchedule(u);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${isSelected ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' : 'bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] text-theme-text-muted hover:bg-[var(--theme-bg-surface)]'}`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {newWorkSchedule.some(h => h > 0) && (
+                    <div>
+                      <p className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest mb-2">2. Số giờ làm mỗi ca</p>
+                      <div className="space-y-2">
+                        {['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','CN'].map((day, idx) => {
+                          if ((newWorkSchedule[idx] ?? 0) === 0) return null;
+                          return (
+                            <div key={day} className="flex items-center gap-3">
+                              <span className="text-xs text-theme-text-muted w-14">{day}</span>
+                              <input type="number" min="0.5" max="24" step="0.5"
+                                value={newWorkSchedule[idx]}
+                                onChange={(e) => {
+                                  const u = [...newWorkSchedule];
+                                  u[idx] = parseFloat(e.target.value) || 0;
+                                  setNewWorkSchedule(u);
+                                }}
+                                className="glass-input w-24 py-2 text-center text-sm font-bold"
+                              />
+                              <span className="text-xs text-theme-text-muted">giờ</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-[10px] font-black text-theme-text-muted uppercase tracking-widest mb-2">3. Mức lương / giờ (VNĐ)</p>
+                    <input type="text" className="glass-input w-full px-4 py-2.5 text-sm"
+                      placeholder="VD: 50.000" value={newSourceRate}
+                      onChange={(e) => handleAmountChange(e, setNewSourceRate)}
+                      onBlur={() => { if (newSourceRate) setNewSourceRate(formatCurrency(parseFormattedNumber(newSourceRate))); }}
+                    />
+                    {newSourceType === 'scheduled' && modalWordsPreview && (
+                      <p className="text-[10px] text-emerald-400/80 font-bold italic ml-2 mt-1">
+                        {modalWordsPreview}
+                      </p>
+                    )}
+                  </div>
+
+                  {newSourceRate && newWorkSchedule.some(h => h > 0) && (() => {
+                    const totalHours = newWorkSchedule.reduce((sum, h, idx) => sum + h * (idx < 5 ? 4.33 : 4), 0);
+                    const forecast = Math.round(totalHours * parseFormattedNumber(newSourceRate));
+                    return (
+                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                        <p className="text-[10px] text-emerald-300">📊 Hệ thống đếm được tổng <strong>{totalHours.toFixed(1)} giờ</strong> làm việc trong tháng này.</p>
+                        <p className="text-sm font-black text-emerald-400 mt-1">Dự báo lương sẽ nhận: <span className="text-base">{formatCurrency(forecast)}đ</span></p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+            </div>
+            
+            <div className="pt-4 shrink-0 border-t border-[var(--theme-subtle-border)] mt-auto">
+              <button 
+                onClick={handleSaveSource} 
+                disabled={!newSourceName.trim() || (newSourceType === 'scheduled' && !newWorkSchedule.some(h => h > 0))}
+                className={`w-full py-3 rounded-2xl font-bold transition-all duration-300 ${
+                  (!newSourceName.trim() || (newSourceType === 'scheduled' && !newWorkSchedule.some(h => h > 0)))
+                    ? 'bg-[var(--theme-subtle-bg)] text-theme-text-muted cursor-not-allowed border border-[var(--theme-subtle-border)]' 
+                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5 active:scale-95'
+                }`}
+              >
+                {!newSourceName.trim() 
+                  ? 'Vui lòng nhập tên nguồn tiền' 
+                  : (newSourceType === 'scheduled' && !newWorkSchedule.some(h => h > 0))
+                    ? 'Vui lòng chọn lịch làm việc'
+                    : 'Xác nhận Nguồn Thu'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
+    <AnimatePresence>
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setConfirmDelete(null)}
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+          />
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 10 }}
+            className="glass-panel w-full max-w-sm p-8 rounded-[32px] relative z-10 border border-[var(--theme-subtle-border)] shadow-2xl overflow-hidden"
+            style={{ background: 'var(--theme-bg-panel)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500/0 via-rose-500/50 to-rose-500/0" />
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20 mb-2">
+                <Trash2 className="w-8 h-8 text-rose-500" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-theme-text-primary mb-2">Xác nhận xóa?</h3>
+                <p className="text-sm text-theme-text-muted leading-relaxed">
+                  Bạn có chắc chắn muốn xóa <span className="text-rose-400 font-bold">{confirmDelete.type === 'source' ? 'nguồn thu' : 'khoản thu'}</span> <span className="text-rose-400 font-bold">"{confirmDelete.title}"</span>?
+                </p>
+                {confirmDelete.type === 'source' && (
+                  <p className="mt-4 p-3 bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded-xl text-[10px] text-theme-text-muted italic">
+                    * Lưu ý: Lịch sử tiền mặt đã nhận từ nguồn này vẫn sẽ được giữ lại để đảm bảo số dư ngân sách của bạn không bị sai lệch.
+                  </p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3 w-full mt-6">
+                <button onClick={() => setConfirmDelete(null)} className="px-4 py-3 rounded-2xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] text-theme-text-muted font-bold text-sm hover:bg-[var(--theme-bg-surface)] transition-all">Hủy bỏ</button>
+                <button onClick={() => executeDelete()} className="px-4 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 text-white font-bold text-sm shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 transition-all">Xác nhận xóa</button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
-  Tooltip as RechartsTooltip, Customized,
+  Tooltip as RechartsTooltip,
 } from 'recharts';
 import type { Jar } from './LinkedSliders';
 

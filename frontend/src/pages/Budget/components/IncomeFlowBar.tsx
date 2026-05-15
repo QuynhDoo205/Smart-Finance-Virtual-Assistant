@@ -85,7 +85,7 @@ export default function IncomeFlowBar({ totalIncome, fixedExpenses, formatCurren
       </div>
 
       {/* Visual flow bar */}
-      <div className="mt-4 h-3 rounded-full overflow-hidden flex gap-0.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
+      <div className="mt-4 h-3 rounded-full overflow-hidden flex gap-0.5" style={{ background: 'var(--theme-subtle-bg)' }}>
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${fixedPct}%` }}

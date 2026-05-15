@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { motion } from 'framer-motion';
 import './store/themeStore'; // initialize theme on load
+import Landing from './pages/Landing';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import OnboardingSurvey from './pages/Onboarding/OnboardingSurvey';
@@ -15,11 +16,18 @@ import Badges from './pages/Gamification/Badges';
 import InsightsGoals from './pages/Insights/InsightsGoals';
 import CrisisManager from './pages/Crisis/CrisisManager';
 import ExpenseTracker from './pages/Expense/ExpenseTracker';
+import AdminDashboard from './pages/Admin/AdminDashboard';
+import AdminUserList from './pages/Admin/AdminUserList';
+import AdminDatabase from './pages/Admin/AdminDatabase';
+import AdminAIConfig from './pages/Admin/AdminAIConfig';
+import AdminSettings from './pages/Admin/AdminSettings';
+import AdminLayout from './components/layout/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import Maintenance from './pages/Maintenance';
+import FloatingAI from './components/ai/FloatingAI';
 
 function App() {
-  // Demo placeholder Client ID. The user will need to configure their real one.
-  const GOOGLE_CLIENT_ID = '97914893984-ucfpo0bs0ggn0vtvlgg1l0l7o1eifaja.apps.googleusercontent.com';
+  const GOOGLE_CLIENT_ID = '509981311672-d3g4gkko1ir0qmritmdpvquh01gvnvso.apps.googleusercontent.com';
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -61,10 +69,11 @@ function App() {
         
         <div className="relative z-10 min-h-screen flex flex-col">
           <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/onboarding" element={<OnboardingSurvey />} />
+            <Route path="/maintenance" element={<Maintenance />} />
             
             {/* Protected Main App Routes */}
             <Route path="/app" element={
@@ -82,7 +91,21 @@ function App() {
               <Route path="expense" element={<ExpenseTracker />} />
               <Route path="profile" element={<Profile />} />
             </Route>
+
+            {/* Dedicated Admin Portal Routes */}
+            <Route path="/app/admin" element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="users" element={<AdminUserList />} />
+              <Route path="database" element={<AdminDatabase />} />
+              <Route path="ai-config" element={<AdminAIConfig />} />
+              <Route path="settings" element={<AdminSettings />} />
+            </Route>
           </Routes>
+          <FloatingAI />
         </div>
       </div>
     </BrowserRouter>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export type AppTheme = 'cyberpunk' | 'light-tech' | 'matrix';
+export type AppTheme = 'cyberpunk' | 'light-tech' | 'matrix' | 'sakura' | 'ocean' | 'sunset';
 
 // Global state using module-level variable + subscriber pattern (no Zustand needed)
 let currentTheme: AppTheme = (localStorage.getItem('app-theme') as AppTheme) || 'cyberpunk';

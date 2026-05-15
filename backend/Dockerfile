@@ -4,25 +4,25 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json pnpm-lock.yaml ./
 
-# Install dependencies
-RUN npm install
+# Install pnpm and dependencies
+RUN npm install -g pnpm && pnpm config set ignore-scripts true && pnpm install
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN pnpm run build
 
 # Stage 2: Production
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy only production dependencies
-COPY package*.json ./
-RUN npm install --only=production
+# Copy only production dependencies using pnpm
+COPY package.json pnpm-lock.yaml ./
+RUN npm install -g pnpm && pnpm config set ignore-scripts true && pnpm install --prod
 
 # Copy built files from previous stage
 COPY --from=build /app/dist ./dist

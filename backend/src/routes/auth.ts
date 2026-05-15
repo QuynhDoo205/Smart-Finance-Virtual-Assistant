@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
+import nodemailer from 'nodemailer';
 import pool from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthRequest } from '../middleware/auth.js';
@@ -10,11 +11,30 @@ import type { AuthRequest } from '../middleware/auth.js';
 const router = Router();
 const googleClient = new OAuth2Client(process.env['GOOGLE_CLIENT_ID'] || 'YOUR_GOOGLE_CLIENT_ID');
 
+// Cấu hình Nodemailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env['GMAIL_USER'],
+    pass: process.env['GMAIL_APP_PASSWORD'],
+  },
+});
+
 // ============================================================
 // POST /api/auth/register – Đăng ký tài khoản mới
 // ============================================================
 router.post('/register', async (req: Request, res: Response): Promise<void> => {
   try {
+    // Kiểm tra cài đặt hệ thống
+    const settingsRes = await pool.query("SELECT * FROM system_settings WHERE key = 'app_settings'");
+    if (settingsRes.rows.length > 0) {
+      const settings = JSON.parse(settingsRes.rows[0].value);
+      if (settings.allowRegistration === false) {
+        res.status(403).json({ success: false, message: 'Chức năng đăng ký hiện đang tạm khóa bởi Admin.' });
+        return;
+      }
+    }
+    
     const { full_name, email, password } = req.body;
 
     // Validate input
@@ -34,24 +54,102 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Kiểm tra email đã tồn tại chưa
+    // Kiểm tra email đã tồn tại trong bảng chính chưa
     const existingUser = await pool.query('SELECT id FROM nguoi_dung WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       res.status(409).json({ success: false, message: 'Email đã được sử dụng' });
       return;
     }
 
+    // Tạo mã OTP 6 số ngẫu nhiên
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    // Tạo user mới
+    // Lưu vào bảng tạm otp_xac_thuc (Upsert)
+    await pool.query(
+      `INSERT INTO otp_xac_thuc (email, ho_ten, mat_khau_hash, otp_code, expires_at) 
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (email) 
+       DO UPDATE SET ho_ten = EXCLUDED.ho_ten, mat_khau_hash = EXCLUDED.mat_khau_hash, otp_code = EXCLUDED.otp_code, expires_at = EXCLUDED.expires_at, ngay_tao = NOW()`,
+      [email, full_name, password_hash, otpCode, expiresAt]
+    );
+
+    // Gửi email OTP
+    const mailOptions = {
+      from: '"Nova Finance AI" <levanthang0166@gmail.com>',
+      to: email,
+      subject: 'Mã xác thực Đăng ký tài khoản Nova Finance',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #010828; color: #fff; border-radius: 16px; border: 1px solid #00D1FF;">
+          <h2 style="color: #00D1FF; text-align: center;">XÁC THỰC TÀI KHOẢN</h2>
+          <p style="font-size: 16px;">Chào <strong>${full_name}</strong>,</p>
+          <p style="font-size: 16px;">Cảm ơn bạn đã đăng ký gia nhập Nova Finance. Để hoàn tất, vui lòng nhập mã xác thực gồm 6 chữ số dưới đây:</p>
+          <div style="background-color: rgba(255,255,255,0.1); padding: 16px; text-align: center; border-radius: 8px; margin: 24px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #00D1FF;">${otpCode}</span>
+          </div>
+          <p style="font-size: 14px; color: #a1a1aa;">Mã này có hiệu lực trong vòng 5 phút. Vui lòng không chia sẻ mã này cho bất kỳ ai.</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({
+      success: true,
+      message: 'Mã OTP đã được gửi đến email của bạn!',
+      step: 'otp'
+    });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ khi gửi OTP, vui lòng thử lại' });
+  }
+});
+
+// ============================================================
+// POST /api/auth/register/verify – Xác thực OTP và Tạo User
+// ============================================================
+router.post('/register/verify', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, otp_code } = req.body;
+
+    if (!email || !otp_code) {
+      res.status(400).json({ success: false, message: 'Thiếu thông tin xác thực' });
+      return;
+    }
+
+    // Lấy thông tin từ bảng tạm
+    const otpRecord = await pool.query(
+      'SELECT ho_ten, mat_khau_hash, expires_at FROM otp_xac_thuc WHERE email = $1 AND otp_code = $2',
+      [email, otp_code]
+    );
+
+    if (otpRecord.rows.length === 0) {
+      res.status(400).json({ success: false, message: 'Mã OTP không chính xác' });
+      return;
+    }
+
+    const { ho_ten, mat_khau_hash, expires_at } = otpRecord.rows[0];
+
+    // Kiểm tra hết hạn
+    if (new Date() > new Date(expires_at)) {
+      res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn, vui lòng đăng ký lại' });
+      return;
+    }
+
+    // Đã hợp lệ -> Tạo user chính thức
     const result = await pool.query(
       `INSERT INTO nguoi_dung (ho_ten, email, mat_khau, ngay_tao, ngay_cap_nhat) 
        VALUES ($1, $2, $3, NOW(), NOW()) 
-       RETURNING id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, ngay_tao AS created_at`,
-      [full_name, email, password_hash]
+       RETURNING id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, is_admin, ngay_tao AS created_at`,
+      [ho_ten, email, mat_khau_hash]
     );
+
+    // Xóa record ở bảng tạm
+    await pool.query('DELETE FROM otp_xac_thuc WHERE email = $1', [email]);
 
     const newUser = result.rows[0];
 
@@ -65,7 +163,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 
     res.status(201).json({
       success: true,
-      message: 'Đăng ký thành công!',
+      message: 'Xác thực thành công! Đang chuyển hướng...',
       data: {
         token,
         user: {
@@ -97,7 +195,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     // Tim user theo email
     const result = await pool.query(
-      'SELECT id, ho_ten AS full_name, email, mat_khau AS password_hash, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url FROM nguoi_dung WHERE email = $1',
+      'SELECT id, ho_ten AS full_name, email, mat_khau AS password_hash, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, is_admin FROM nguoi_dung WHERE email = $1',
       [email]
     );
 
@@ -135,6 +233,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
           monthly_income: user.monthly_income,
           onboarding_completed: user.onboarding_completed,
           avatar_url: user.avatar_url,
+          is_admin: user.is_admin,
         }
       }
     });
@@ -156,24 +255,33 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Verify token with google-auth-library
-    // Ignore audience validation if NO client ID provided yet (For dev test only)
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: process.env['GOOGLE_CLIENT_ID'] || 'YOUR_GOOGLE_CLIENT_ID', 
-    }).catch(() => null);
+    let payload: any;
 
-    // If verification fail locally due to bad client_id, we can also decode payload directly using jwt (but less secure)
-    // Here we assume it passes or we fallback to jwt decode for demo.
-    let payload = ticket?.getPayload();
-    
-    // NẾU CẤU HÌNH TRÊN CHƯA THIẾT LẬP CLIENT ID, decode jwt thủ công (Chỉ dùng trên dev)
-    if (!payload) {
-      payload = jwt.decode(token) as any;
+    try {
+      // Verify token with google-auth-library (ID Token flow)
+      const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: process.env['GOOGLE_CLIENT_ID'] || 'YOUR_GOOGLE_CLIENT_ID',
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      // If verification fails, it might be an access token from custom login button
+      try {
+        const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          payload = await response.json();
+        } else {
+          console.error('Google userinfo fetch failed:', await response.text());
+        }
+      } catch (fetchErr) {
+        console.error('Failed to fetch userinfo with access token:', fetchErr);
+      }
     }
 
     if (!payload || !payload.email) {
-      res.status(401).json({ success: false, message: 'Token từ Google không hợp lệ hoặc không có email' });
+      res.status(401).json({ success: false, message: 'Xác thực Google thất bại hoặc không có email' });
       return;
     }
 
@@ -181,7 +289,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
 
     // Check if user exists
     const existingUserRes = await pool.query(
-      'SELECT id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url FROM nguoi_dung WHERE email = $1',
+      'SELECT id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, is_admin FROM nguoi_dung WHERE email = $1',
       [email]
     );
 
@@ -196,7 +304,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       const result = await pool.query(
         `INSERT INTO nguoi_dung (ho_ten, email, mat_khau, hinh_anh, ngay_tao, ngay_cap_nhat) 
          VALUES ($1, $2, $3, $4, NOW(), NOW()) 
-         RETURNING id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, ngay_tao AS created_at`,
+         RETURNING id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, is_admin, ngay_tao AS created_at`,
         [name, email, password_hash, picture]
       );
       user = result.rows[0];
@@ -233,6 +341,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
           monthly_income: user.monthly_income,
           onboarding_completed: user.onboarding_completed,
           avatar_url: user.avatar_url,
+          is_admin: user.is_admin,
         }
       }
     });
@@ -249,7 +358,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promi
   try {
     const userId = req.user?.id;
     const result = await pool.query(
-      'SELECT id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, tien_te AS currency, ngay_tao AS created_at FROM nguoi_dung WHERE id = $1',
+      'SELECT id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, hinh_anh AS avatar_url, tien_te AS currency, is_admin, ngay_tao AS created_at FROM nguoi_dung WHERE id = $1',
       [userId]
     );
 
@@ -261,6 +370,110 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promi
     res.json({ success: true, data: { user: result.rows[0] } });
   } catch (err) {
     console.error('Get me error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
+  }
+});
+
+// ============================================================
+// POST /api/auth/forgot-password – Quên mật khẩu
+// ============================================================
+router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({ success: false, message: 'Vui lòng cung cấp email' });
+      return;
+    }
+
+    // Kiểm tra user tồn tại
+    const result = await pool.query('SELECT id, ho_ten FROM nguoi_dung WHERE email = $1', [email]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Email này không tồn tại trong hệ thống' });
+      return;
+    }
+
+    const user = result.rows[0];
+
+    // Tạo mật khẩu mới ngẫu nhiên
+    const newPassword = Math.random().toString(36).slice(-8);
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(newPassword, salt);
+
+    // Cập nhật mật khẩu trong DB
+    await pool.query('UPDATE nguoi_dung SET mat_khau = $1, ngay_cap_nhat = NOW() WHERE id = $2', [password_hash, user.id]);
+
+    // Gửi email
+    const mailOptions = {
+      from: `"NovaFinance Assistant" <${process.env['GMAIL_USER']}>`,
+      to: email,
+      subject: 'Khôi phục mật khẩu - NovaFinance',
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #0ea5e9;">Khôi phục mật khẩu</h2>
+          <p>Chào <b>${user.ho_ten}</b>,</p>
+          <p>Chúng tôi đã nhận được yêu cầu khôi phục mật khẩu của bạn.</p>
+          <p>Mật khẩu mới của bạn là: <b style="font-size: 1.2rem; color: #e11d48; padding: 5px 10px; background: #f1f5f9; border-radius: 4px;">${newPassword}</b></p>
+          <p>Vui lòng đăng nhập bằng mật khẩu này và đổi lại mật khẩu mới trong phần cài đặt sau khi truy cập thành công.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 0.8rem; color: #999;">Đây là email tự động, vui lòng không trả lời.</p>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.json({ success: true, message: 'Mật khẩu mới đã được gửi về Gmail của bạn' });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi khi gửi email khôi phục' });
+  }
+});
+
+// ============================================================
+// POST /api/auth/change-password – Đổi mật khẩu
+// ============================================================
+router.post('/change-password', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ success: false, message: 'Vui lòng điền đầy đủ thông tin' });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({ success: false, message: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+      return;
+    }
+
+    // Lấy thông tin user
+    const result = await pool.query('SELECT mat_khau FROM nguoi_dung WHERE id = $1', [userId]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+      return;
+    }
+
+    const user = result.rows[0];
+
+    // Kiểm tra mật khẩu hiện tại
+    const isMatch = await bcrypt.compare(currentPassword, user.mat_khau);
+    if (!isMatch) {
+      res.status(401).json({ success: false, message: 'Mật khẩu hiện tại không chính xác' });
+      return;
+    }
+
+    // Hash mật khẩu mới
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(newPassword, salt);
+
+    // Cập nhật
+    await pool.query('UPDATE nguoi_dung SET mat_khau = $1, ngay_cap_nhat = NOW() WHERE id = $2', [password_hash, userId]);
+
+    res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
+  } catch (err) {
+    console.error('Change password error:', err);
     res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
   }
 });
