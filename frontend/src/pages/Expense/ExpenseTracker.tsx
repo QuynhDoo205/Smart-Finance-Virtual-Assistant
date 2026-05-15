@@ -246,7 +246,7 @@ export default function ExpenseTracker() {
             amount: parseFloat(t.so_tien || t.amount) || 0,
             category: 
               (Object.keys(CATEGORY_MAP).find(
-                (k) => CATEGORY_MAP[k as ExpenseCategory] === t.danh_muc_id,
+                (k) => CATEGORY_MAP[k as ExpenseCategory] === Number(t.danh_muc_id),
               ) as ExpenseCategory) || "other",
             description: t.tieu_de || t.title || t.note || "Giao dịch",
             store: t.title || t.tieu_de,
@@ -447,12 +447,15 @@ export default function ExpenseTracker() {
     if (!scannedData) return;
     try {
       const categoryId = CATEGORY_MAP[scannedData.category];
+      // Hợp nhất Ngày và Giờ để lưu vào TIMESTAMP trong DB
+      const combinedDateTime = `${scannedData.date} ${scannedData.time || '00:00'}`;
+      
       const res = await transactionsApi.create({
         title: scannedData.store || scannedData.description,
         amount: scannedData.amount,
         type: "chi_phi",
         categoryId,
-        date: scannedData.date,
+        date: combinedDateTime,
         note: scannedData.description,
       });
 
@@ -463,7 +466,8 @@ export default function ExpenseTracker() {
             amount: scannedData.amount,
             category: scannedData.category,
             description: scannedData.store || scannedData.description,
-            date: scannedData.date || todayStr,
+            // Hiển thị thời gian hợp nhất trong danh sách local
+            date: combinedDateTime,
             source: "scanner" as const,
             type: "expense" as const,
           },
@@ -908,6 +912,10 @@ export default function ExpenseTracker() {
                                   {
                                     label: "Danh mục",
                                     value: `${CATEGORY_INFO[scannedData.category].emoji} ${CATEGORY_INFO[scannedData.category].label}`,
+                                  },
+                                  {
+                                    label: "Giờ giao dịch",
+                                    value: scannedData.time || "—",
                                   },
                                 ].map((item) => (
                                   <div

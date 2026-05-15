@@ -5,7 +5,7 @@ import { BrainCircuit, RefreshCw, Sparkles, Info, HelpCircle, Target, X, Externa
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Link, useNavigate } from 'react-router-dom';
 import LinkedSliders, { type Jar } from './components/LinkedSliders';
-import { dashboardApi, authApi, transactionsApi, userApi } from '../../utils/api';
+import { dashboardApi, authApi, transactionsApi, userApi, incomeApi } from '../../utils/api';
 import Skeleton from '../../components/common/Skeleton';
 
 const INIT_JARS: Jar[] = [
@@ -68,17 +68,26 @@ export default function BudgetManager() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [profileRes, transRes, dashRes, dashBudgetRes] = await Promise.all([
+        const [profileRes, transRes, dashRes, dashBudgetRes, incomeRes] = await Promise.all([
           authApi.me(),
           transactionsApi.list(50),
           dashboardApi.getSummary(),
-          dashboardApi.getBudget()
+          dashboardApi.getBudget(),
+          incomeApi.getSources()
         ]);
         
         let detectedIncome = profileRes.success ? (profileRes.data.user.monthly_income || 0) : 0;
         
-        if (detectedIncome === 0 && dashRes.success) {
+        const forecasted = (incomeRes.success && incomeRes.data.sources)
+          ? incomeRes.data.sources.reduce((sum: number, s: any) => sum + (parseFloat(s.so_tien_du_kien) || 0), 0)
+          : 0;
+
+        if (detectedIncome === 0 && dashRes.success && dashRes.data.totalIncome > 0) {
           detectedIncome = dashRes.data.totalIncome;
+        }
+        
+        if (detectedIncome === 0 && forecasted > 0) {
+          detectedIncome = forecasted;
         }
 
         if (detectedIncome === 0 && transRes.success) {
@@ -179,9 +188,25 @@ export default function BudgetManager() {
 
   const handleSyncReality = async () => {
     try {
-      const summaryRes = await dashboardApi.getSummary();
-      if (summaryRes.success && summaryRes.data.totalIncome > 0) {
-        const realIncome = summaryRes.data.totalIncome;
+      const [summaryRes, incomeRes] = await Promise.all([
+        dashboardApi.getSummary(),
+        incomeApi.getSources()
+      ]);
+      
+      if (summaryRes.success) {
+        const actualIncome = summaryRes.data.totalIncome;
+        const forecasted = (incomeRes.success && incomeRes.data.sources)
+          ? incomeRes.data.sources.reduce((sum: number, s: any) => sum + (parseFloat(s.so_tien_du_kien) || 0), 0)
+          : 0;
+        
+        const realIncome = actualIncome > 0 ? actualIncome : forecasted;
+        
+        if (realIncome <= 0) {
+          setToastError("Không tìm thấy dữ liệu thu nhập thực tế hoặc dự kiến.");
+          setTimeout(() => setToastError(null), 3000);
+          return;
+        }
+
         setIncome(realIncome);
         const budgetRes = await dashboardApi.getBudget();
         const jarCategories = [4, 3, 9, 7, 8]; 

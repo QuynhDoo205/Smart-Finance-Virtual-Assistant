@@ -202,7 +202,7 @@ router.post('/chat', async (req: AuthRequest, res: Response): Promise<void> => {
 
     // Nếu AI bóc tách được chi tiêu, tiến hành lưu luôn (Auto-save)
     if (result.data) {
-      const { amount, category, description, date, store } = result.data;
+      const { amount, category, description, date, time, store } = result.data;
       
       const catMap: Record<string, string> = {
         'food': 'Ăn uống',
@@ -226,14 +226,17 @@ router.post('/chat', async (req: AuthRequest, res: Response): Promise<void> => {
         );
         const categoryId = catResult.rows[0]?.id;
 
+        // Kết hợp ngày và giờ nếu có
+        const transactionDateTime = time ? `${date} ${time}` : (date || new Date());
+
         await client.query(
           `INSERT INTO giao_dich (nguoi_dung_id, danh_muc_id, tieu_de, so_tien, loai_giao_dich, ghi_chu, ngay_giao_dich)
            VALUES ($1, $2, $3, $4, 'chi_phi', $5, $6)
            RETURNING *`,
-          [userId, categoryId, description || (store ? `Mua tại ${store}` : 'Chi tiêu AI'), amount, `Ghi nhận tự động từ Nova AI: ${message}`, date || new Date()]
+          [userId, categoryId, description || (store ? `Mua tại ${store}` : 'Chi tiêu AI'), amount, `Ghi nhận tự động từ Nova AI: ${message}`, transactionDateTime]
         );
 
-        const transDate = new Date(date || new Date());
+        const transDate = new Date(transactionDateTime);
         const month = transDate.getMonth() + 1;
         const year = transDate.getFullYear();
 

@@ -207,6 +207,7 @@ export default function Dashboard() {
     committedFixedExpenses: 0,
     availableAfterCommitments: 0,
     netAvailableBalance: 0,
+    categoryDistribution: [],
   };
 
   // Use forecasted income in the header stat when no actual income yet
@@ -217,7 +218,19 @@ export default function Dashboard() {
   const mergedBudgets = [...budgets].sort((a, b) => b.limit_amount - a.limit_amount);
 
   // --- CARD STATS ---
-  const topExpenseCategory = [...mergedBudgets].filter(b => b.spent_amount > 0).sort((a, b) => b.spent_amount - a.spent_amount)[0];
+  // --- CARD STATS ---
+  const topExpenseCategoryFromSummary = (displaySummary.categoryDistribution && displaySummary.categoryDistribution.length > 0)
+    ? [...displaySummary.categoryDistribution].sort((a, b) => b.value - a.value)[0]
+    : null;
+
+  // Map to budget format for UI compatibility
+  const topExpenseCategory = topExpenseCategoryFromSummary ? {
+    category_name: topExpenseCategoryFromSummary.name,
+    spent_amount: topExpenseCategoryFromSummary.value,
+    category_color: topExpenseCategoryFromSummary.color,
+    budget_title: topExpenseCategoryFromSummary.name
+  } : null;
+
   const incomeAchievement = forecastedIncome > 0 ? (displaySummary.totalIncome / forecastedIncome) * 100 : 0;
   const savingsRate = displayIncome > 0 ? Math.max(0, Math.round(((displayIncome - displaySummary.totalExpense) / displayIncome) * 100)) : 0;
   const expenseRatio = displayIncome > 0 ? Math.min(100, Math.round((displaySummary.totalExpense / displayIncome) * 100)) : 0;

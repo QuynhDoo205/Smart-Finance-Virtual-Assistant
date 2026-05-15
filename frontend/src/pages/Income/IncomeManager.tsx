@@ -137,15 +137,17 @@ export default function IncomeManager() {
               const note = t.ghi_chu || t.note || "";
               const matchedSource = mappedSources.find(s => note.includes(s.name) || (t.tieu_de || t.title || "").includes(s.name));
               
-              // Xác định loại dựa trên note [salary], [allowance], [other]...
-              let type: SourceCategory | undefined = undefined;
-              if (note.includes('[salary]')) type = 'salary';
-              else if (note.includes('[allowance]')) type = 'allowance';
-              else if (note.includes('[other]')) type = 'other';
-              
-              // Nếu không có tag cụ thể, lấy loại của nguồn tiền tương ứng
-              if (!type && matchedSource) {
-                type = matchedSource.sourceType;
+              // Xác định loại dựa trên danh_muc_id (ưu tiên cao nhất)
+              let category: SourceCategory = 'other';
+              const dId = Number(t.danh_muc_id);
+              if (dId === 1) category = 'salary';
+              else if (dId === 2) category = 'allowance';
+              else if (dId === 3) category = 'other';
+              else {
+                // Fallback nếu danh_muc_id không có (giao dịch cũ)
+                if (note.includes('[salary]')) category = 'salary';
+                else if (note.includes('[allowance]')) category = 'allowance';
+                else if (matchedSource) category = matchedSource.sourceType;
               }
 
               return {
@@ -153,7 +155,7 @@ export default function IncomeManager() {
                 sourceId: matchedSource ? matchedSource.id : "other",
                 amount: parseFloat(t.so_tien || t.amount),
                 date: t.ngay_giao_dich || t.transaction_date,
-                category: type || 'other',
+                category,
                 isAi: note.toLowerCase().includes('nova') || note.toLowerCase().includes('ai')
               };
             })
@@ -852,7 +854,7 @@ export default function IncomeManager() {
                         initial={{ opacity: 0, y: 0, scale: 0.95 }}
                         animate={{ opacity: 1, y: 8, scale: 1 }}
                         exit={{ opacity: 0, y: 0, scale: 0.95 }}
-                        className="absolute top-full left-0 w-full z-20 bg-[var(--theme-bg-panel)] border border-[var(--theme-border)] rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] overflow-hidden py-2"
+                        className="absolute top-full left-0 w-full z-50 bg-[#0a0f2b] border border-white/10 rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] overflow-hidden py-2"
                       >
                         {sources.filter(s => globalFilter === 'all' || s.sourceType === globalFilter).length === 0 ? (
                           <div className="px-4 py-3 text-xs text-theme-text-muted italic">Chưa có nguồn tiền nào cho mục này</div>

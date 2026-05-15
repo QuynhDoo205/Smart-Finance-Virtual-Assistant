@@ -87,6 +87,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
               CASE WHEN t.loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END AS type,
               t.ghi_chu AS note,
               t.ngay_giao_dich AS transaction_date,
+              t.danh_muc_id,
               COALESCE(c.ten_danh_muc, '') AS category_name,
               COALESCE(c.bieu_tuong, '') AS category_icon,
               COALESCE(c.mau_sac, '#888') AS category_color

@@ -256,14 +256,14 @@ router.get('/budget', async (req: AuthRequest, res: Response): Promise<void> => 
         SELECT 
           COALESCE(b.id, 0) as id,
           COALESCE(b.gioi_han_chi_tieu, 0) as limit_amount,
-          COALESCE(s.total_spent, b.da_chi_tieu, 0) as spent_amount,
+          COALESCE(s.total_spent, 0) as spent_amount,
           c.ten_danh_muc as category_name,
           b.tieu_de as budget_title,
           c.bieu_tuong as category_icon,
           c.mau_sac as category_color,
           CASE 
             WHEN COALESCE(b.gioi_han_chi_tieu, 0) > 0 
-            THEN ROUND((COALESCE(s.total_spent, b.da_chi_tieu, 0) / b.gioi_han_chi_tieu * 100)::numeric, 1)
+            THEN ROUND((COALESCE(s.total_spent, 0) / b.gioi_han_chi_tieu * 100)::numeric, 1)
             ELSE 0 
           END as usage_percent,
           c.id as category_id

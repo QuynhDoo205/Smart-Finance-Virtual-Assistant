@@ -115,6 +115,7 @@ export interface AIParsedExpense {
   category: 'food' | 'transport' | 'shopping' | 'entertainment' | 'health' | 'education' | 'other';
   description: string;
   date: string;
+  time?: string; // HH:mm
 }
 
 const SYSTEM_PROMPT = `
@@ -135,7 +136,8 @@ LUÔN TRẢ VỀ JSON THEO ĐỊNH DẠNG:
     "amount": number, 
     "category": "food" | "transport" | "shopping" | "entertainment" | "health" | "education" | "other", 
     "description": "string", 
-    "date": "YYYY-MM-DD" 
+    "date": "YYYY-MM-DD",
+    "time": "HH:mm"
   } | null
 }
 `;
@@ -159,9 +161,10 @@ export async function analyzeReceiptImage(imageBuffer: Buffer, mimeType: string)
         "amount": số tiền tổng (number),
         "category": "food" | "transport" | "shopping" | "entertainment" | "health" | "education" | "other",
         "description": "Mô tả ngắn",
-        "date": "YYYY-MM-DD"
+        "date": "YYYY-MM-DD",
+        "time": "HH:mm"
       }
-      Lưu ý: Nếu không thấy ngày, dùng ngày: ${today}.
+      Lưu ý: Nếu không thấy ngày, dùng ngày: ${today}. Nếu không thấy giờ, bỏ trống hoặc dùng "00:00".
     `;
 
     const response = await model.generateContent([

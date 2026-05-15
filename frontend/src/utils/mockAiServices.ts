@@ -6,6 +6,7 @@ export interface ParsedExpense {
   category: ExpenseCategory;
   description: string;
   date: string;
+  time?: string;
 }
 
 const today = () => new Date().toISOString().split('T')[0];

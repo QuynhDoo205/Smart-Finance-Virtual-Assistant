@@ -42,23 +42,40 @@ export default function FloatingAI() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [history, setHistory] = useState<{ title: string; date: string; messages: Message[] }[]>([]);
 
-  const defaultGreeting = (): Message[] => ([
+  const defaultGreeting = (currentUser?: any): Message[] => ([
     { 
       role: 'assistant', 
-      content: authStore.getUser() 
-        ? `Chào ${authStore.getUser()?.full_name.split(' ').pop()}! Tôi là Nova. Hôm nay tôi có thể giúp gì cho tài chính của bạn ạ?` 
-        : 'Chào bạn! Tôi là Nova. Hãy ĐĂNG NHẬP để tôi hỗ trợ bạn tốt nhất nhé!' 
+      content: (currentUser || authStore.getUser()) 
+        ? `Chào ${ (currentUser || authStore.getUser())?.full_name.split(' ').pop()}! Tôi là Nova. Hôm nay tôi có thể giúp gì cho tài chính của bạn ạ?` 
+        : 'Chào bạn! Tôi là Orbis - Trợ lý tài chính ảo. Vui lòng ĐĂNG NHẬP để tôi có thể truy cập dữ liệu và hỗ trợ bạn chính xác nhất nhé! ✨' 
     }
   ]);
 
   useEffect(() => {
-    setMessages(defaultGreeting());
-    const savedHistory = localStorage.getItem('chat_history');
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
+    const currentUser = authStore.getUser();
+    setMessages(defaultGreeting(currentUser));
+    if (currentUser) {
+      const savedHistory = localStorage.getItem(`chat_history_${currentUser.id}`);
+      if (savedHistory) setHistory(JSON.parse(savedHistory));
+    }
   }, []);
 
   useEffect(() => {
-    const unsubscribe = authStore.subscribe((newUser) => { setUser(newUser); });
+    const unsubscribe = authStore.subscribe((newUser) => { 
+      setUser(newUser);
+      // Khi auth thay đổi (login/logout), reset lại toàn bộ trạng thái chat
+      setMessages(defaultGreeting(newUser));
+      setShowHistory(false);
+      
+      // Nếu là logout, xóa lịch sử tạm thời trong state
+      if (!newUser) {
+        setHistory([]);
+      } else {
+        const savedHistory = localStorage.getItem(`chat_history_${newUser.id}`);
+        if (savedHistory) setHistory(JSON.parse(savedHistory));
+        else setHistory([]);
+      }
+    });
     return () => unsubscribe();
   }, []);
 
@@ -109,8 +126,8 @@ export default function FloatingAI() {
     if (!text) setInput('');
     setLoading(true);
 
-    // Xử lý khi chưa đăng nhập (Mock AI Data thông minh)
-    if (!user) {
+    // Xử lý khi chưa đăng nhập hoặc Token hết hạn (Mock AI Data thông minh)
+    if (!user || !authStore.isAuthenticated()) {
       setTimeout(() => {
         const textLower = rawInput.toLowerCase();
         let reply = "";
@@ -151,7 +168,7 @@ export default function FloatingAI() {
         const newAssistantMsg: Message = { role: 'assistant', content: res.reply };
         setMessages(prev => [...prev, newAssistantMsg]);
         
-        // Save history even on first response
+        // Save history even on first response (cá nhân hóa theo userId)
         const newHistoryItem = { 
           title: rawInput.substring(0, 30) + '...', 
           date: new Date().toISOString(), 
@@ -159,7 +176,7 @@ export default function FloatingAI() {
         };
         const updatedHistory = [newHistoryItem, ...history.filter(h => h.title !== newHistoryItem.title).slice(0, 9)];
         setHistory(updatedHistory);
-        localStorage.setItem('chat_history', JSON.stringify(updatedHistory));
+        localStorage.setItem(`chat_history_${user.id}`, JSON.stringify(updatedHistory));
       }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Dạ, hệ thống đang bận. Thử lại sau nhé!' } as Message]);
