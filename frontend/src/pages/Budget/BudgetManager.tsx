@@ -56,6 +56,8 @@ export default function BudgetManager() {
   const [jars, setJars] = useState<Jar[]>(INIT_JARS);
   const [fixedExpenses, setFixedExpenses] = useState<{name: string, emoji: string, amount: number}[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [actualExpense, setActualExpense] = useState(0);
+  const [lockedEmergency, setLockedEmergency] = useState(0);
   const [saved, setSaved] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -85,6 +87,11 @@ export default function BudgetManager() {
         }
         
         setIncome(detectedIncome);
+        // Lưu chi tiêu thực tế tháng này và quỹ dự phòng để trừ vào thẻ 3
+        if (dashRes.success) {
+          setActualExpense(dashRes.data.totalExpense || 0);
+          setLockedEmergency(dashRes.data.remainingEmergency || 0);
+        }
 
         // 2. Fetch Budgets
         const budgetRes = await dashboardApi.getBudget();
@@ -146,7 +153,8 @@ export default function BudgetManager() {
   }, []);
 
   const totalFixed = fixedExpenses.reduce((s, e) => s + e.amount, 0);
-  const availableToBudget = Math.max(0, income - totalFixed);
+  // Thẻ 3: Khả dụng = Thu nhập - Phí cố định - Quỹ dự phòng - Chi tiêu thực tế tháng này
+  const availableToBudget = Math.max(0, income - totalFixed - lockedEmergency - actualExpense);
   const isOverBudget = totalFixed > income;
   const unallocated = 100 - jars.reduce((s, j) => s + j.percentage, 0);
 
@@ -176,12 +184,22 @@ export default function BudgetManager() {
         const realIncome = summaryRes.data.totalIncome;
         setIncome(realIncome);
         const budgetRes = await dashboardApi.getBudget();
+        const jarCategories = [4, 3, 9, 7, 8]; 
         const existingBudgets = budgetRes.success 
-          ? budgetRes.data.budgets.map((b: any) => ({ 
-              categoryName: b.budget_title || b.category_name, 
-              amount: b.limit_amount,
-              category: b.category_name
-            }))
+          ? budgetRes.data.budgets
+              .filter((b: any) => {
+                // CHỈ giữ lại các mục thực sự là phí cố định:
+                // 1. Không thuộc category của 6 lọ chuẩn
+                // 2. HOẶC thuộc category đó nhưng có tiêu đề riêng (vd: Ăn uống bên ngoài)
+                const isJarCat = jarCategories.includes(Number(b.category_id));
+                const hasTitle = b.budget_title && b.budget_title.trim() !== '';
+                return !isJarCat || hasTitle;
+              })
+              .map((b: any) => ({ 
+                categoryName: b.budget_title || b.category_name, 
+                amount: b.limit_amount,
+                category: b.category_name
+              }))
           : [];
         await userApi.updateOnboarding(realIncome, existingBudgets);
         // Thay alert bằng toast trạng thái
@@ -483,7 +501,30 @@ export default function BudgetManager() {
             <p className="text-[10px] font-black uppercase tracking-widest text-theme-text-primary">3. Khả dụng để chia lọ</p>
           </div>
           <h3 className="text-3xl font-black text-primary-400 tracking-tighter drop-shadow-sm">{fmtVND(availableToBudget)}</h3>
-          <p className="text-[9px] text-theme-text-muted font-bold mt-2 italic">Số dư thực tế để phân bổ các lọ.</p>
+          <div className="mt-3 space-y-1 text-[9px] text-theme-text-muted font-bold">
+            <div className="flex justify-between">
+              <span className="opacity-60">Thu nhập ròng</span>
+              <span className="text-cyan-400">{fmtVND(income)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="opacity-60">− Phí cố định</span>
+              <span className="text-rose-400">−{fmtVND(totalFixed)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="opacity-60">− Chi tiêu tháng này</span>
+              <span className="text-amber-400">−{fmtVND(actualExpense)}</span>
+            </div>
+            {lockedEmergency > 0 && (
+              <div className="flex justify-between">
+                <span className="opacity-60">− Quỹ dự phòng đang khóa</span>
+                <span className="text-sky-400">−{fmtVND(lockedEmergency)}</span>
+              </div>
+            )}
+            <div className="border-t border-white/10 pt-1 flex justify-between">
+              <span className="text-primary-300 font-black">= Còn khả dụng</span>
+              <span className="text-primary-300">{fmtVND(availableToBudget)}</span>
+            </div>
+          </div>
         </div>
       </div>
 

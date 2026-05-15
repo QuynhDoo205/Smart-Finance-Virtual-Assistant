@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, LogIn, Sparkles, AlertCircle, Loader2, ArrowRight, CheckCircle2, Eye, EyeOff, X, Globe, MessageSquare } from 'lucide-react';
@@ -6,6 +6,7 @@ import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
 import { authApi } from '../../utils/api';
 import type { UserProfile } from '../../utils/api';
 import authStore from '../../store/authStore';
+import { getTheme } from '../../store/themeStore';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -18,6 +19,14 @@ export default function Login() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
   const [successUser, setSuccessUser] = useState<UserProfile | null>(null);
+
+  // Force dark theme for Auth pages to preserve video background fidelity
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'cyberpunk');
+    return () => {
+      document.documentElement.setAttribute('data-theme', getTheme());
+    };
+  }, []);
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -111,10 +120,14 @@ export default function Login() {
                 KỶ NGUYÊN<br/>
                 <span className="text-[#00D1FF]">TÀI CHÍNH AI</span>
               </h1>
-              <span className="absolute -right-4 lg:-right-16 top-0 lg:top-4 font-condiment text-[#00D1FF] text-2xl sm:text-4xl md:text-5xl -rotate-6 opacity-95 drop-shadow-[0_0_15px_rgba(0,209,255,0.6)]">Trợ lý ảo</span>
+              <div className="absolute -right-4 lg:-right-12 top-0 lg:top-4 bg-[#00D1FF]/10 border border-[#00D1FF]/30 backdrop-blur-md px-4 py-1.5 rounded-full shadow-[0_0_20px_rgba(0,209,255,0.3)]">
+                <span className="font-bold text-[#00D1FF] text-xs sm:text-sm uppercase tracking-widest flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3" /> Trợ lý ảo
+                </span>
+              </div>
             </div>
-            <p className="mt-6 text-sm sm:text-base text-[#EFF4FF] font-bold max-w-md leading-relaxed uppercase tracking-[0.15em] opacity-80 mx-auto lg:mx-0">
-              Công nghệ trí tuệ nhân tạo tối ưu hóa dòng tiền và kiến tạo tương lai vững chắc.
+            <p className="mt-8 text-sm sm:text-base text-white/70 font-medium max-w-md leading-relaxed tracking-wide mx-auto lg:mx-0">
+              Công nghệ trí tuệ nhân tạo tối ưu hóa dòng tiền và kiến tạo tương lai vững chắc cho bạn.
             </p>
           </motion.div>
         </div>
@@ -131,7 +144,7 @@ export default function Login() {
                   <h2 className="font-grotesk text-4xl uppercase tracking-tighter leading-none mb-2 text-white">Đăng nhập</h2>
                   <div className="flex items-center gap-2 justify-center lg:justify-start">
                      <div className="h-[2px] w-10 bg-[#00D1FF]" />
-                     <p className="text-[#00D1FF] font-black text-[10px] tracking-[0.4em] uppercase">Truy cập hệ thống</p>
+                     <p className="text-[#00D1FF] font-black text-[10px] tracking-widest uppercase">Truy cập hệ thống</p>
                   </div>
                 </div>
 
@@ -143,7 +156,7 @@ export default function Login() {
 
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white uppercase tracking-[0.4em] ml-3">Địa chỉ Email</label>
+                    <label className="text-[10px] font-black text-white/80 uppercase tracking-widest ml-3">Địa chỉ Email</label>
                     <div className="relative group">
                       <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-white/40 group-focus-within:text-[#00D1FF] transition-all" />
                       <input
@@ -156,7 +169,7 @@ export default function Login() {
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-center px-3">
-                      <label className="text-[10px] font-black text-white uppercase tracking-[0.4em]">Mật khẩu</label>
+                      <label className="text-[10px] font-black text-white/80 uppercase tracking-widest">Mật khẩu</label>
                       <button type="button" onClick={() => setShowForgotModal(true)} className="text-[10px] font-black text-[#00D1FF] hover:text-white uppercase tracking-widest transition-all">Quên mật khẩu?</button>
                     </div>
                     <div className="relative group">
@@ -170,11 +183,14 @@ export default function Login() {
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
+                    {password.length > 0 && password.length < 6 && (
+                      <p className="text-[10px] text-rose-400 font-bold ml-3 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> Mật khẩu phải từ 6 ký tự trở lên</p>
+                    )}
                   </div>
 
                   <button 
                     disabled={loading} type="submit"
-                    className="group relative w-full py-4 rounded-full bg-[#00D1FF] text-[#010828] font-grotesk text-base uppercase tracking-[0.2em] hover:bg-white transition-all duration-300 flex items-center justify-center gap-3 mt-6 overflow-hidden shadow-xl shadow-[#00D1FF]/10"
+                    className="group relative w-full py-4 rounded-full bg-gradient-to-r from-[#00D1FF] to-[#0077FF] text-white font-grotesk text-base uppercase tracking-widest hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-3 mt-6 shadow-[0_10px_30px_rgba(0,209,255,0.3)]"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-shine" />
                     {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <><LogIn size={20} /> Đăng nhập ngay</>}
@@ -183,8 +199,8 @@ export default function Login() {
 
                 <div className="mt-8">
                   <div className="relative flex items-center justify-center mb-6">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-                    <span className="relative px-4 bg-[#010828] text-[9px] font-black text-white/40 uppercase tracking-[0.5em]">Hoặc đăng nhập với</span>
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/20"></div></div>
+                    <span className="relative px-4 bg-[#010828] text-[9px] font-black text-white/50 uppercase tracking-widest">Hoặc tiếp tục với</span>
                   </div>
                   
                   <button
@@ -197,18 +213,32 @@ export default function Login() {
                 </div>
                 
                 <p className="mt-8 text-center text-white/50 font-bold text-[11px] tracking-widest uppercase">
-                  Chưa có tài khoản? <Link to="/register" className="text-[#00D1FF] hover:text-white transition-colors underline underline-offset-4 decoration-2 font-black">Đăng ký ngay</Link>
+                  Chưa có tài khoản? <Link to="/register" className="text-[#00D1FF] hover:text-white transition-colors font-black ml-1">Đăng ký</Link>
                 </p>
               </motion.div>
             ) : (
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="liquid-glass bg-[#010828]/70 backdrop-blur-[35px] rounded-[40px] p-16 text-center border border-[#00D1FF]/30 shadow-2xl">
-                <div className="w-20 h-20 rounded-full bg-[#00D1FF]/20 flex items-center justify-center mx-auto mb-8 border border-[#00D1FF]/40 shadow-inner">
-                  <CheckCircle2 className="w-12 h-12 text-[#00D1FF]" />
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="liquid-glass bg-[#010828]/70 backdrop-blur-[35px] rounded-[40px] p-10 sm:p-12 text-center border border-[#00D1FF]/30 shadow-2xl flex flex-col items-center justify-center">
+                <div className="relative w-24 h-24 mx-auto mb-6">
+                  <div className="absolute inset-0 rounded-full bg-[#00D1FF]/20 animate-pulse" />
+                  {successUser?.avatar_url ? (
+                    <img src={successUser.avatar_url} alt="Avatar" className="w-full h-full rounded-full object-cover border-2 border-[#00D1FF] relative z-10" />
+                  ) : (
+                    <div className="w-full h-full rounded-full border-2 border-[#00D1FF] bg-[#010828] text-[#00D1FF] font-grotesk text-4xl flex items-center justify-center relative z-10">
+                      {successUser?.full_name ? successUser.full_name.charAt(0).toUpperCase() : <CheckCircle2 className="w-10 h-10" />}
+                    </div>
+                  )}
+                  <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-emerald-500 rounded-full border-[3px] border-[#010828] flex items-center justify-center z-20 shadow-lg">
+                    <CheckCircle2 className="w-4 h-4 text-white" />
+                  </div>
                 </div>
-                <h2 className="font-grotesk text-5xl uppercase tracking-tighter mb-4 text-white">Thành công</h2>
-                <p className="text-[#00D1FF] text-xl mb-12 uppercase tracking-[0.2em] font-grotesk">Chào mừng trở lại</p>
-                <button onClick={proceedToApp} className="group relative w-full py-4 rounded-full bg-[#00D1FF] text-[#010828] font-grotesk text-lg uppercase tracking-widest hover:bg-white transition-all flex items-center justify-center gap-4 shadow-2xl">
-                   Bắt đầu <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
+                
+                <h2 className="font-grotesk text-3xl sm:text-4xl uppercase tracking-tighter mb-3 text-white">Xác thực thành công</h2>
+                <p className="text-white/70 text-sm mb-10 font-bold tracking-wider">
+                  Chào mừng trở lại, <span className="text-[#00D1FF]">{successUser?.full_name || 'Người dùng'}</span>!
+                </p>
+                
+                <button onClick={proceedToApp} className="group relative w-full py-4 rounded-full bg-gradient-to-r from-[#00D1FF] to-[#0077FF] text-white font-grotesk text-base uppercase tracking-widest hover:opacity-90 transition-all flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(0,209,255,0.3)]">
+                   Vào bảng điều khiển <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
                 </button>
               </motion.div>
             )}
@@ -220,22 +250,44 @@ export default function Login() {
       <AnimatePresence>
         {showForgotModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-[#010828]/95 backdrop-blur-[30px]" onClick={() => setShowForgotModal(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 30 }} className="relative w-full max-w-lg liquid-glass bg-[#010828]/80 rounded-[40px] p-10 border border-white/20 shadow-2xl">
-              <button onClick={() => setShowForgotModal(false)} className="absolute top-8 right-8 text-white/30 hover:text-white transition-colors p-2"><X size={24} /></button>
-              <h3 className="font-grotesk text-4xl uppercase tracking-tighter mb-4 leading-none text-white">Khôi phục</h3>
-              <p className="text-white/50 mb-8 uppercase text-xs font-black tracking-[0.4em] leading-relaxed">Nhập email để nhận hướng dẫn khôi phục mật khẩu.</p>
-              <form onSubmit={handleForgotPassword} className="space-y-6">
-                <div className="space-y-3">
-                   <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em] ml-3">Email bảo mật</label>
-                   <input
-                    type="email" placeholder="VD: NGUYEN@EXAMPLE.COM" value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)} required
-                    className="w-full bg-black/50 border border-white/10 rounded-full py-4 px-8 text-white text-lg focus:outline-none focus:border-[#00D1FF] transition-all font-bold tracking-widest"
-                  />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-[#010828]/40 backdrop-blur-md" onClick={() => setShowForgotModal(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 30 }} className="relative w-full max-w-[420px] liquid-glass bg-[#010828]/70 backdrop-blur-[25px] rounded-[35px] p-8 sm:p-10 border border-white/20 shadow-[0_25px_80px_rgba(0,0,0,0.7)]">
+              <button onClick={() => setShowForgotModal(false)} className="absolute top-6 right-6 text-white/30 hover:text-white transition-colors bg-white/5 hover:bg-rose-500 rounded-full p-2"><X size={16} /></button>
+              
+              <div className="mb-8 text-center">
+                <div className="w-14 h-14 mx-auto bg-[#00D1FF]/10 rounded-full flex items-center justify-center border border-[#00D1FF]/30 mb-4 shadow-[0_0_20px_rgba(0,209,255,0.2)]">
+                  <Lock className="w-6 h-6 text-[#00D1FF]" />
                 </div>
-                <button type="submit" disabled={forgotLoading} className="w-full py-4 rounded-full bg-[#00D1FF] text-[#010828] font-grotesk text-lg uppercase tracking-widest hover:bg-white transition-all shadow-2xl">
-                  {forgotLoading ? <Loader2 className="animate-spin mx-auto w-8 h-8" /> : 'Gửi yêu cầu'}
+                <h3 className="font-grotesk text-2xl sm:text-3xl uppercase tracking-tighter mb-2 leading-none text-white">Khôi phục mật khẩu</h3>
+                <p className="text-white/60 text-xs font-bold leading-relaxed">Vui lòng nhập email đăng ký, chúng tôi sẽ gửi hướng dẫn khôi phục qua email.</p>
+              </div>
+              
+              {forgotMessage && (
+                <div className={`mb-6 p-3.5 rounded-xl text-[10px] font-bold flex items-center gap-2 shadow-lg ${forgotMessage.includes('Lỗi') || forgotMessage.includes('không') ? 'bg-rose-500/20 border border-rose-500/30 text-rose-100 animate-shake' : 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-100'}`}>
+                  {forgotMessage.includes('Lỗi') || forgotMessage.includes('không') ? <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />} 
+                  <span>{forgotMessage}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleForgotPassword} className="space-y-6">
+                <div className="space-y-1.5">
+                   <label className="text-[9px] font-black text-white/80 uppercase tracking-widest ml-3">Email bảo mật</label>
+                   <div className="relative group">
+                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-[#00D1FF] transition-all" />
+                     <input
+                      type="email" placeholder="NAME@EXAMPLE.COM" value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)} required
+                      className="w-full bg-black/50 border border-white/10 rounded-full py-3.5 pl-12 pr-5 text-sm focus:outline-none focus:bg-black/70 focus:border-[#00D1FF]/40 transition-all placeholder:text-white/10 font-bold text-white"
+                    />
+                  </div>
+                </div>
+                
+                <button 
+                  disabled={forgotLoading} type="submit"
+                  className="group relative w-full py-4 rounded-full bg-gradient-to-r from-[#00D1FF] to-[#0077FF] text-white font-grotesk text-base uppercase tracking-widest hover:opacity-90 disabled:opacity-50 transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(0,209,255,0.3)]"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-shine rounded-full" />
+                  {forgotLoading ? <Loader2 className="animate-spin w-5 h-5" /> : <><ArrowRight size={18} /> Gửi yêu cầu</>}
                 </button>
               </form>
             </motion.div>

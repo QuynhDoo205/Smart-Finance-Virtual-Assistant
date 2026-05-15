@@ -4,7 +4,7 @@ import * as Lucide from 'lucide-react';
 import {
   Key, Home, Shield, Compass, ArrowUpRight,
   Plus, Pencil, Trash2, X, Check, CheckCircle2, AlertTriangle, DollarSign,
-  FileText, Tag, TrendingDown, Mail, Loader2, RefreshCw, HelpCircle
+  FileText, Tag, TrendingDown, Mail, Loader2, RefreshCw, HelpCircle, Eye, EyeOff
 } from 'lucide-react';
 import { userApi, dashboardApi, incomeApi, API_ROOT } from '../../utils/api';
 import authStore from '../../store/authStore';
@@ -495,6 +495,8 @@ export default function Profile() {
     email: user?.email || '' 
   });
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
   const totalFixed = expenses.reduce((s, e) => s + e.amount, 0);
@@ -969,37 +971,61 @@ export default function Profile() {
                      </div>
                   </div>
 
-                  <div className="space-y-5 w-full mb-8">
-                    {[
-                      { label: 'Mật khẩu hiện tại', icon: Key, color: 'text-theme-text-muted', focus: 'rgba(255,255,255,0.2)' },
-                      { label: 'Mật khẩu mới', icon: Shield, color: 'text-fuchsia-400', focus: 'rgba(217,70,239,0.45)' },
-                    ].map(({ label, icon: Icon, color, focus }) => (
-                      <div key={label} className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-theme-text-muted uppercase tracking-widest">{label}</label>
-                        <div className="relative">
-                          <Icon className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${color} pointer-events-none`} />
-                          <input
-                            type="password"
-                            className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-subtle-border)] rounded-2xl px-4 py-4 pl-12 text-lg text-theme-text-primary placeholder-gray-600 focus:outline-none transition-all font-mono"
-                            placeholder="••••••••"
-                            onFocus={e => { e.target.style.borderColor = focus; e.target.style.boxShadow = `0 0 0 3px ${focus}33`; }}
-                            onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.05)'; e.target.style.boxShadow = 'none'; }}
-                          />
+                  {userAuth.provider === 'google' ? (
+                    <div className="mb-8 p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 flex flex-col items-center justify-center text-center w-full">
+                      <div className="w-16 h-16 bg-indigo-500/10 rounded-full flex items-center justify-center mb-4 border border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
+                        <Shield className="w-8 h-8 text-indigo-400" />
+                      </div>
+                      <h3 className="text-theme-text-primary font-bold text-lg mb-2">Được bảo vệ bởi Google</h3>
+                      <p className="text-theme-text-muted text-sm max-w-md leading-relaxed">Tài khoản của bạn được liên kết trực tiếp với Google. Bạn không cần sử dụng mật khẩu và mức độ bảo mật đang ở mức tối đa.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-6 w-full mb-8">
+                        <div className="space-y-2 relative">
+                          <label className="text-[11px] font-bold text-theme-text-muted uppercase tracking-widest">Mật khẩu hiện tại</label>
+                          <div className="relative group">
+                            <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-theme-text-muted pointer-events-none group-focus-within:text-white transition-colors" />
+                            <input
+                              type={showCurrentPassword ? 'text' : 'password'}
+                              className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-subtle-border)] rounded-2xl px-4 py-4 pl-12 pr-12 text-lg text-theme-text-primary placeholder-gray-600 focus:outline-none focus:border-white/20 focus:ring-4 focus:ring-white/5 transition-all font-mono"
+                              placeholder="••••••••"
+                            />
+                            <button type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-white transition-colors">
+                              {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 relative">
+                          <label className="text-[11px] font-bold text-theme-text-muted uppercase tracking-widest text-fuchsia-400">Mật khẩu mới</label>
+                          <div className="relative group">
+                            <Shield className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-fuchsia-400/50 pointer-events-none group-focus-within:text-fuchsia-400 transition-colors" />
+                            <input
+                              type={showNewPassword ? 'text' : 'password'}
+                              className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-subtle-border)] rounded-2xl px-4 py-4 pl-12 pr-12 text-lg text-theme-text-primary placeholder-gray-600 focus:outline-none focus:border-fuchsia-400/50 focus:ring-4 focus:ring-fuchsia-500/10 transition-all font-mono"
+                              placeholder="••••••••"
+                            />
+                            <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-fuchsia-400 transition-colors">
+                              {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-theme-text-muted ml-1 mt-2 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5"/> Mật khẩu mới cần tối thiểu 6 ký tự để đảm bảo an toàn.</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
 
-                  <div className="flex justify-end pt-6 border-t border-[var(--theme-subtle-border)] w-full">
-                    <motion.button
-                      whileHover={{ scale: 1.02, boxShadow: '0 0 28px rgba(217,70,239,0.45)' }}
-                      whileTap={{ scale: 0.97 }}
-                      className="flex items-center justify-center gap-2 px-8 py-4 w-full md:w-auto bg-gradient-to-r from-purple-600 to-fuchsia-500 text-theme-text-primary font-bold rounded-xl"
-                      style={{ boxShadow: '0 0 20px rgba(217,70,239,0.3)' }}
-                    >
-                      <Key className="w-5 h-5" /> Đổi mật khẩu
-                    </motion.button>
-                  </div>
+                      <div className="flex justify-end pt-6 border-t border-[var(--theme-subtle-border)] w-full">
+                        <motion.button
+                          whileHover={{ scale: 1.02, boxShadow: '0 0 28px rgba(217,70,239,0.45)' }}
+                          whileTap={{ scale: 0.97 }}
+                          className="flex items-center justify-center gap-2 px-8 py-4 w-full md:w-auto bg-gradient-to-r from-purple-600 to-fuchsia-500 text-theme-text-primary font-bold rounded-xl"
+                          style={{ boxShadow: '0 0 20px rgba(217,70,239,0.3)' }}
+                        >
+                          <Key className="w-5 h-5" /> Cập nhật mật khẩu
+                        </motion.button>
+                      </div>
+                    </>
+                  )}
 
                   {/* Danger Zone */}
                   <div className="mt-12 pt-8 border-t border-red-500/20 w-full overflow-hidden relative group">

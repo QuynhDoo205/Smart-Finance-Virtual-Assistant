@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Share+Tech+Mono&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -184,13 +184,13 @@
   body {
     background-color: var(--theme-bg-deep);
     color: var(--theme-text-primary);
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     @apply antialiased overflow-x-hidden;
     transition: background-color 0.4s ease, color 0.4s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Inter', sans-serif;
   }
 
   /* Remove browser default password reveal/clear buttons (Edge/Chrome) */
@@ -397,11 +397,7 @@
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--theme-neon-primary); }
 
-/* Light tech specific background adjustment */
-[data-theme="light-tech"] .min-h-screen,
-[data-theme="light-tech"] #root > div {
-  background-color: var(--theme-bg-deep);
-}
+/* Removed light tech specific background adjustment as body handles it */
 
 /* Matrix theme - monospace everything in budget page */
 [data-theme="matrix"] h1,
@@ -419,39 +415,174 @@
 }
 
 /* ============================================
-   ORBIS NFT - LIQUID GLASS SYSTEM
+   THEME SAFETY: AUTH PAGES ALWAYS DARK
+   (Login/Register have fixed dark video backgrounds)
    ============================================ */
 
-.font-grotesk { font-family: 'Anton', sans-serif !important; }
-.font-condiment { font-family: 'Condiment', cursive !important; }
-
-.liquid-glass {
-  background: rgba(255, 255, 255, 0.01);
-  background-blend-mode: luminosity;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: none;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  position: relative;
-  overflow: hidden;
+/* Force auth/login pages to always render in dark theme */
+[data-theme="light-tech"] .auth-dark-lock,
+[data-theme="sakura"] .auth-dark-lock,
+[data-theme="ocean"] .auth-dark-lock {
+  background-color: #010828 !important;
 }
 
-.liquid-glass::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1.4px;
-  background: linear-gradient(180deg,
-    rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%,
-    rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%,
-    rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  pointer-events: none;
+/* ============================================
+   THEME SAFETY: LIGHT THEMES TEXT CONTRAST FIX
+   Nova Light, Sakura Pink, Ocean Blue
+   ============================================ */
+
+/* --- text-white & text-white/* → must be dark on light themes --- */
+[data-theme="light-tech"] .text-white,
+[data-theme="sakura"] .text-white,
+[data-theme="ocean"] .text-white {
+  color: var(--theme-text-primary) !important;
 }
+
+[data-theme="light-tech"] .text-white\/70,
+[data-theme="light-tech"] .text-white\/60,
+[data-theme="light-tech"] .text-white\/50,
+[data-theme="light-tech"] .text-white\/40,
+[data-theme="light-tech"] .text-white\/30,
+[data-theme="sakura"] .text-white\/70,
+[data-theme="sakura"] .text-white\/60,
+[data-theme="sakura"] .text-white\/50,
+[data-theme="sakura"] .text-white\/40,
+[data-theme="sakura"] .text-white\/30,
+[data-theme="ocean"] .text-white\/70,
+[data-theme="ocean"] .text-white\/60,
+[data-theme="ocean"] .text-white\/50,
+[data-theme="ocean"] .text-white\/40,
+[data-theme="ocean"] .text-white\/30 {
+  color: var(--theme-text-muted) !important;
+}
+
+/* --- Card backgrounds: bg-black/* & bg-white/* --- */
+[data-theme="light-tech"] .bg-black\/50,
+[data-theme="light-tech"] .bg-black\/60,
+[data-theme="light-tech"] .bg-black\/70,
+[data-theme="light-tech"] .bg-black\/80,
+[data-theme="sakura"] .bg-black\/50,
+[data-theme="sakura"] .bg-black\/60,
+[data-theme="sakura"] .bg-black\/70,
+[data-theme="sakura"] .bg-black\/80,
+[data-theme="ocean"] .bg-black\/50,
+[data-theme="ocean"] .bg-black\/60,
+[data-theme="ocean"] .bg-black\/70,
+[data-theme="ocean"] .bg-black\/80 {
+  background-color: var(--theme-subtle-bg) !important;
+  border-color: var(--theme-border) !important;
+}
+
+/* --- Input fields --- */
+[data-theme="light-tech"] input,
+[data-theme="sakura"] input,
+[data-theme="ocean"] input {
+  background-color: var(--theme-bg-surface) !important;
+  color: var(--theme-text-primary) !important;
+  border-color: var(--theme-border) !important;
+}
+
+[data-theme="light-tech"] input::placeholder,
+[data-theme="sakura"] input::placeholder,
+[data-theme="ocean"] input::placeholder {
+  color: var(--theme-text-muted) !important;
+  opacity: 0.6 !important;
+}
+
+/* --- Sidebar & Navigation panels --- */
+[data-theme="light-tech"] .sidebar-wrapper,
+[data-theme="sakura"] .sidebar-wrapper,
+[data-theme="ocean"] .sidebar-wrapper {
+  background-color: var(--theme-bg-panel) !important;
+  border-right-color: var(--theme-border) !important;
+}
+
+/* --- Floating AI / Chat panel --- */
+[data-theme="light-tech"] .ai-chat-panel,
+[data-theme="sakura"] .ai-chat-panel,
+[data-theme="ocean"] .ai-chat-panel {
+  background-color: var(--theme-bg-surface) !important;
+  border-color: var(--theme-border) !important;
+}
+
+/* --- glass-panel on light themes needs stronger bg --- */
+[data-theme="light-tech"] .glass-panel,
+[data-theme="sakura"] .glass-panel,
+[data-theme="ocean"] .glass-panel {
+  background: var(--theme-bg-surface) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06) !important;
+}
+
+/* --- liquid-glass on light themes --- */
+[data-theme="light-tech"] .liquid-glass,
+[data-theme="sakura"] .liquid-glass,
+[data-theme="ocean"] .liquid-glass {
+  background: var(--theme-bg-panel) !important;
+  border: 1px solid var(--theme-border) !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08) !important;
+}
+
+/* --- Theme icon colors - keep themed accent on light --- */
+[data-theme="light-tech"] .text-\[\#00D1FF\],
+[data-theme="light-tech"] .text-cyan-400 {
+  color: var(--theme-neon-primary) !important;
+}
+
+[data-theme="sakura"] .text-\[\#00D1FF\],
+[data-theme="sakura"] .text-cyan-400 {
+  color: var(--theme-neon-primary) !important;
+}
+
+[data-theme="ocean"] .text-\[\#00D1FF\],
+[data-theme="ocean"] .text-cyan-400 {
+  color: var(--theme-neon-primary) !important;
+}
+
+/* --- Borders on light themes --- */
+[data-theme="light-tech"] .border-white\/20,
+[data-theme="light-tech"] .border-white\/10,
+[data-theme="light-tech"] .border-white\/5,
+[data-theme="sakura"] .border-white\/20,
+[data-theme="sakura"] .border-white\/10,
+[data-theme="sakura"] .border-white\/5,
+[data-theme="ocean"] .border-white\/20,
+[data-theme="ocean"] .border-white\/10,
+[data-theme="ocean"] .border-white\/5 {
+  border-color: var(--theme-border) !important;
+}
+
+/* --- Modal overlays: bg-[#010828]/* on light themes --- */
+[data-theme="light-tech"] [class*="bg-\[#010828\]"],
+[data-theme="sakura"] [class*="bg-\[#010828\]"],
+[data-theme="ocean"] [class*="bg-\[#010828\]"] {
+  background-color: var(--theme-bg-panel) !important;
+}
+
+/* --- Dashboard page headings --- */
+[data-theme="light-tech"] h1,
+[data-theme="light-tech"] h2,
+[data-theme="light-tech"] h3,
+[data-theme="sakura"] h1,
+[data-theme="sakura"] h2,
+[data-theme="sakura"] h3,
+[data-theme="ocean"] h1,
+[data-theme="ocean"] h2,
+[data-theme="ocean"] h3 {
+  color: var(--theme-text-primary) !important;
+}
+
+/* --- Gradient text on light themes: ensure readable --- */
+[data-theme="light-tech"] .bg-clip-text,
+[data-theme="sakura"] .bg-clip-text,
+[data-theme="ocean"] .bg-clip-text {
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ============================================
+   MISC
+   ============================================ */
 
 /* Texture Overlay */
 .texture-overlay {
@@ -464,3 +595,4 @@
   opacity: 0.6;
   background-size: cover;
 }
+

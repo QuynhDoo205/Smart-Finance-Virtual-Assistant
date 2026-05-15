@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   AlertTriangle, ShieldAlert, HeartPulse, Shield, Siren, 
   ArrowDownToLine, Flame, CheckCircle, Loader2, Sparkles, 
-  X, DollarSign, Wallet, Clock, ArrowRight
+  X, DollarSign, Wallet, Clock, ArrowRight, Lock, Settings2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { dashboardApi, transactionsApi } from '../../utils/api';
@@ -60,6 +60,9 @@ export default function CrisisManager() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const [emergencyTransactions, setEmergencyTransactions] = useState<any[]>([]);
+  const [emergencyFundRate, setEmergencyFundRate] = useState(10);
+  const [isSavingRate, setIsSavingRate] = useState(false);
+  const [showRateEditor, setShowRateEditor] = useState(false);
 
   const loadData = async () => {
     try {
@@ -68,7 +71,11 @@ export default function CrisisManager() {
         transactionsApi.list(50)
       ]);
       
-      if (sumRes.success) setSummary(sumRes.data);
+    if (sumRes.success) {
+      setSummary(sumRes.data);
+      // Lấy tỷ lệ quỹ dự phòng từ API
+      if (sumRes.data.emergencyFundRate) setEmergencyFundRate(sumRes.data.emergencyFundRate);
+    }
       
       if (transRes.success) {
         const emergency = transRes.data.transactions.filter((t: any) => 
@@ -98,6 +105,11 @@ export default function CrisisManager() {
     const finalAmount = Number(withdrawAmount);
     if (isNaN(finalAmount) || finalAmount <= 0) {
       setNotification({ type: 'error', msg: 'Vui lòng nhập số tiền hợp lệ!' });
+      return;
+    }
+    // Chặn rút nếu tài chính đang ở mức an toàn
+    if (!isWarning && !isCrisis) {
+      setNotification({ type: 'error', msg: 'Chỉ được rút khi tài chính vào mức Cảnh báo hoặc Khủng hoảng!' });
       return;
     }
 
@@ -140,10 +152,30 @@ export default function CrisisManager() {
   const isWarning = usagePercent >= 70 && usagePercent <= 95;
   const isCrisis = usagePercent > 95 || summary?.isSurvivalMode;
 
-  // Tính quỹ dự phòng (giả định 10% thu nhập là lọ dự phòng)
-  const totalEmergencyLimit = Number(summary?.totalIncome || 0) * 0.1;
+  // Số tiền quỹ dự phòng = % số dư khả dụng (sau phí cố định)
+  const availableBase = Number(summary?.availableAfterCommitments || summary?.totalBalance || 0);
+  const totalEmergencyLimit = summary?.emergencyLimit ?? (availableBase * (emergencyFundRate / 100));
   const totalWithdrawn = emergencyTransactions.reduce((sum, t) => sum + Number(t.so_tien || t.amount || 0), 0);
   const remainingEmergency = Math.max(0, totalEmergencyLimit - totalWithdrawn);
+
+  // Số dư ví thực sự = tổng tài sản - phí cố định - phần đã khóa cho quỹ dự phòng
+  const walletBalance = summary?.netAvailableBalance ?? Math.max(0, availableBase - totalEmergencyLimit);
+
+  const handleSaveRate = async () => {
+    setIsSavingRate(true);
+    try {
+      const res = await dashboardApi.updateEmergencyRate(emergencyFundRate);
+      if (res.success) {
+        setNotification({ type: 'success', msg: `Đã lưu tỷ lệ quỹ dự phòng: ${emergencyFundRate}%` });
+        setShowRateEditor(false);
+        await loadData(); // Reload để cập nhật số liệu
+      }
+    } catch {
+      setNotification({ type: 'error', msg: 'Có lỗi khi lưu cài đặt' });
+    } finally {
+      setIsSavingRate(false);
+    }
+  };
 
   const containerVars = {
     hidden: { opacity: 0 },
@@ -246,25 +278,77 @@ export default function CrisisManager() {
                 <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.05]">
                   <div className="flex items-center gap-2 mb-2 text-theme-text-muted">
                     <Wallet className="w-4 h-4" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Số dư ví</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Số dư ví (khả dụng)</span>
                   </div>
                   <p className="text-xl font-black text-theme-text-primary">
-                    {new Intl.NumberFormat('vi-VN').format(summary?.totalBalance || 0)}
+                    {new Intl.NumberFormat('vi-VN').format(walletBalance)}
                     <span className="text-xs ml-1 opacity-50">đ</span>
+                  </p>
+                  <p className="text-[9px] text-theme-text-muted mt-1 italic">
+                    Sau khi trừ Phí cố định & Quỹ ({emergencyFundRate}%)
                   </p>
                 </div>
                 <div className="p-4 rounded-2xl bg-sky-500/5 border border-sky-500/10 border-dashed">
-                  <div className="flex items-center gap-2 mb-2 text-sky-400">
-                    <Shield className="w-4 h-4" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Quỹ dự phòng còn</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-sky-400">
+                      <Shield className="w-4 h-4" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Quỹ dự phòng còn</span>
+                    </div>
+                    <button 
+                      onClick={() => setShowRateEditor(!showRateEditor)}
+                      className="p-1 rounded-lg bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-all"
+                      title="Chỉnh tỷ lệ quỹ"
+                    >
+                      <Settings2 className="w-3 h-3" />
+                    </button>
                   </div>
                   <p className="text-xl font-black text-sky-400">
                     {new Intl.NumberFormat('vi-VN').format(remainingEmergency)}
                     <span className="text-xs ml-1 opacity-50">đ</span>
                   </p>
-                  <p className="text-[9px] text-theme-text-muted mt-1 italic">Hạn mức ảo (10% thu nhập)</p>
+                  <p className="text-[9px] text-theme-text-muted mt-1 italic">Hạn mức: {emergencyFundRate}% số dư ({new Intl.NumberFormat('vi-VN').format(totalEmergencyLimit)}đ)</p>
                 </div>
               </div>
+
+              {/* Slider chỉnh tỷ lệ quỹ dự phòng */}
+              <AnimatePresence>
+                {showRateEditor && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-4 rounded-2xl bg-sky-500/5 border border-sky-500/20 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-black text-sky-400 uppercase tracking-widest">Tỷ lệ Quỹ Dự Phòng</p>
+                        <span className="text-lg font-black text-sky-400">{emergencyFundRate}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1" max="50" step="1"
+                        value={emergencyFundRate}
+                        onChange={(e) => setEmergencyFundRate(Number(e.target.value))}
+                        className="w-full h-2 rounded-full appearance-none bg-sky-500/20 accent-sky-400 cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[9px] text-theme-text-muted">
+                        <span>Thấp (1%)</span><span>An toàn (10%)</span><span>Cấp thủ (30%)</span><span>Tối đa (50%)</span>
+                      </div>
+                      <p className="text-[9px] text-sky-400/70 italic">
+                        Cơ sở tính: {new Intl.NumberFormat('vi-VN').format(availableBase)}đ (Sau phí cố định) <br/>
+                        Quỹ sẽ khóa: {new Intl.NumberFormat('vi-VN').format(availableBase * (emergencyFundRate / 100))}đ
+                      </p>
+                      <button
+                        onClick={handleSaveRate}
+                        disabled={isSavingRate}
+                        className="w-full py-2.5 rounded-xl bg-sky-500 text-black font-black text-xs uppercase tracking-widest hover:bg-sky-400 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                      >
+                        {isSavingRate ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu cài đặt'}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </motion.div>
@@ -325,17 +409,36 @@ export default function CrisisManager() {
 
       <motion.div variants={itemVars} className="flex flex-col items-center gap-4 pt-10">
         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-500/60">Giao dịch nhạy cảm</p>
-        <button 
-          onClick={() => setShowWithdrawModal(true)}
-          className="relative group px-10 py-5 bg-[#0F172A] border-2 border-red-500/30 hover:border-red-500 rounded-[2rem] overflow-hidden transition-all duration-500 shadow-[0_0_40px_rgba(239,68,68,0.15)] hover:shadow-[0_0_60px_rgba(239,68,68,0.4)] hover:scale-105 active:scale-95"
-        >
-          <div className="absolute inset-0 w-full h-full bg-red-500/5 group-hover:bg-red-500/10 transition-colors" />
-          <span className="relative z-10 flex items-center gap-4 font-black text-red-500 group-hover:text-red-400 uppercase tracking-widest text-base">
-            <Siren className="w-6 h-6 animate-pulse" /> RÚT TIỀN TỪ QUỸ DỰ PHÒNG
-          </span>
-        </button>
-        <p className="text-xs text-theme-text-muted italic max-w-sm text-center">Tiền sẽ được "vật lý" trừ khỏi hạn mức tiết kiệm tháng này của bạn.</p>
+        {!isWarning && !isCrisis ? (
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative px-10 py-5 bg-[#0F172A] border-2 border-gray-500/20 rounded-[2rem] opacity-60 cursor-not-allowed">
+              <span className="flex items-center gap-4 font-black text-gray-500 uppercase tracking-widest text-base">
+                <Lock className="w-6 h-6" /> RÚT QUỸ DỰ PHÒNG
+              </span>
+            </div>
+            <p className="text-xs text-emerald-500/80 font-bold flex items-center gap-2">
+              <Shield className="w-4 h-4" /> Tài chính đang AN TOÀN — Chức năng rút bị khóa
+            </p>
+            <p className="text-[10px] text-theme-text-muted italic max-w-sm text-center">
+              Quỹ dự phòng chỉ mở khi chi tiêu vượt qua 70% thu nhập (mức Cảnh báo hoặc Khủng hoảng).
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <button 
+              onClick={() => setShowWithdrawModal(true)}
+              className="relative group px-10 py-5 bg-[#0F172A] border-2 border-red-500/30 hover:border-red-500 rounded-[2rem] overflow-hidden transition-all duration-500 shadow-[0_0_40px_rgba(239,68,68,0.15)] hover:shadow-[0_0_60px_rgba(239,68,68,0.4)] hover:scale-105 active:scale-95"
+            >
+              <div className="absolute inset-0 w-full h-full bg-red-500/5 group-hover:bg-red-500/10 transition-colors" />
+              <span className="relative z-10 flex items-center gap-4 font-black text-red-500 group-hover:text-red-400 uppercase tracking-widest text-base">
+                <Siren className="w-6 h-6 animate-pulse" /> RÚT TIỀN TỪ QUỸ DỰ PHÒNG
+              </span>
+            </button>
+            <p className="text-xs text-theme-text-muted italic max-w-sm text-center">Tiền sẽ được "vật lý" trừ khỏi hạn mức tiết kiệm tháng này của bạn.</p>
+          </div>
+        )}
       </motion.div>
+
 
       <AnimatePresence>
         {showWithdrawModal && (

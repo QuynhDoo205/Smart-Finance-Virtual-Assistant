@@ -1,27 +1,28 @@
 import { AnimatePresence, motion } from "framer-motion";
-import {
+import { 
+  Receipt, 
+  Upload, 
+  CheckCircle, 
+  X, 
+  MessageSquare, 
+  Send, 
+  Sparkles, 
+  Scan, 
+  RefreshCw,
+  PenLine, 
+  DollarSign, 
+  Calendar, 
+  FileText, 
+  ChevronRight, 
+  Search, 
+  Trash2, 
   AlertCircle,
-  Calendar,
   Camera,
-  CheckCircle,
-  ChevronRight,
-  DollarSign,
-  FileText,
   Loader2,
-  MessageSquare,
-  PenLine,
-  Receipt,
-  Scan,
-  Search,
-  Send,
-  Sparkles,
-  Upload,
-  X,
-  Trash2,
   TrendingUp,
   ChevronDown,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { aiApi, transactionsApi } from "../../utils/api";
 import { numberToVietnameseWords } from "../../utils/numberToWords";
 import {
@@ -42,6 +43,20 @@ const CATEGORY_MAP: Record<ExpenseCategory, number> = {
 };
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
+const getSourceFromRecord = (record: any) => {
+  const noteStr = (record.note || record.ghi_chu || "").toLowerCase();
+  const titleStr = (record.title || record.tieu_de || "").toLowerCase();
+  
+  const isChat = noteStr.includes("nova") || noteStr.includes("chat") || titleStr.includes("nova");
+  const isScan = noteStr.includes("scan") || noteStr.includes("bill") || noteStr.includes("hóa đơn") || titleStr.includes("scan");
+
+  return isChat 
+    ? "chat" as const 
+    : isScan 
+    ? "scanner" as const 
+    : "manual" as const;
+};
+
 interface ExpenseItem {
   id: string;
   amount: number;
@@ -182,19 +197,42 @@ export default function ExpenseTracker() {
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const getCurrentISOTime = () => new Date().toISOString();
+
   const getLocalDateStr = (d: Date | string = new Date()) => {
     let date: Date;
     if (typeof d === 'string') {
-      if (d.includes('T')) {
-        date = new Date(d);
-      } else {
-        const [y, m, d_part] = d.split('-').map(Number);
-        date = new Date(y, m - 1, d_part);
-      }
+      date = d.includes('T') ? new Date(d) : new Date(d.replace(/-/g, '/'));
     } else {
       date = d;
     }
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return date.toISOString().split('T')[0];
+  };
+
+  const safeParseDate = (d: any): Date => {
+    if (!d) return new Date();
+    if (d instanceof Date) return isNaN(d.getTime()) ? new Date() : d;
+    const s = String(d).trim();
+    if (!s) return new Date();
+    const date = new Date(s);
+    return isNaN(date.getTime()) ? new Date() : date;
+  };
+
+  /** Chuyển Date (UTC) sang giờ Việt Nam (UTC+7) */
+  const toVNDate = (d: any): Date => {
+    const utc = safeParseDate(d);
+    return new Date(utc.getTime() + 7 * 60 * 60 * 1000);
+  };
+
+  const formatFullDate = (d: string | Date) => {
+    const vn = toVNDate(d);
+    return `${String(vn.getUTCDate()).padStart(2,'0')}/${String(vn.getUTCMonth()+1).padStart(2,'0')}/${vn.getUTCFullYear()}`;
+  };
+
+  const formatTime = (d: string | Date) => {
+    if (!d) return '--:--';
+    const vn = toVNDate(d);
+    return `${String(vn.getUTCHours()).padStart(2,'0')}:${String(vn.getUTCMinutes()).padStart(2,'0')}`;
   };
 
   // Load initial data
@@ -212,15 +250,12 @@ export default function ExpenseTracker() {
               ) as ExpenseCategory) || "other",
             description: t.tieu_de || t.title || t.note || "Giao dịch",
             store: t.title || t.tieu_de,
-            date: t.transaction_date || t.ngay_giao_dich,
-            source: "manual" as const,
+            // Ưu tiên created_at, ngay_tao, timestamp để lấy chính xác giờ phút giây
+            date: (t as any).created_at || (t as any).ngay_tao || (t as any).timestamp || t.transaction_date || t.ngay_giao_dich || new Date().toISOString(),
+            source: getSourceFromRecord(t),
             type: (t.type === 'income' || t.loai_giao_dich === 'thu_nhap' ? 'income' : 'expense') as "income" | "expense",
           }))
-          .sort((a, b) => {
-            const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
-            if (dateCompare !== 0) return dateCompare;
-            return parseInt(b.id) - parseInt(a.id);
-          });
+          .sort((a, b) => safeParseDate(b.date).getTime() - safeParseDate(a.date).getTime());
           setExpenses(mapped);
         }
       } catch (err) {
@@ -255,6 +290,15 @@ export default function ExpenseTracker() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  
+  const resetChat = () => {
+    setMessages([
+      {
+        role: "bot",
+        text: 'Xin chào! Hãy kể tôi nghe bạn vừa chi gì 👋\nVD: "Ăn phở hết 40k" hay "Đổ xăng 80.000đ"',
+      },
+    ]);
+  };
 
   // Manual state
   const [manualAmount, setManualAmount] = useState<number | ''>("");
@@ -305,6 +349,8 @@ export default function ExpenseTracker() {
       matchesCategory = exp.type === 'expense';
     } else if (selectedFilterCategory === 'income') {
       matchesCategory = exp.type === 'income';
+    } else if (selectedFilterCategory === 'nova') {
+      matchesCategory = exp.source === 'chat' || exp.source === 'scanner';
     } else {
       matchesCategory = exp.category === selectedFilterCategory;
     }
@@ -312,24 +358,31 @@ export default function ExpenseTracker() {
     return matchesSearch && matchesCategory;
   });
 
-  const groupExpensesByDate = (items: ExpenseItem[]) => {
+  const formatGroupTitle = (dateStr: string) => {
+    const d = toVNDate(dateStr);
+    const now = toVNDate(new Date());
+    
+    const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const targetMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const diffDays = Math.round((todayMs - targetMs) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "HÔM NAY";
+    if (diffDays === 1) return "HÔM QUA";
+    if (diffDays < 7) return `THỨ ${d.getDay() === 0 ? "CHỦ NHẬT" : d.getDay() + 1} - ${formatFullDate(d)}`;
+    return formatFullDate(d);
+  };
+
+  const groupedExpenses = useMemo(() => {
     const groups: Record<string, ExpenseItem[]> = {};
-    items.forEach((item) => {
-      const date = item.date;
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(item);
+    filteredExpenses.forEach((item) => {
+      const vn = toVNDate(item.date);
+      // dateKey theo giờ Việt Nam để group đúng
+      const dateKey = `${vn.getUTCFullYear()}-${String(vn.getUTCMonth()+1).padStart(2,'0')}-${String(vn.getUTCDate()).padStart(2,'0')}`;
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(item);
     });
-    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
-  };
-
-  const getDateLabel = (dateStr: string) => {
-    const target = getLocalDateStr(dateStr);
-    if (target === todayStr) return "Hôm nay";
-    if (target === yesterdayStr) return "Hôm qua";
-
-    const [y, m, d] = target.split("-");
-    return `${d}/${m}/${y}`;
-  };
+    return groups;
+  }, [filteredExpenses]);
 
   const executeDelete = async (id: string) => {
     try {
@@ -443,8 +496,18 @@ export default function ExpenseTracker() {
       { role: "typing", text: "" },
     ]);
 
+    const now = new Date();
+    const localISO = now.getFullYear() + '-' + 
+                     String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                     String(now.getDate()).padStart(2, '0') + 'T' + 
+                     String(now.getHours()).padStart(2, '0') + ':' + 
+                     String(now.getMinutes()).padStart(2, '0') + ':' + 
+                     String(now.getSeconds()).padStart(2, '0') + '+07:00';
+
     try {
-      const aiRes = await aiApi.chat(text);
+      // Ép AI dùng định dạng đầy đủ ngày giờ để tránh mất dữ liệu và lệch ngày
+      const contextMsg = `[Hệ thống: Hiện tại là ${localISO}. Hãy luôn trả về trường date theo định dạng ISO 8601 kèm múi giờ, ví dụ: ${localISO}] ${text}`;
+      const aiRes = await aiApi.chat(contextMsg);
       setMessages((prev) => prev.filter((m) => m.role !== "typing"));
 
       if (aiRes.success) {
@@ -456,39 +519,29 @@ export default function ExpenseTracker() {
           const result = aiRes.data;
           const category = result.category || "other";
           const info = CATEGORY_INFO[category] || CATEGORY_INFO["other"];
-          const categoryId = CATEGORY_MAP[category] || CATEGORY_MAP["other"];
 
-          const res = await transactionsApi.create({
-            title: result.description || "Giao dịch qua Chat",
-            amount: result.amount || 0,
-            type: "chi_phi",
-            categoryId,
-            date: result.date || getLocalDateStr(),
-            note: "Ghi nhận qua chatbot",
-          });
+          // KHÔNG gọi transactionsApi.create ở đây nữa vì Backend đã tự động ghi nhận
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "bot",
+              text: `✨ Hệ thống đã tự động ghi sổ:\n${info.emoji} ${info.label} — ${fmt(result.amount)}đ`,
+            },
+          ]);
 
-          if (res.success) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "bot",
-                text: `✨ Hệ thống đã tự động ghi sổ:\n${info.emoji} ${info.label} — ${fmt(result.amount)}đ`,
-              },
-            ]);
-
-            setExpenses((prev: ExpenseItem[]) => [
-              {
-                id: (res.data.transaction.id || Date.now()).toString(),
-                amount: result.amount,
-                category: category,
-                description: result.description || info.label,
-                date: result.date || getLocalDateStr(),
-                source: "chat",
-                type: "expense" as const,
-              },
-              ...prev,
-            ]);
-          }
+          // Cập nhật danh sách hiển thị với thời gian thực tế
+          setExpenses((prev: ExpenseItem[]) => [
+            {
+              id: Date.now().toString(),
+              amount: result.amount,
+              category: category,
+              description: result.description || info.label,
+              date: getCurrentISOTime(), // Sử dụng giờ thực tế tại máy người dùng
+              source: "chat",
+              type: "expense" as const,
+            },
+            ...prev,
+          ]);
         }
       }
     } catch (err) {
@@ -517,12 +570,13 @@ export default function ExpenseTracker() {
 
     try {
       const categoryId = CATEGORY_MAP[manualCat];
+      const fullDate = manualDate === todayStr ? getCurrentISOTime() : `${manualDate}T${new Date().toLocaleTimeString('en-GB')}`;
       const res = await transactionsApi.create({
         title: manualNote || CATEGORY_INFO[manualCat].label,
         amount,
         type: "chi_phi",
         categoryId,
-        date: manualDate,
+        date: fullDate,
         note: manualNote,
       });
 
@@ -537,7 +591,7 @@ export default function ExpenseTracker() {
             amount,
             category: manualCat,
             description: manualNote,
-            date: manualDate,
+            date: manualDate === todayStr ? getCurrentISOTime() : `${manualDate}T${new Date().toLocaleTimeString('en-GB')}`,
             source: "manual" as const,
             type: "expense" as const,
           },
@@ -588,8 +642,8 @@ export default function ExpenseTracker() {
     },
   ];
 
-  const totalSpent = expenses.reduce(
-    (s: number, e: ExpenseItem) => s + e.amount,
+  const totalSpent = filteredExpenses.reduce(
+    (s: number, e: ExpenseItem) => s + (e.type === 'expense' ? e.amount : 0),
     0,
   );
 
@@ -622,10 +676,6 @@ export default function ExpenseTracker() {
     <motion.div
       initial="hidden"
       animate="show"
-      variants={{
-        hidden: { opacity: 0 },
-        show: { opacity: 1, transition: { staggerChildren: 0.05 } }
-      }}
       className="max-w-5xl mx-auto pb-28"
     >
       {/* ── Header ── */}
@@ -898,7 +948,7 @@ export default function ExpenseTracker() {
                                   whileHover={{ scale: 1.02 }}
                                   whileTap={{ scale: 0.97 }}
                                   onClick={resetScanner}
-                                  className="flex-1 py-3 rounded-xl border border-[var(--theme-subtle-border)] text-theme-text-muted hover:text-theme-text-primary hover:border-white/20 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                  className="flex-1 py-3 rounded-xl border border-[var(--theme-subtle-border)] text-theme-text-muted hover:text-theme-text-primary hover:border-white/20 transition-all text-sm font-medium flex items-center justify-center gap-2"
                                 >
                                   <X className="w-4 h-4" /> Thử lại
                                 </motion.button>
@@ -914,20 +964,18 @@ export default function ExpenseTracker() {
                                     boxShadow: "0 0 22px rgba(34,211,238,0.4)",
                                   }}
                                 >
-                                  <CheckCircle className="w-4 h-4" /> Xác nhận
-                                  lưu
+                                  <CheckCircle className="w-4 h-4" /> Xác nhận lưu
                                 </motion.button>
                               </div>
                             </motion.div>
                           )}
                         </div>
                       )}
-                  </div>
-                </NeonCard>
-              </motion.div>
-            )}
+                    </div>
+                  </NeonCard>
+                </motion.div>
+              )}
 
-            {/* ===================== CHAT ===================== */}
             {activeTab === "chat" && (
               <motion.div
                 key="chat"
@@ -942,93 +990,64 @@ export default function ExpenseTracker() {
                   style={{ height: "520px" } as React.CSSProperties}
                 >
                   {/* Chat Header */}
-                  <div className="flex items-center gap-3 p-5 border-b border-white/[0.06] flex-shrink-0">
-                    <div className="relative">
-                      <div
-                        className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 flex items-center justify-center"
-                        style={{ boxShadow: "0 0 14px rgba(56,189,248,0.55)" }}
-                      >
-                        <Sparkles className="w-5 h-5 text-theme-text-primary" />
+                  <div className="flex items-center justify-between p-5 border-b border-white/[0.06] flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div
+                          className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 flex items-center justify-center"
+                          style={{ boxShadow: "0 0 14px rgba(56,189,248,0.55)" }}
+                        >
+                          <Sparkles className="w-5 h-5 text-theme-text-primary" />
+                        </div>
+                        <div
+                          className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-cyan-400 rounded-full border-2 border-[#050d1a]"
+                          style={{ boxShadow: "0 0 8px rgba(34,211,238,0.9)" }}
+                        />
                       </div>
-                      <div
-                        className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-cyan-400 rounded-full border-2 border-[#050d1a]"
-                        style={{ boxShadow: "0 0 8px rgba(34,211,238,0.9)" }}
-                      />
+                      <div>
+                        <p className="text-theme-text-primary font-bold text-sm">
+                          Nova AI Assistant
+                        </p>
+                        <p
+                          className="text-[10px] font-black uppercase tracking-widest"
+                          style={{ color: "rgba(34,211,238,0.8)" }}
+                        >
+                          Quantum Intelligence
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-theme-text-primary font-bold text-sm">
-                        Nova AI
-                      </p>
-                      <p
-                        className="text-xs font-medium"
-                        style={{ color: "rgba(34,211,238,0.8)" }}
-                      >
-                        Đang theo dõi chi tiêu của bạn
-                      </p>
-                    </div>
+                    <button 
+                      onClick={resetChat}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-black text-theme-text-muted hover:text-sky-400 hover:border-sky-500/30 transition-all uppercase tracking-widest group"
+                    >
+                      <RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
+                      Làm mới
+                    </button>
                   </div>
 
-                  {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+                  {/* Messages - FIXED HEIGHT to prevent layout shift */}
+                  <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar bg-black/20">
                     <AnimatePresence initial={false}>
                       {messages.map((msg, i) => (
                         <motion.div
                           key={i}
-                          initial={{ opacity: 0, y: 14, scale: 0.95 }}
+                          initial={{ opacity: 0, y: 10, scale: 0.98 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          transition={{
-                            type: "spring",
-                            stiffness: 380,
-                            damping: 30,
-                          }}
                           className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                         >
                           {msg.role === "typing" ? (
-                            <div
-                              className="flex items-center gap-1.5 px-4 py-3 rounded-2xl rounded-tl-sm"
-                              style={{
-                                background: "rgba(8,47,73,0.7)",
-                                border: "1px solid rgba(34,211,238,0.2)",
-                                boxShadow: "0 2px 18px rgba(34,211,238,0.07)",
-                              }}
-                            >
-                              {[0, 1, 2].map((j) => (
-                                <motion.div
-                                  key={j}
-                                  className="w-2 h-2 rounded-full bg-cyan-400"
-                                  animate={{
-                                    y: [0, -5, 0],
-                                    opacity: [0.4, 1, 0.4],
-                                  }}
-                                  transition={{
-                                    duration: 0.65,
-                                    repeat: Infinity,
-                                    delay: j * 0.16,
-                                  }}
-                                />
-                              ))}
+                            <div className="bg-white/5 p-2.5 rounded-2xl flex gap-1 animate-pulse border border-white/5">
+                              <div className="w-1.5 h-1.5 bg-sky-400 rounded-full" />
+                              <div className="w-1.5 h-1.5 bg-sky-400 rounded-full" />
+                              <div className="w-1.5 h-1.5 bg-sky-400 rounded-full" />
                             </div>
                           ) : (
                             <div
-                              className={`max-w-[82%] px-4 py-3.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                              className={`max-w-[85%] px-4 py-3 rounded-2xl text-xs font-bold leading-relaxed shadow-xl ${
                                 msg.role === "user"
-                                  ? "rounded-tr-sm text-theme-text-primary"
-                                  : "rounded-tl-sm text-cyan-50"
+                                  ? "bg-sky-500 text-white rounded-tr-none"
+                                  : "bg-[#1e2d3d]/50 border border-white/10 text-cyan-50 rounded-tl-none"
                               }`}
-                              style={
-                                msg.role === "user"
-                                  ? {
-                                      background: "#1e2d3d",
-                                      border:
-                                        "1px solid rgba(255,255,255,0.08)",
-                                    }
-                                  : {
-                                      background: "rgba(8,47,73,0.65)",
-                                      border: "1px solid rgba(34,211,238,0.22)",
-                                      boxShadow:
-                                        "0 2px 22px rgba(34,211,238,0.07)",
-                                    }
-                              }
                             >
                               {msg.text}
                             </div>
@@ -1040,7 +1059,7 @@ export default function ExpenseTracker() {
                   </div>
 
                   {/* Quick suggestions */}
-                  <div className="px-4 pb-2 flex gap-2 overflow-x-auto flex-shrink-0 custom-scrollbar">
+                  <div className="px-4 pb-2 flex gap-2 overflow-x-auto flex-shrink-0 no-scrollbar">
                     {[
                       "Ăn phở 40k",
                       "Đổ xăng 80k",
@@ -1056,7 +1075,7 @@ export default function ExpenseTracker() {
                         }}
                         whileTap={{ scale: 0.94 }}
                         onClick={() => setChatInput(s)}
-                        className="px-3 py-1.5 rounded-xl text-theme-text-muted text-xs hover:text-cyan-300 transition-colors whitespace-nowrap flex-shrink-0"
+                        className="px-3 py-1.5 rounded-xl text-theme-text-muted text-[10px] font-black uppercase tracking-widest hover:text-cyan-300 transition-colors whitespace-nowrap flex-shrink-0"
                         style={{
                           background: "rgba(6,20,40,0.8)",
                           border: "1px solid rgba(255,255,255,0.07)",
@@ -1080,18 +1099,9 @@ export default function ExpenseTracker() {
                         type="text"
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
-                        placeholder="VD: Hôm nay ăn phở hết 40k…"
+                        placeholder="Hỏi Nova về chi tiêu của bạn..."
                         disabled={chatLoading}
-                        className="flex-1 rounded-xl px-4 py-3 text-sm text-theme-text-primary placeholder-gray-600 outline-none transition-all disabled:opacity-50"
-                        style={{
-                          background: "rgba(6,20,40,0.8)",
-                          border: "1px solid rgba(255,255,255,0.08)",
-                        }}
-                        onFocus={(e) =>
-                          (e.target.style.boxShadow =
-                            "0 0 0 3px rgba(34,211,238,0.08)")
-                        }
-                        onBlur={(e) => (e.target.style.boxShadow = "none")}
+                        className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-theme-text-primary placeholder:text-white/10 outline-none focus:border-sky-500/50 transition-all disabled:opacity-50"
                       />
                       <motion.button
                         type="submit"
@@ -1373,7 +1383,7 @@ export default function ExpenseTracker() {
 
               {/* Search & Filter Bar */}
               <div className="flex flex-col gap-3 mb-4">
-                <div className="flex bg-[var(--theme-subtle-bg)] p-1 rounded-xl border border-[var(--theme-subtle-border)]">
+                <div className="flex bg-[var(--theme-subtle-bg)] p-1 rounded-xl border border-[var(--theme-subtle-border)] flex-wrap gap-1">
                   <button 
                     onClick={() => setSelectedFilterCategory('all')} 
                     className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${selectedFilterCategory === 'all' ? 'bg-cyan-500 text-white' : 'text-theme-text-muted hover:text-white'}`}
@@ -1386,11 +1396,18 @@ export default function ExpenseTracker() {
                   >
                     Chi tiêu
                   </button>
-                  <button 
-                    onClick={() => setSelectedFilterCategory('income')} 
+                  <button
+                    onClick={() => setSelectedFilterCategory("income")}
                     className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${selectedFilterCategory === 'income' ? 'bg-emerald-500 text-white' : 'text-theme-text-muted hover:text-white'}`}
                   >
                     Thu nhập
+                  </button>
+                  <button
+                    onClick={() => setSelectedFilterCategory("nova")}
+                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5 ${selectedFilterCategory === 'nova' ? 'bg-sky-500 text-white' : 'text-theme-text-muted hover:text-white'}`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Nova AI
                   </button>
                 </div>
                 
@@ -1407,7 +1424,7 @@ export default function ExpenseTracker() {
                   </div>
                   <div className="relative">
                     <select
-                      value={selectedFilterCategory === 'all' || selectedFilterCategory === 'income' || selectedFilterCategory === 'expense' ? 'all' : selectedFilterCategory}
+                      value={selectedFilterCategory === 'all' || selectedFilterCategory === 'income' || selectedFilterCategory === 'expense' || selectedFilterCategory === 'nova' ? 'all' : selectedFilterCategory}
                       onChange={(e) => setSelectedFilterCategory(e.target.value)}
                       className="pl-3 pr-8 py-2 bg-[var(--theme-bg-surface)] border border-[var(--theme-subtle-border)] rounded-xl text-[10px] font-bold text-theme-text-primary outline-none focus:border-cyan-500/50 transition-all cursor-pointer appearance-none min-w-[100px]"
                     >
@@ -1437,7 +1454,7 @@ export default function ExpenseTracker() {
                   transition={{ duration: 0.5 }}
                   className="text-2xl font-extrabold mt-1"
                 >
-                  {fmt(filteredExpenses.reduce((s, e) => e.type === 'expense' ? s + e.amount : s, 0))}
+                  {fmt(totalSpent)}
                   <span className="text-sm font-normal text-theme-text-muted">
                     đ
                   </span>
@@ -1455,85 +1472,75 @@ export default function ExpenseTracker() {
                       </p>
                     </div>
                   ) : (
-                    groupExpensesByDate(filteredExpenses).map(
-                      ([date, items]) => (
+                    Object.entries(groupedExpenses)
+                      .sort((a, b) => b[0].localeCompare(a[0]))
+                      .map(([date, items]: [string, ExpenseItem[]]) => (
                         <div key={date} className="space-y-2">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className="h-[1px] flex-1 bg-[var(--theme-subtle-bg)]" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-theme-text-muted px-2 py-0.5 rounded-full border border-[var(--theme-subtle-border)] bg-white/[0.02]">
-                              {getDateLabel(date)}
+                            <div className="h-[1px] flex-1 bg-white/5" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-sky-400/80 px-2.5 py-1 rounded-full border border-sky-500/20 bg-sky-500/5">
+                              {formatGroupTitle(date)}
                             </span>
-                            <div className="h-[1px] flex-1 bg-[var(--theme-subtle-bg)]" />
+                            <div className="h-[1px] flex-1 bg-white/5" />
                           </div>
 
                           {items.map((exp: ExpenseItem) => {
-                            const info =
-                              CATEGORY_INFO[exp.category] ||
-                              CATEGORY_INFO["other"];
-                            const srcEmoji =
-                              exp.source === "scanner"
-                                ? "📷"
-                                : exp.source === "chat"
-                                  ? "💬"
-                                  : "✏️";
+                            const info = CATEGORY_INFO[exp.category] || CATEGORY_INFO["other"];
                             return (
                               <motion.div
                                 key={exp.id}
+                                layout
                                 initial={{ opacity: 0, x: 16 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, scale: 0.92 }}
-                                transition={{
-                                  type: "spring",
-                                  stiffness: 380,
-                                  damping: 30,
-                                }}
+                                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                                className="group relative flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-white/15 hover:bg-white/[0.05] transition-all"
                               >
-                                <motion.div
-                                  whileHover={{
-                                    x: 2,
-                                    borderColor: "rgba(255,255,255,0.12)",
-                                  }}
-                                  className="flex items-center gap-3 p-3 rounded-xl transition-colors cursor-default"
-                                  style={{
-                                    background: "rgba(255,255,255,0.025)",
-                                    border: "1px solid rgba(255,255,255,0.05)",
-                                  }}
-                                >
-                                  <div
-                                    className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm border flex-shrink-0 ${info.bg}`}
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg border shadow-lg flex-shrink-0 ${info.bg} border-white/10`}>
+                                  {info.emoji}
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-0.5">
+                                    <p className="text-xs font-black text-theme-text-primary tracking-tight truncate">
+                                      {exp.store || exp.description || 'Giao dịch chi tiêu'}
+                                    </p>
+                                    {(exp.source === 'chat' || exp.source === 'scanner') && (
+                                      <Sparkles className="w-3 h-3 text-sky-400 animate-pulse" />
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-[10px] text-theme-text-muted font-bold uppercase tracking-widest">
+                                      {info.label}
+                                    </p>
+                                    <span className="w-1 h-1 rounded-full bg-white/10" />
+                                    <p className="text-[10px] text-sky-400/80 font-black">
+                                      {formatTime(exp.date)}
+                                    </p>
+                                    <span className="w-1 h-1 rounded-full bg-white/10" />
+                                    <p className="text-[10px] text-theme-text-muted italic opacity-50">
+                                      {exp.source === 'chat' ? 'qua chat' : exp.source === 'scanner' ? 'quét bill' : 'thủ công'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col items-end gap-1">
+                                  <span className={`text-sm font-black tracking-tight ${exp.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {exp.type === 'income' ? '+' : '-'}{fmt(exp.amount)}
+                                    <span className="text-[10px] ml-0.5 opacity-70">đ</span>
+                                  </span>
+                                  <button 
+                                    onClick={() => setConfirmDelete({ id: exp.id, title: exp.store || exp.description || 'Giao dịch này' })}
+                                    className="p-1.5 hover:bg-rose-500/15 rounded-lg text-theme-text-muted hover:text-rose-400 transition-all opacity-0 group-hover:opacity-100"
                                   >
-                                    {info.emoji}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-theme-text-primary truncate">
-                                      {exp.store || exp.description}
-                                    </p>
-                                    <p className="text-[10px] text-gray-600 uppercase font-bold tracking-tight">
-                                      {info.label} · {srcEmoji} · {getDateLabel(exp.date)}
-                                    </p>
-                                  </div>
-                                  <div className="flex flex-col items-end gap-1">
-                                    <span className={`text-sm font-bold ${exp.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                      {exp.type === 'income' ? '+' : '-'}{fmt(exp.amount)}đ
-                                    </span>
-                                    <button 
-                                      onClick={(e) => { 
-                                        e.stopPropagation(); 
-                                        setConfirmDelete({ id: exp.id, title: exp.store || exp.description || 'Giao dịch này' });
-                                      }}
-                                      className="p-1.5 hover:bg-rose-500/15 rounded-lg text-gray-600 hover:text-rose-400 transition-all group/del"
-                                      title="Xóa giao dịch"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5 group-hover/del:scale-110 transition-transform" />
-                                    </button>
-                                  </div>
-                                </motion.div>
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </motion.div>
                             );
                           })}
                         </div>
-                      ),
-                    )
+                      ))
                   )}
                 </AnimatePresence>
               </div>

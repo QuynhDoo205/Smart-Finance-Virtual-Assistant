@@ -4,10 +4,10 @@ import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as
 import { 
   ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, 
   Target, RefreshCw, Search, ShoppingBag, 
-  HelpCircle
+  HelpCircle, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardApi, incomeApi } from '../../utils/api';
+import { dashboardApi, incomeApi, transactionsApi } from '../../utils/api';
 import type { DashboardSummary, Transaction, Budget, IncomeSourceRecord } from '../../utils/api';
 import authStore from '../../store/authStore';
 import Skeleton from '../../components/common/Skeleton';
@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [chartData, setChartData] = useState<{name: string; income: number; expense: number}[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLogicInfo, setShowLogicInfo] = useState(false);
+  const [chartRange, setChartRange] = useState<'week' | 'month' | '6months'>('6months');
 
   const user = authStore.getUser();
   const navigate = useNavigate();
@@ -39,15 +40,53 @@ export default function Dashboard() {
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
   
+
+
+  /**
+   * SUPER NORMALIZER - Xử lý chính xác timestamp từ PostgreSQL
+   * PostgreSQL trả về ISO string dạng: "2026-05-14T17:39:00.000Z" (UTC)
+   * Ta cần hiển thị theo giờ Việt Nam (+7) bằng Intl
+   */
+  const safeParseDate = (d: any): Date => {
+    if (!d) return new Date();
+    if (d instanceof Date) return isNaN(d.getTime()) ? new Date() : d;
+    const s = String(d).trim();
+    if (!s) return new Date();
+    // Mọi định dạng timestamp đều được xử lý bằng new Date()
+    // PostgreSQL: "2026-05-14T17:39:00.000Z" - trình duyệt tự hiểu là UTC
+    // Sau đó Intl sẽ chuyển sang VN time khi hiển thị
+    const date = new Date(s);
+    return isNaN(date.getTime()) ? new Date() : date;
+  };
+
+  /** Chuyển UTC timestamp sang giờ Việt Nam (UTC+7) */
+  const toVNDate = (d: any): Date => {
+    const utc = safeParseDate(d);
+    return new Date(utc.getTime() + 7 * 60 * 60 * 1000);
+  };
+
+  const formatTime = (d: string | Date) => {
+    if (!d) return '--:--';
+    const vn = toVNDate(d);
+    return `${String(vn.getUTCHours()).padStart(2,'0')}:${String(vn.getUTCMinutes()).padStart(2,'0')}`;
+  };
+
+  const formatFullDate = (d: string | Date) => {
+    const vn = toVNDate(d);
+    return `${String(vn.getUTCDate()).padStart(2,'0')}/${String(vn.getUTCMonth()+1).padStart(2,'0')}/${vn.getUTCFullYear()}`;
+  };
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return 'Hôm nay';
-    if (diffDays === 1) return 'Hôm qua';
-    return date.toLocaleDateString('vi-VN');
+    const d = toVNDate(dateStr);
+    const now = toVNDate(new Date());
+    const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const targetMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const diffDays = Math.round((todayMs - targetMs) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return "Hôm nay";
+    if (diffDays === 1) return "Hôm qua";
+    if (diffDays < 7) return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+    return formatFullDate(dateStr);
   };
 
   const fetchData = async () => {
@@ -55,41 +94,67 @@ export default function Dashboard() {
     try {
       const [summaryRes, txRes, budgetRes, incomeRes, chartRes] = await Promise.all([
         dashboardApi.getSummary(),
-        dashboardApi.getTransactions(25),
+        transactionsApi.list(25), // Dùng API đầy đủ để lấy giờ phút
         dashboardApi.getBudget(),
         incomeApi.getSources(),
-        dashboardApi.getChartData(),
+        dashboardApi.getChartData(chartRange),
       ]);
-      setSummary(summaryRes.data);
-      setTransactions(txRes.data.transactions);
-      setBudgets(budgetRes.data.budgets);
-      if (incomeRes.success) setIncomeSources(incomeRes.data.sources);
-      if (chartRes.success) {
-        // Transform backend data format to Recharts format
+      
+      if (summaryRes?.success) setSummary(summaryRes.data);
+      if (txRes?.success && txRes?.data?.transactions) setTransactions(txRes.data.transactions);
+      if (budgetRes?.success) setBudgets(budgetRes.data.budgets || []);
+      if (incomeRes?.success) setIncomeSources(incomeRes.data.sources || []);
+      
+      if (chartRes?.success && chartRes?.data?.chartData) {
         const rawData = chartRes.data.chartData;
         const formattedMap = new Map();
-        
-        // Luôn tạo đủ 6 tháng gần nhất (bao gồm tháng hiện tại)
         const today = new Date();
-        for (let i = 5; i >= 0; i--) {
-          const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-          const monthStr = `Tháng ${d.getMonth() + 1}`;
-          formattedMap.set(monthStr, { name: monthStr, income: 0, expense: 0 });
-        }
-
-        // Đắp dữ liệu thật vào
-        rawData.forEach((row: any) => {
-          const key = `Tháng ${row.month}`;
-          if (formattedMap.has(key)) {
-            if (row.type === 'income') formattedMap.get(key).income = Number(row.total);
-            else formattedMap.get(key).expense = Number(row.total);
+        
+        if (chartRange === 'week') {
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+            const keyStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+            formattedMap.set(keyStr, { name: keyStr, income: 0, expense: 0 });
           }
-        });
+          rawData.forEach((row: any) => {
+            const key = `${String(row.day).padStart(2, '0')}/${String(row.month).padStart(2, '0')}`;
+            if (formattedMap.has(key)) {
+              if (row.type === 'income') formattedMap.get(key).income = Number(row.total);
+              else formattedMap.get(key).expense = Number(row.total);
+            }
+          });
+        } else if (chartRange === 'month') {
+          for (let i = 29; i >= 0; i--) {
+            const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+            const keyStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+            formattedMap.set(keyStr, { name: keyStr, income: 0, expense: 0 });
+          }
+          rawData.forEach((row: any) => {
+            const key = `${String(row.day).padStart(2, '0')}/${String(row.month).padStart(2, '0')}`;
+            if (formattedMap.has(key)) {
+              if (row.type === 'income') formattedMap.get(key).income = Number(row.total);
+              else formattedMap.get(key).expense = Number(row.total);
+            }
+          });
+        } else {
+          for (let i = 5; i >= 0; i--) {
+            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const monthStr = `Tháng ${d.getMonth() + 1}`;
+            formattedMap.set(monthStr, { name: monthStr, income: 0, expense: 0 });
+          }
+          rawData.forEach((row: any) => {
+            const key = `Tháng ${row.month}`;
+            if (formattedMap.has(key)) {
+              if (row.type === 'income') formattedMap.get(key).income = Number(row.total);
+              else formattedMap.get(key).expense = Number(row.total);
+            }
+          });
+        }
         
         setChartData(Array.from(formattedMap.values()));
       }
-    } catch {
-      // Error handling
+    } catch (err) {
+      console.error("Dashboard stable sync error:", err);
     } finally {
       setLoading(false);
     }
@@ -97,23 +162,31 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [chartRange]);
 
   const pieData = (summary?.categoryDistribution && summary.categoryDistribution.length > 0)
     ? summary.categoryDistribution.map(d => ({ name: d.name, value: Number(d.value), color: d.color }))
-    : budgets.length > 0
+    : (budgets || []).length > 0
       ? budgets.map(b => ({ name: b.category_name, value: Number(b.spent_amount) || 0, color: b.category_color }))
       : [];
   
-  const displayTransactions = transactions.length > 0 ? transactions : [];
+  const displayTransactions = Array.isArray(transactions) ? transactions : [];
 
   const filteredTransactions = displayTransactions.filter(tx => {
-    const matchesSearch = tx.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          tx.category_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || 
-                        (filterType === 'income' && (tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap')) ||
-                        (filterType === 'expense' && (tx.type === 'expense' || (tx as any).loai_giao_dich === 'chi_phi'));
-    return matchesSearch && matchesType;
+    if (!tx || !tx.title) return false;
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = tx.title.toLowerCase().includes(searchLower) || 
+                          (tx.category_name || '').toLowerCase().includes(searchLower);
+    
+    if (filterType === 'all') return matchesSearch;
+    
+    const isIncome = tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap';
+    const isExpense = tx.type === 'expense' || (tx as any).loai_giao_dich === 'chi_phi' || tx.type === 'chi_phi';
+    
+    if (filterType === 'income') return matchesSearch && isIncome;
+    if (filterType === 'expense') return matchesSearch && isExpense;
+    
+    return matchesSearch;
   });
 
   // Calculate forecasted income from income sources
@@ -131,52 +204,21 @@ export default function Dashboard() {
     incomeChangePercent: 0,
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
+    committedFixedExpenses: 0,
+    availableAfterCommitments: 0,
+    netAvailableBalance: 0,
   };
 
   // Use forecasted income in the header stat when no actual income yet
   const displayIncome = displaySummary.totalIncome > 0 ? displaySummary.totalIncome : forecastedIncome;
   const isForecasted = displaySummary.totalIncome === 0 && forecastedIncome > 0;
 
-  // --- SMART MERGE FOR BUDGET MONITOR ---
-  // Merge actual budgets with fixed income sources for a complete view
-  const mergedBudgets = (() => {
-    // Start with income sources (fixed ones with a positive expected amount)
-    const list: Budget[] = incomeSources
-      .filter(s => s.loai_nguon === 'fixed' && Number(s.so_tien_du_kien) > 0)
-      .map(s => ({
-        id: -1, // Virtual ID
-        category_name: s.ten_nguon,
-        limit_amount: Number(s.so_tien_du_kien),
-        spent_amount: 0, // Income sources are usually "Fixed Costs" that we expect to pay
-        usage_percent: 0,
-        category_icon: '🔒',
-        category_color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-      }));
+  // --- BUDGET MONITOR ---
+  const mergedBudgets = [...budgets].sort((a, b) => b.limit_amount - a.limit_amount);
 
-    // Add actual budgets that don't overlap by name
-    budgets.forEach(b => {
-      const exists = list.find(l => l.category_name.toLowerCase() === b.category_name.toLowerCase());
-      if (!exists) {
-        list.push(b);
-      }
-    });
-
-    // Update spent_amount for virtual income budgets based on actual transactions
-    list.forEach(item => {
-      if (item.id === -1) {
-        const actualIncome = displayTransactions
-          .filter(tx => 
-            (tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap') && 
-            (tx.title === item.category_name || tx.note?.includes(item.category_name))
-          )
-          .reduce((sum, tx) => sum + Number(tx.amount), 0);
-        item.spent_amount = actualIncome;
-        item.usage_percent = item.limit_amount > 0 ? (actualIncome / item.limit_amount) * 100 : 0;
-      }
-    });
-
-    return list.sort((a, b) => b.limit_amount - a.limit_amount);
-  })();
+  // --- CARD STATS ---
+  const topExpenseCategory = [...mergedBudgets].filter(b => b.spent_amount > 0).sort((a, b) => b.spent_amount - a.spent_amount)[0];
+  const incomeAchievement = forecastedIncome > 0 ? (displaySummary.totalIncome / forecastedIncome) * 100 : 0;
 
   if (loading) {
     return (
@@ -244,13 +286,17 @@ export default function Dashboard() {
 
       {/* Summary Cards - Smaller & Harmonious */}
       <motion.div variants={itemVars} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="glass-panel p-6 rounded-2xl border border-[var(--theme-subtle-border)] bg-gradient-to-br from-primary-500/10 via-transparent to-transparent shadow-lg relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-4">
+        {/* ── PREMIUM BALANCE CARD: Số dư thực vs Khả dụng ── */}
+        <div className="glass-panel p-6 rounded-2xl border border-[var(--theme-subtle-border)] bg-gradient-to-br from-primary-500/10 via-transparent to-transparent shadow-lg relative overflow-hidden group col-span-1 md:col-span-1">
+          {/* Glow effect */}
+          <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-primary-500/10 blur-2xl group-hover:bg-primary-500/15 transition-all duration-700" />
+          
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center border border-primary-500/20 shadow-[0_0_15px_rgba(56,189,248,0.2)]">
                 <Wallet className="text-primary-400 w-5 h-5" />
               </div>
-              <h3 className="text-theme-text-muted font-black text-[10px] uppercase tracking-[0.15em]">Tổng tài sản</h3>
+              <h3 className="text-theme-text-muted font-black text-[10px] uppercase tracking-[0.15em]">Tài sản</h3>
             </div>
             <div className="flex items-center text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
               <TrendingUp className="w-3 h-3 mr-1" />
@@ -258,65 +304,188 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <p className="text-3xl font-black text-theme-text-primary tracking-tighter mb-5">
-            {formatCurrency(displaySummary.totalBalance)}
-          </p>
+          {/* ── Block 1: Số dư thực ── */}
+          <div className="mb-3">
+            <p className="text-[9px] text-theme-text-muted font-bold uppercase tracking-widest mb-0.5">Số dư thực tế</p>
+            <p className="text-2xl font-black text-theme-text-primary tracking-tighter">
+              {formatCurrency(displaySummary.totalBalance)}
+            </p>
+          </div>
+
+          {/* ── Divider với icon ── */}
+          {/* ── Divider với icon ── */}
+          {((displaySummary.committedFixedExpenses ?? 0) > 0 || (displaySummary.remainingEmergency ?? 0) > 0) && (
+            <>
+              <div className="relative flex items-center gap-2 my-3">
+                <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+                  <Lock className="w-2.5 h-2.5 text-amber-400" />
+                  <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest">
+                    Đã khóa {formatCurrency((displaySummary.committedFixedExpenses ?? 0) + (displaySummary.remainingEmergency ?? 0))}
+                  </span>
+                </div>
+                <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              </div>
+
+              {/* ── Block 2: Khả dụng thực sự (sau cam kết & quỹ) ── */}
+              <div className="relative p-3 rounded-xl border overflow-hidden"
+                style={{
+                  background: (displaySummary.netAvailableBalance ?? 0) >= 0
+                    ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
+                  borderColor: (displaySummary.netAvailableBalance ?? 0) >= 0
+                    ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5"
+                      style={{ color: (displaySummary.netAvailableBalance ?? 0) >= 0 ? '#34d399' : '#f87171' }}>
+                      Khả dụng thực sự
+                    </p>
+                    <p className="text-xl font-black tracking-tighter"
+                      style={{ color: (displaySummary.netAvailableBalance ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
+                      {formatCurrency(displaySummary.netAvailableBalance ?? displaySummary.totalBalance)}
+                    </p>
+                  </div>
+                  <div className={`text-[9px] font-black px-2 py-1 rounded-lg ${
+                    (displaySummary.netAvailableBalance ?? 0) >= displaySummary.totalBalance * 0.5
+                      ? 'bg-emerald-500/15 text-emerald-400'
+                      : (displaySummary.netAvailableBalance ?? 0) >= 0
+                        ? 'bg-amber-500/15 text-amber-400'
+                        : 'bg-rose-500/15 text-rose-400'
+                  }`}>
+                    {(displaySummary.netAvailableBalance ?? 0) >= displaySummary.totalBalance * 0.5
+                      ? '✓ An toàn' 
+                      : (displaySummary.netAvailableBalance ?? 0) >= 0
+                        ? '⚡ Thắt chặt'
+                        : '⚠ Thiếu hụt'}
+                  </div>
+                </div>
+
+                {/* Progress bar: % đã cam kết và khóa quỹ */}
+                <div className="mt-2.5">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[8px] text-theme-text-muted">Đã khóa (Cố định + Quỹ còn lại)</span>
+                    <span className="text-[8px] font-black text-amber-400">
+                      {displaySummary.totalBalance > 0
+                        ? Math.min(100, Math.round((((displaySummary.committedFixedExpenses ?? 0) + (displaySummary.remainingEmergency ?? 0)) / displaySummary.totalBalance) * 100))
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden flex">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-amber-500 to-orange-500"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, Math.round(((displaySummary.committedFixedExpenses ?? 0) / Math.max(displaySummary.totalBalance, 1)) * 100))}%` }}
+                      transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
+                    />
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-sky-400 to-blue-500"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, Math.round(((displaySummary.remainingEmergency ?? 0) / Math.max(displaySummary.totalBalance, 1)) * 100))}%` }}
+                      transition={{ duration: 1, delay: 0.5, ease: 'easeOut' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Khi không có fixed expenses - hiển thị breakdown cũ */}
+          {(displaySummary.committedFixedExpenses ?? 0) === 0 && (
+            <div className="space-y-2.5 pt-4 border-t border-white/5">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] text-theme-text-muted font-bold uppercase tracking-tight">Tiền có thể tiêu</span>
+                </div>
+                <span className="text-[13px] font-black text-emerald-400">
+                  {formatCurrency(displaySummary.totalBalance - (displaySummary.remainingEmergency || 0))}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                  <span className="text-[10px] text-theme-text-muted font-bold uppercase tracking-tight">Quỹ dự phòng còn</span>
+                </div>
+                <span className="text-[13px] font-black text-sky-400">
+                  {formatCurrency(displaySummary.remainingEmergency || 0)}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="glass-panel p-5 rounded-2xl border border-[var(--theme-subtle-border)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                <ArrowDownRight className="text-emerald-400 w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-theme-text-muted font-black text-[9px] uppercase tracking-widest">Thu nhập</h3>
+                {isForecasted && <span className="text-[8px] text-amber-400 font-bold">(Dự tính)</span>}
+              </div>
+            </div>
+            <p className="text-3xl font-black text-theme-text-primary tracking-tighter">
+              {formatCurrency(displayIncome)}
+            </p>
+          </div>
           
-          <div className="space-y-2.5 pt-4 border-t border-white/5">
-            <div className="flex justify-between items-center group/item">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] text-theme-text-muted font-bold uppercase tracking-tight">Tiền có thể tiêu</span>
-              </div>
-              <span className="text-[13px] font-black text-emerald-400">
-                {formatCurrency(displaySummary.totalBalance - (displaySummary.remainingEmergency || 0))}
-              </span>
+          <div className="mt-4 pt-3 border-t border-[var(--theme-subtle-border)] flex justify-between items-center text-[10px]">
+            <div className="flex flex-col">
+              <span className="text-theme-text-muted font-bold mb-0.5">Tiến độ thu nhập</span>
+              <span className="text-emerald-400 font-black">{forecastedIncome > 0 ? Math.min(100, Math.round(incomeAchievement)) : 0}%</span>
             </div>
-            <div className="flex justify-between items-center group/item">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-                <span className="text-[10px] text-theme-text-muted font-bold uppercase tracking-tight">Quỹ dự phòng còn</span>
-              </div>
-              <span className="text-[13px] font-black text-sky-400">
-                {formatCurrency(displaySummary.remainingEmergency || 0)}
-              </span>
+            <div className="flex flex-col text-right">
+              <span className="text-theme-text-muted font-bold mb-0.5">Mục tiêu</span>
+              <span className="text-theme-text-primary font-black">{formatCurrency(forecastedIncome)}</span>
             </div>
           </div>
         </div>
 
-        <div className="glass-panel p-5 rounded-2xl border border-[var(--theme-subtle-border)]">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <ArrowDownRight className="text-emerald-400 w-5 h-5" />
+        <div className="glass-panel p-5 rounded-2xl border border-[var(--theme-subtle-border)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
+                <ArrowUpRight className="text-rose-400 w-5 h-5" />
+              </div>
+              <h3 className="text-theme-text-muted font-black text-[9px] uppercase tracking-widest">Chi tiêu</h3>
             </div>
-            <div>
-              <h3 className="text-theme-text-muted font-black text-[9px] uppercase tracking-widest">Thu nhập</h3>
-              {isForecasted && <span className="text-[8px] text-amber-400 font-bold">(Dự tính)</span>}
+            <p className="text-3xl font-black text-theme-text-primary tracking-tighter">
+              {formatCurrency(displaySummary.totalExpense)}
+            </p>
+          </div>
+          
+          <div className="mt-4 pt-3 border-t border-[var(--theme-subtle-border)] flex justify-between items-center text-[10px]">
+            <div className="flex flex-col">
+              <span className="text-theme-text-muted font-bold mb-0.5">Chi nhiều nhất</span>
+              <span className="text-rose-400 font-black truncate max-w-[100px]">
+                {topExpenseCategory ? (topExpenseCategory.budget_title || topExpenseCategory.category_name) : 'Chưa có'}
+              </span>
+            </div>
+            <div className="flex flex-col text-right">
+              <span className="text-theme-text-muted font-bold mb-0.5">Số tiền</span>
+              <span className="text-theme-text-primary font-black">{topExpenseCategory ? formatCurrency(topExpenseCategory.spent_amount) : '0đ'}</span>
             </div>
           </div>
-          <p className="text-3xl font-black text-theme-text-primary tracking-tighter">
-            {formatCurrency(displayIncome)}
-          </p>
-        </div>
-
-        <div className="glass-panel p-5 rounded-2xl border border-[var(--theme-subtle-border)]">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
-              <ArrowUpRight className="text-rose-400 w-5 h-5" />
-            </div>
-            <h3 className="text-theme-text-muted font-black text-[9px] uppercase tracking-widest">Chi tiêu</h3>
-          </div>
-          <p className="text-3xl font-black text-theme-text-primary tracking-tighter">
-            {formatCurrency(displaySummary.totalExpense)}
-          </p>
         </div>
       </motion.div>
 
-      {/* --- 6-Month Trend Chart --- */}
+      {/* --- Trend Chart --- */}
       {chartData.length > 0 && (
         <div className="glass-panel p-6 rounded-[2rem] border border-[var(--theme-subtle-border)] shadow-lg">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-md font-black text-theme-text-primary tracking-tight">Biểu đồ dòng tiền (6 tháng)</h3>
+            <h3 className="text-md font-black text-theme-text-primary tracking-tight">Biểu đồ dòng tiền</h3>
+            <select
+              value={chartRange}
+              onChange={(e) => setChartRange(e.target.value as any)}
+              className="bg-[var(--theme-bg)] border border-[var(--theme-subtle-border)] text-theme-text-primary text-xs font-bold px-3 py-1.5 rounded-lg focus:outline-none focus:border-primary-500"
+            >
+              <option value="week" className="bg-slate-900 text-white">7 ngày qua</option>
+              <option value="month" className="bg-slate-900 text-white">30 ngày qua</option>
+              <option value="6months" className="bg-slate-900 text-white">6 tháng qua</option>
+            </select>
           </div>
           <div className="w-full h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -380,38 +549,45 @@ export default function Dashboard() {
           <AnimatePresence>
             {showLogicInfo && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-6 p-4 rounded-xl bg-primary-500/5 border border-primary-500/10 text-[11px] text-theme-text-muted overflow-hidden">
-                <p><span className="text-theme-text-primary font-bold">Lưu ý:</span> Nova so sánh <span className="text-white font-bold">Thực tiêu</span> / <span className="text-primary-400 font-bold">Kế hoạch</span>. Các mục có biểu tượng <span className="text-emerald-400">🔒</span> là các khoản cố định được đồng bộ từ mục Thu nhập.</p>
+                <p><span className="text-theme-text-primary font-bold">Lưu ý:</span> Nova theo dõi chi tiêu của cả <span className="text-emerald-400 font-bold">LỌ NGÂN SÁCH</span> (có thể linh hoạt) và <span className="text-rose-400 font-bold">PHÍ CỐ ĐỊNH</span> (bắt buộc phải trả).</p>
               </motion.div>
             )}
           </AnimatePresence>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
             {mergedBudgets.map(budget => {
-              const isIncomeTarget = budget.id === -1;
+              const isFixedExpense = budget.budget_title && budget.budget_title.trim() !== '';
               const hasNoLimitButSpent = budget.limit_amount === 0 && budget.spent_amount > 0;
               const displayPercent = hasNoLimitButSpent ? 100 : Math.min(budget.usage_percent, 100);
               
-              let barColorClass = 'bg-emerald-500';
-              if (isIncomeTarget) {
-                barColorClass = budget.usage_percent >= 100 ? 'bg-emerald-500' : 'bg-sky-500';
-              } else {
-                barColorClass = hasNoLimitButSpent ? 'bg-rose-500' : budget.usage_percent >= 90 ? 'bg-rose-500' : 'bg-primary-500';
+              let barColorClass = 'bg-primary-500';
+              if (hasNoLimitButSpent || budget.usage_percent >= 90) {
+                barColorClass = 'bg-rose-500';
               }
 
               return (
-                <div key={budget.category_name} className="space-y-2">
+                <div key={budget.category_name + budget.budget_title} className="space-y-2">
                   <div className="flex justify-between items-center text-xs">
                     <div className="flex items-center gap-1.5">
-                      {budget.id === -1 && <span className="text-[10px]">🔒</span>}
-                      <span className="font-bold text-theme-text-muted">{budget.category_name}</span>
+                      <span className="font-bold text-theme-text-muted">{budget.budget_title || budget.category_name}</span>
+                      {isFixedExpense ? (
+                        <span className="px-1.5 py-[1px] rounded bg-rose-500/10 text-rose-400 text-[7px] font-black tracking-widest uppercase">Cố định</span>
+                      ) : (
+                        <span className="px-1.5 py-[1px] rounded bg-emerald-500/10 text-emerald-400 text-[7px] font-black tracking-widest uppercase">Lọ</span>
+                      )}
                     </div>
                     <span className="font-black text-theme-text-primary">
-                      {formatCurrency(budget.spent_amount)} / <span className="opacity-30">{budget.limit_amount > 0 ? formatCurrency(budget.limit_amount) : '0đ'}</span>
+                      {isFixedExpense 
+                        ? <span className="text-rose-400">- {formatCurrency(budget.limit_amount)}</span>
+                        : <>{formatCurrency(budget.spent_amount)} / <span className="opacity-30">{budget.limit_amount > 0 ? formatCurrency(budget.limit_amount) : '0đ'}</span></>
+                      }
                     </span>
                   </div>
-                  <div className="h-2 bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden border border-[var(--theme-subtle-border)]">
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${displayPercent}%` }} transition={{ duration: 1 }} className={`h-full rounded-full ${barColorClass}`} />
-                  </div>
+                  {!isFixedExpense && (
+                    <div className="h-2 bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden border border-[var(--theme-subtle-border)]">
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${displayPercent}%` }} transition={{ duration: 1 }} className={`h-full rounded-full ${barColorClass}`} />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -482,25 +658,29 @@ export default function Dashboard() {
           </div>
           
           <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2.5">
-            {filteredTransactions.map(tx => (
-              <div key={tx.id} className="flex items-center justify-between p-3.5 rounded-[1.25rem] bg-white/[0.01] border border-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer group" onClick={() => navigate('/app/expense')}>
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${(tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                    {(tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap') ? <TrendingUp className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
+            {filteredTransactions.map(tx => {
+              // Tìm kiếm sâu các trường thời gian có thể có
+              const displayDate = (tx as any).created_at || (tx as any).ngay_tao || (tx as any).timestamp || (tx as any).ngay_giao_dich || tx.transaction_date;
+              return (
+                <div key={tx.id} className="flex items-center justify-between p-3.5 rounded-[1.25rem] bg-white/[0.01] border border-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer group" onClick={() => navigate('/app/expense')}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${(tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                      {(tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap') ? <TrendingUp className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
+                    </div>
+                    <div>
+                      <h4 className="text-[13px] font-bold text-theme-text-primary">{tx.title}</h4>
+                      <p className="text-[9px] text-theme-text-muted font-bold mt-0.5">
+                        {tx.category_name === 'Lương' ? '💼 ' : tx.category_name === 'Trợ cấp' ? '🎁 ' : ''}
+                        {tx.category_name} • <span className="text-primary-400">{formatTime(displayDate)}</span> • {formatDate(displayDate)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-[13px] font-bold text-theme-text-primary">{tx.title}</h4>
-                    <p className="text-[9px] text-theme-text-muted font-bold mt-0.5">
-                      {tx.category_name === 'Lương' ? '💼 ' : tx.category_name === 'Trợ cấp' ? '🎁 ' : ''}
-                      {tx.category_name} • {formatDate(tx.transaction_date)}
-                    </p>
-                  </div>
+                  <p className={`text-[14px] font-black ${(tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap') ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {(tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap') ? '+' : '-'}{formatCurrency(tx.amount)}
+                  </p>
                 </div>
-                <p className={`text-[14px] font-black ${(tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap') ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {(tx.type === 'income' || (tx as any).loai_giao_dich === 'thu_nhap') ? '+' : '-'}{formatCurrency(tx.amount)}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
           
           <button 

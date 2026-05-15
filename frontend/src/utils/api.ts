@@ -80,10 +80,21 @@ export const authApi = {
     apiFetch<{
       success: boolean;
       message: string;
-      data: { token: string; user: UserProfile };
+      step?: string;
+      data?: { token: string; user: UserProfile };
     }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ full_name, email, password }),
+    }),
+
+  verifyOtp: (email: string, otp_code: string) =>
+    apiFetch<{
+      success: boolean;
+      message: string;
+      data: { token: string; user: UserProfile };
+    }>('/auth/register/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp_code }),
     }),
 
   googleLogin: (token: string, intent: 'login' | 'register' = 'login') =>
@@ -140,8 +151,8 @@ export const dashboardApi = {
       body: JSON.stringify({ amount }),
     }),
   
-  getChartData: () =>
-    apiFetch<{ success: boolean; data: { chartData: ChartDataPoint[] } }>('/dashboard/chart-data'),
+  getChartData: (range?: string) =>
+    apiFetch<{ success: boolean; data: { chartData: ChartDataPoint[] } }>(`/dashboard/chart-data${range ? `?range=${range}` : ''}`),
     
   suggestJars: () =>
     apiFetch<{ success: boolean; data: { jars: { name: string; percentage: number }[] } }>('/dashboard/suggest-jars'),
@@ -150,6 +161,12 @@ export const dashboardApi = {
     apiFetch<{ success: boolean; message: string }>('/dashboard/setup-budget', {
       method: 'POST',
       body: JSON.stringify({ budgets }),
+    }),
+
+  updateEmergencyRate: (rate: number) =>
+    apiFetch<{ success: boolean; message: string }>('/dashboard/emergency-rate', {
+      method: 'PUT',
+      body: JSON.stringify({ rate }),
     }),
 };
 
@@ -345,6 +362,12 @@ export interface DashboardSummary {
   categoryDistribution?: { name: string; value: number; color: string }[];
   month: number;
   year: number;
+  // Dữ liệu mới: cam kết chi phí cố định
+  committedFixedExpenses?: number;
+  availableAfterCommitments?: number;
+  // Quỹ dự phòng
+  emergencyFundRate?: number;
+  netAvailableBalance?: number;
 }
 
 export interface Transaction {
@@ -364,6 +387,7 @@ export interface Budget {
   limit_amount: number;
   spent_amount: number;
   category_name: string;
+  budget_title?: string;
   category_icon: string;
   category_color: string;
   usage_percent: number;

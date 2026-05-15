@@ -83,7 +83,13 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const limit = parseInt(req.query['limit'] as string) || 50;
 
     const result = await pool.query(
-      `SELECT t.*, c.ten_danh_muc, c.bieu_tuong as category_icon, c.mau_sac as category_color
+      `SELECT t.id, t.tieu_de AS title, t.so_tien AS amount,
+              CASE WHEN t.loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END AS type,
+              t.ghi_chu AS note,
+              t.ngay_giao_dich AS transaction_date,
+              COALESCE(c.ten_danh_muc, '') AS category_name,
+              COALESCE(c.bieu_tuong, '') AS category_icon,
+              COALESCE(c.mau_sac, '#888') AS category_color
        FROM giao_dich t
        LEFT JOIN danh_muc c ON t.danh_muc_id = c.id
        WHERE t.nguoi_dung_id = $1

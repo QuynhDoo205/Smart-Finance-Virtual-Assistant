@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Wallet, PieChart, MessageSquare, Award, LogOut, Menu, X, Sparkles, Target, AlertTriangle, ShoppingBag, Settings, User, Shield } from 'lucide-react';
+import { LayoutDashboard, Wallet, PieChart, MessageSquare, Award, LogOut, Menu, X, Orbit, Target, AlertTriangle, ShoppingBag, Settings, User, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_ROOT, authApi, adminApi } from '../../utils/api';
 import ThemeSidebar from './ThemeSidebar';
@@ -85,13 +85,18 @@ export default function MainLayout() {
 
   const SidebarContent = () => (
     <div className="h-full flex flex-col py-6 px-4">
-      <div className="flex items-center gap-2 px-2 mb-6">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-primary-500 to-accent-400 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.4)]">
-          <Sparkles className="text-theme-text-primary w-5 h-5" />
+      <div className="flex items-center gap-3 px-2 mb-8 mt-2">
+        <div className="w-10 h-10 rounded-[14px] bg-gradient-to-br from-primary-500 via-primary-600 to-accent-600 flex items-center justify-center shadow-[0_0_25px_rgba(56,189,248,0.4)] border border-white/20">
+          <Orbit className="text-white w-5 h-5 animate-[spin_8s_linear_infinite]" />
         </div>
-        <span className="text-xl font-bold tracking-tight text-theme-text-primary drop-shadow-md">
-          Nova<span className="text-primary-400">Finance</span>
-        </span>
+        <div className="flex flex-col">
+          <span className="text-[22px] font-black tracking-tighter text-theme-text-primary leading-none">
+            NOVA<span className="text-primary-400">FIN</span>
+          </span>
+          <span className="text-[8px] font-bold text-theme-text-muted uppercase tracking-[0.25em] mt-0.5">
+            Quantum AI System
+          </span>
+        </div>
       </div>
 
       <nav className="flex-1 space-y-1.5 overflow-y-auto pr-2 custom-scrollbar">
@@ -170,8 +175,8 @@ export default function MainLayout() {
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 inset-x-0 h-16 z-30 flex items-center justify-between px-4 border-b border-[var(--theme-subtle-border)] backdrop-blur-md" style={{ backgroundColor: 'var(--theme-glass-bg)' }}>
         <div className="flex items-center gap-2">
-          <Sparkles className="text-primary-400 w-6 h-6" />
-          <span className="text-xl font-bold text-theme-text-primary">Nova<span className="text-primary-400">Finance</span></span>
+          <Orbit className="text-primary-400 w-6 h-6 animate-[spin_8s_linear_infinite]" />
+          <span className="text-xl font-black tracking-tighter text-theme-text-primary">NOVA<span className="text-primary-400">FIN</span></span>
         </div>
         <button onClick={toggleMobileMenu} className="p-2 text-theme-text-muted hover:text-theme-text-primary">
           {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}

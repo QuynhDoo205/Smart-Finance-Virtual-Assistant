@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus, X, Trash2, CheckCircle2, AlertCircle, Info, Settings, Wallet, Banknote, Edit3, TrendingUp, ChevronDown, HelpCircle, Gift, Sparkles } from "lucide-react";
+import { Plus, X, Trash2, CheckCircle2, AlertCircle, Info, Settings, Wallet, Banknote, Edit3, TrendingUp, ChevronDown, HelpCircle, Gift, Sparkles, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { dashboardApi, incomeApi, transactionsApi, userApi } from "../../utils/api";
 import { calculateMonthlyForecast } from "../../utils/salaryCalculator";
@@ -25,6 +25,7 @@ interface IncomeRecord {
   amount: number;
   date: string;
   category?: SourceCategory;
+  isAi?: boolean;
 }
 
 export default function IncomeManager() {
@@ -50,7 +51,7 @@ export default function IncomeManager() {
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string; type: 'record' | 'source' } | null>(null);
 
   const todayStr = getLocalDateStr();
-  const [globalFilter, setGlobalFilter] = useState<'all' | SourceCategory>('all');
+  const [globalFilter, setGlobalFilter] = useState<'all' | SourceCategory | 'ai'>('all');
 
   const [sources, setSources] = useState<IncomeSource[]>([]);
   const [records, setRecords] = useState<IncomeRecord[]>([]);
@@ -152,7 +153,8 @@ export default function IncomeManager() {
                 sourceId: matchedSource ? matchedSource.id : "other",
                 amount: parseFloat(t.so_tien || t.amount),
                 date: t.ngay_giao_dich || t.transaction_date,
-                category: type || 'other'
+                category: type || 'other',
+                isAi: note.toLowerCase().includes('nova') || note.toLowerCase().includes('ai')
               };
             })
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -424,8 +426,6 @@ export default function IncomeManager() {
 
   const handleUpdateGlobalIncome = async () => {
     try {
-      // Find or create a 'Khác' fixed source to hold the difference if needed,
-      // but the simplest way is to just update the user's monthly_income in profile.
       const budgetRes = await dashboardApi.getBudget();
       const existingBudgets = budgetRes.success 
         ? budgetRes.data.budgets.map((b: any) => ({ categoryName: b.budget_title || b.category_name, amount: b.limit_amount, category: b.category_name }))
@@ -442,19 +442,53 @@ export default function IncomeManager() {
     }
   };
 
+  const handleQuickSync = (s: IncomeSource) => {
+    const actual = actualBySource[s.id] || 0;
+    const expected = s.expectedAmount || 0;
+    const missing = expected - actual;
+
+    if (missing <= 0) {
+      setNotification({ type: 'info', message: 'Nguồn thu này đã đủ hoặc vượt mức dự tính! ✓' });
+      return;
+    }
+
+    setSourceId(s.id);
+    setAmount(missing.toString());
+    setSelectedRecordCategory(s.sourceType);
+    setWordsPreview(numberToVietnameseWords(missing));
+    
+    // Smooth scroll to entry form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setNotification({ type: 'info', message: `Đã tự động điền ${formatCurrency(missing)}đ còn thiếu cho ${s.name}. Hãy nhấn nút 'Cộng vào Ngân sách' để hoàn tất.` });
+  };
+
   // --- Derived State ---
-  const actualIncomeThisMonth = useMemo(() => {
+  const { actualIncomeThisMonth, actualBySource } = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     
-    return records
-      .filter(r => {
-        const d = new Date(r.date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-      })
-      .reduce((sum, r) => sum + r.amount, 0);
+    const monthlyRecords = records.filter(r => {
+      const d = new Date(r.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const total = monthlyRecords.reduce((sum, r) => sum + r.amount, 0);
+    
+    const bySource: Record<string, number> = {};
+    monthlyRecords.forEach(r => {
+      bySource[r.sourceId] = (bySource[r.sourceId] || 0) + r.amount;
+    });
+
+    return { actualIncomeThisMonth: total, actualBySource: bySource };
   }, [records]);
+
+  const fixedIncomeStatus = useMemo(() => {
+    const fixedSources = sources.filter(s => s.type === 'fixed');
+    const expected = fixedSources.reduce((sum, s) => sum + (s.expectedAmount || 0), 0);
+    const actual = fixedSources.reduce((sum, s) => sum + (actualBySource[s.id] || 0), 0);
+    return { expected, actual, missing: Math.max(0, expected - actual) };
+  }, [sources, actualBySource]);
   const totalForecasted = useMemo(
     () =>
       sources.reduce((sum, s) => {
@@ -695,26 +729,31 @@ export default function IncomeManager() {
 
         <motion.div
           variants={itemVars}
-          className="glass-panel p-6 rounded-[24px] relative overflow-hidden group hover:border-sky-500/30 transition-all duration-500"
+          className={`glass-panel p-6 rounded-[24px] relative overflow-hidden group transition-all duration-500 border ${fixedIncomeStatus.missing > 0 ? 'border-amber-500/30 bg-amber-500/5' : 'border-sky-500/30'}`}
         >
-          <div className="absolute top-0 right-0 w-24 h-24 bg-sky-500/10 rounded-full blur-2xl -mr-12 -mt-12" />
+          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-12 -mt-12 ${fixedIncomeStatus.missing > 0 ? 'bg-amber-500/10' : 'bg-sky-500/10'}`} />
           <div className="flex items-start justify-between">
             <div>
               <h3 className="text-theme-text-muted font-bold text-[10px] uppercase tracking-widest mb-1">
                 Thực thu (Đã nhận)
               </h3>
-              <div className="text-2xl font-black text-sky-400 tracking-tight">
+              <div className={`text-2xl font-black tracking-tight ${fixedIncomeStatus.missing > 0 ? 'text-amber-400' : 'text-sky-400'}`}>
                 {formatCurrency(actualIncomeThisMonth)} <span className="text-sm text-theme-text-muted font-normal uppercase">vnđ</span>
               </div>
             </div>
-            <div className="p-2 bg-sky-500/10 rounded-xl border border-sky-500/20">
-              <Wallet className="w-5 h-5 text-sky-400" />
+            <div className={`p-2 rounded-xl border ${fixedIncomeStatus.missing > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-sky-500/10 border-sky-500/20'}`}>
+              <Wallet className={`w-5 h-5 ${fixedIncomeStatus.missing > 0 ? 'text-amber-400' : 'text-sky-400'}`} />
             </div>
           </div>
           <div className="mt-3 h-1 bg-[var(--theme-subtle-bg)] rounded-full overflow-hidden">
-            <div className="h-full bg-sky-400" style={{ width: `${Math.min((actualIncomeThisMonth / (totalForecasted || 1)) * 100, 100)}%` }} />
+            <div className={`h-full ${fixedIncomeStatus.missing > 0 ? 'bg-amber-500' : 'bg-sky-400'}`} style={{ width: `${Math.min((actualIncomeThisMonth / (totalForecasted || 1)) * 100, 100)}%` }} />
           </div>
-          <p className="mt-1 text-[10px] text-theme-text-muted italic">{Math.round((actualIncomeThisMonth / (totalForecasted || 1)) * 100)}% dự báo</p>
+          <div className="mt-1.5 flex items-center justify-between">
+            <p className="text-[10px] text-theme-text-muted italic">{Math.round((actualIncomeThisMonth / (totalForecasted || 1)) * 100)}% dự báo</p>
+            {fixedIncomeStatus.missing > 0 && (
+              <p className="text-[10px] font-black text-amber-500 uppercase tracking-tighter italic">Cần thu thêm {formatCurrency(fixedIncomeStatus.missing)}đ cố định</p>
+            )}
+          </div>
         </motion.div>
 
         {/* 3rd card: Phân loại Luồng tiền */}
@@ -746,7 +785,7 @@ export default function IncomeManager() {
 
       {/* --- Global Filter Tabs (Universal Filter) --- */}
       <motion.div variants={itemVars} className="flex justify-start my-8">
-        <div className="flex  p-1.5 rounded-[1.5rem] border border-[var(--theme-subtle-border)] backdrop-blur-xl shadow-2xl">
+        <div className="flex p-1.5 rounded-[1.5rem] border border-[var(--theme-subtle-border)] backdrop-blur-xl shadow-2xl">
           <button 
             onClick={() => setGlobalFilter('all')} 
             className={`px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${globalFilter === 'all' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-105' : 'text-theme-text-muted hover:text-white'}`}
@@ -824,6 +863,7 @@ export default function IncomeManager() {
                               type="button"
                               onClick={() => {
                                 setSourceId(s.id);
+                                setSelectedRecordCategory(s.sourceType);
                                 setIsSelectOpen(false);
                               }}
                               className={`w-full px-4 py-3 text-left text-sm font-bold transition-all hover:bg-emerald-500/20 flex items-center justify-between group ${sourceId === s.id ? 'bg-emerald-500/30 text-emerald-400' : 'text-theme-text-muted hover:text-theme-text-primary'}`}
@@ -924,7 +964,7 @@ export default function IncomeManager() {
           <div className="glass-panel p-6 rounded-3xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-black text-theme-text-primary">
-                Nguồn tiền của bạn
+                Nguồn tiền dự tính trong tháng
               </h3>
               <button
                 onClick={() => { resetSourceForm(); setShowAddSourceModal(true); }}
@@ -935,20 +975,68 @@ export default function IncomeManager() {
               </button>
             </div>
             <div className="space-y-2 mb-8">
-              {sources.filter(s => globalFilter === 'all' || s.sourceType === globalFilter).map(s => (
-                <div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] group hover:border-emerald-500/20 transition-all">
-                  <div>
-                    <p className="text-xs font-bold text-theme-text-primary">{s.name}</p>
-                    <p className="text-[9px] text-theme-text-muted">
-                      {s.sourceType === 'salary' ? '💼 Lương / Job' : s.sourceType === 'allowance' ? '🎁 Trợ cấp' : '✨ Khác'} • {s.type === 'fixed' ? 'Cố định' : s.type === 'variable' ? 'Linh hoạt' : 'Theo lịch'} • {formatCurrency(s.expectedAmount || 0)}
-                    </p>
+              {sources.filter(s => globalFilter === 'all' || s.sourceType === globalFilter).map(s => {
+                const actual = actualBySource[s.id] || 0;
+                const expected = s.expectedAmount || 0;
+                
+                // Logic Chuyên sâu: Chỉ báo 'Thiếu' cho nguồn Cố định (Fixed)
+                const isFixedUnder = s.type === 'fixed' && actual < expected;
+                const progress = expected > 0 ? Math.min((actual / expected) * 100, 100) : 0;
+
+                return (
+                  <div key={s.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all group ${isFixedUnder ? 'bg-amber-500/5 border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.05)]' : 'bg-[var(--theme-subtle-bg)] border-[var(--theme-subtle-border)] hover:border-emerald-500/20'}`}>
+                    <div className="flex-1 min-w-0 pr-4">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-xs font-bold text-theme-text-primary truncate">{s.name}</p>
+                        
+                        {/* Cảnh báo chỉ dành cho Fixed */}
+                        {isFixedUnder && (
+                          <div className="px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center gap-1 animate-pulse">
+                            <AlertCircle className="w-2.5 h-2.5 text-amber-500" />
+                            <span className="text-[8px] font-black text-amber-500 uppercase tracking-tighter">Hụt thu {formatCurrency(expected - actual)}</span>
+                          </div>
+                        )}
+
+                        {/* Hoàn thành cho bất kỳ nguồn nào đạt mục tiêu */}
+                        {expected > 0 && actual >= expected && (
+                          <div className="flex items-center gap-1 text-emerald-500">
+                             <CheckCircle2 className="w-3 h-3" />
+                             <span className="text-[8px] font-black uppercase">
+                               {s.type === 'fixed' ? 'Đã nhận đủ' : 'Đạt mục tiêu'}
+                             </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[9px] text-theme-text-muted">
+                          {s.sourceType === 'salary' ? '💼 Lương' : s.sourceType === 'allowance' ? '🎁 Trợ cấp' : '✨ Khác'} • {s.type === 'fixed' ? 'Cố định' : s.type === 'variable' ? 'Linh hoạt' : 'Theo lịch'} • {formatCurrency(expected)}
+                        </p>
+                        {expected > 0 && (
+                          <div className="w-12 h-1 bg-black/20 rounded-full overflow-hidden">
+                             <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} className={`h-full ${isFixedUnder ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {/* Nút Khớp nhanh chỉ dành cho Fixed */}
+                      {isFixedUnder && (
+                        <button 
+                          onClick={() => handleQuickSync(s)}
+                          className="p-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white rounded-lg transition-all shadow-lg shadow-amber-500/10"
+                          title="Khớp nhanh lương cố định còn thiếu"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all ml-1">
+                        <button onClick={() => handleEditSource(s)} className="p-1.5 hover:bg-[var(--theme-bg-surface)] rounded-lg text-theme-text-muted hover:text-emerald-400"><Edit3 className="w-3 h-3" /></button>
+                        <button onClick={() => handleDeleteSource(s.id)} className="p-1.5 hover:bg-rose-500/15 rounded-lg text-theme-text-muted hover:text-rose-400"><Trash2 className="w-3 h-3" /></button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <button onClick={() => handleEditSource(s)} className="p-1.5 hover:bg-[var(--theme-bg-surface)] rounded-lg text-theme-text-muted hover:text-emerald-400"><Edit3 className="w-3 h-3" /></button>
-                    <button onClick={() => handleDeleteSource(s.id)} className="p-1.5 hover:bg-rose-500/15 rounded-lg text-theme-text-muted hover:text-rose-400"><Trash2 className="w-3 h-3" /></button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex items-center justify-between mb-4">
@@ -969,6 +1057,7 @@ export default function IncomeManager() {
               {records
                 .filter(r => {
                   if (globalFilter === 'all') return true;
+                  if (globalFilter === 'ai') return r.isAi;
                   const src = sources.find(s => s.id === r.sourceId);
                   return src?.sourceType === globalFilter;
                 })
@@ -989,8 +1078,9 @@ export default function IncomeManager() {
                        <Sparkles className="w-4 h-4" />}
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-theme-text-primary">
+                      <p className="text-xs font-bold text-theme-text-primary flex items-center gap-1.5">
                         {sources.find((s) => s.id === record.sourceId)?.name || "Thu nhập"}
+                        {record.isAi && <Sparkles className="w-3 h-3 text-sky-400 animate-pulse" />}
                       </p>
                       <p className="text-[9px] font-bold text-theme-text-muted">
                         {record.category === 'salary' || (!record.category && sources.find(s => s.id === record.sourceId)?.sourceType === 'salary') ? '💼 Lương' : 

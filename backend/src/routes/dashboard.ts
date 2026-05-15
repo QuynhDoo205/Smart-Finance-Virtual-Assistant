@@ -1,12 +1,11 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Response } from 'express';
 import { Router } from 'express';
 import pool from '../db.js';
 import type { AuthRequest } from '../middleware/auth.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { analyzeChatMessage } from '../services/aiService.js';
 
 const router = Router();
-const genAI = new GoogleGenerativeAI((process.env.GOOGLE_AI_KEY || "").trim());
 
 // Tất cả routes dashboard yêu cầu authentication
 router.use(authMiddleware);
@@ -104,7 +103,44 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
       [userId]
     );
     const cumulativeIncome = parseFloat(allTimeIncomeRes.rows[0]?.total ?? '0');
-    const emergencyLimit = cumulativeIncome * 0.1;
+
+    // ── Chi phí cố định đã cam kết (từ bảng ngan_sach)
+    // Phân biệt: Lọ chuẩn (Thiết yếu, Tiết kiệm...) có tieu_de = NULL/rỗng
+    // Chi phí cố định (Tiền Nhà, Điện nước...) có tieu_de = "Tiền Nhà", v.v.
+    // Tính tổng số tiền phí cố định CÒN PHẢI TRẢ trong tháng
+    // Tránh việc trừ đúp: nếu đã thanh toán (chi tiêu) thì không khóa tiền nữa
+    const fixedExpensesResult = await pool.query(
+      `WITH actual_spending AS (
+          SELECT danh_muc_id, SUM(so_tien) as total_spent
+          FROM giao_dich
+          WHERE nguoi_dung_id = $1 AND loai_giao_dich IN ('chi_phi', 'expense')
+          AND EXTRACT(MONTH FROM ngay_giao_dich) = EXTRACT(MONTH FROM CURRENT_DATE)
+          AND EXTRACT(YEAR FROM ngay_giao_dich) = EXTRACT(YEAR FROM CURRENT_DATE)
+          GROUP BY danh_muc_id
+       )
+       SELECT COALESCE(SUM(GREATEST(0, n.gioi_han_chi_tieu - COALESCE(s.total_spent, 0))), 0) as total_unpaid
+       FROM ngan_sach n
+       LEFT JOIN actual_spending s ON n.danh_muc_id = s.danh_muc_id
+       WHERE n.nguoi_dung_id = $1
+         AND n.gioi_han_chi_tieu > 0
+         AND n.tieu_de IS NOT NULL
+         AND TRIM(n.tieu_de) != ''
+         AND EXTRACT(MONTH FROM CURRENT_DATE) = n.thang
+         AND EXTRACT(YEAR FROM CURRENT_DATE) = n.nam`,
+      [userId]
+    );
+    const committedFixedExpenses = parseFloat(fixedExpensesResult.rows[0]?.total_unpaid ?? '0');
+    const availableAfterCommitments = totalBalance - committedFixedExpenses;
+
+    // Lấy tỷ lệ quỹ dự phòng của người dùng (mặc định 10%)
+    const userRateRes = await pool.query(
+      `SELECT emergency_fund_rate FROM nguoi_dung WHERE id = $1`,
+      [userId]
+    );
+    const emergencyFundRate = parseFloat(userRateRes.rows[0]?.emergency_fund_rate ?? '10');
+    
+    // Quỹ dự phòng = % số dư khả dụng SAU KHI đã trừ đi chi phí cố định (như người dùng yêu cầu)
+    const emergencyLimit = availableAfterCommitments * (emergencyFundRate / 100);
 
     const emergencyTransResult = await pool.query(
       `SELECT COALESCE(SUM(so_tien), 0) as total
@@ -116,6 +152,9 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
     const totalWithdrawn = parseFloat(emergencyTransResult.rows[0]?.total ?? '0');
     const remainingEmergency = Math.max(0, emergencyLimit - totalWithdrawn);
 
+    // Số dư thực sự khả dụng (trừ cả cam kết + quỹ dự phòng CÒN LẠI đang bị khóa)
+    const netAvailableBalance = availableAfterCommitments - remainingEmergency;
+
     res.json({
       success: true,
       data: {
@@ -124,16 +163,45 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
         totalExpense,
         remainingEmergency,
         emergencyLimit,
+        emergencyFundRate,
+        // Số dư ví thực tế = tổng tài sản - phí cố định - quỹ dự phòng CÒN LẠI
+        netAvailableBalance: Math.max(0, netAvailableBalance),
         netSavings: totalIncome - totalExpense,
         incomeChangePercent: incomeChange,
         isSurvivalMode,
         categoryDistribution: categoryDistResult.rows,
         month,
         year,
+        // ── Cam kết chi phí cố định
+        committedFixedExpenses,
+        availableAfterCommitments,
       }
     });
   } catch (err) {
     console.error('Dashboard summary error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
+  }
+});
+
+// ============================================================
+// PUT /api/dashboard/emergency-rate – Cập nhật tỷ lệ quỹ dự phòng
+// ============================================================
+router.put('/emergency-rate', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { rate } = req.body;
+    const numRate = parseFloat(rate);
+    if (isNaN(numRate) || numRate < 1 || numRate > 50) {
+      res.status(400).json({ success: false, message: 'Tỷ lệ hợp lệ từ 1% đến 50%' });
+      return;
+    }
+    await pool.query(
+      `UPDATE nguoi_dung SET emergency_fund_rate = $1 WHERE id = $2`,
+      [numRate, userId]
+    );
+    res.json({ success: true, message: `Đã cập nhật tỷ lệ quỹ dự phòng: ${numRate}%` });
+  } catch (err) {
+    console.error('Emergency rate update error:', err);
     res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
   }
 });
@@ -308,25 +376,62 @@ router.post('/savings-goals/:id/fund', async (req: AuthRequest, res: Response): 
 });
 
 // ============================================================
-// GET /api/dashboard/chart-data – Dữ liệu biểu đồ 6 tháng gần nhất
+// GET /api/dashboard/chart-data – Dữ liệu biểu đồ dòng tiền (Tuần/Tháng/6 Tháng)
 // ============================================================
 router.get('/chart-data', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
+    const range = req.query.range as string || '6months';
 
-    const result = await pool.query(
-      `SELECT 
-         EXTRACT(MONTH FROM ngay_giao_dich)::int as month,
-         EXTRACT(YEAR FROM ngay_giao_dich)::int as year,
-         CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END AS type,
-         SUM(so_tien) as total
-       FROM giao_dich
-       WHERE nguoi_dung_id = $1 
-         AND ngay_giao_dich >= NOW() - INTERVAL '6 months'
-       GROUP BY EXTRACT(MONTH FROM ngay_giao_dich), EXTRACT(YEAR FROM ngay_giao_dich), loai_giao_dich
-       ORDER BY year, month`,
-      [userId]
-    );
+    let result;
+    if (range === 'week') {
+      // 7 ngày qua
+      result = await pool.query(
+        `SELECT 
+           EXTRACT(DAY FROM ngay_giao_dich)::int as day,
+           EXTRACT(MONTH FROM ngay_giao_dich)::int as month,
+           EXTRACT(YEAR FROM ngay_giao_dich)::int as year,
+           CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END AS type,
+           SUM(so_tien) as total
+         FROM giao_dich
+         WHERE nguoi_dung_id = $1 
+           AND ngay_giao_dich >= CURRENT_DATE - INTERVAL '6 days'
+         GROUP BY EXTRACT(DAY FROM ngay_giao_dich), EXTRACT(MONTH FROM ngay_giao_dich), EXTRACT(YEAR FROM ngay_giao_dich), CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END
+         ORDER BY year, month, day`,
+        [userId]
+      );
+    } else if (range === 'month') {
+      // 30 ngày qua
+      result = await pool.query(
+        `SELECT 
+           EXTRACT(DAY FROM ngay_giao_dich)::int as day,
+           EXTRACT(MONTH FROM ngay_giao_dich)::int as month,
+           EXTRACT(YEAR FROM ngay_giao_dich)::int as year,
+           CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END AS type,
+           SUM(so_tien) as total
+         FROM giao_dich
+         WHERE nguoi_dung_id = $1 
+           AND ngay_giao_dich >= CURRENT_DATE - INTERVAL '29 days'
+         GROUP BY EXTRACT(DAY FROM ngay_giao_dich), EXTRACT(MONTH FROM ngay_giao_dich), EXTRACT(YEAR FROM ngay_giao_dich), CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END
+         ORDER BY year, month, day`,
+        [userId]
+      );
+    } else {
+      // 6 tháng
+      result = await pool.query(
+        `SELECT 
+           EXTRACT(MONTH FROM ngay_giao_dich)::int as month,
+           EXTRACT(YEAR FROM ngay_giao_dich)::int as year,
+           CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END AS type,
+           SUM(so_tien) as total
+         FROM giao_dich
+         WHERE nguoi_dung_id = $1 
+           AND ngay_giao_dich >= CURRENT_DATE - INTERVAL '5 months'
+         GROUP BY EXTRACT(MONTH FROM ngay_giao_dich), EXTRACT(YEAR FROM ngay_giao_dich), CASE WHEN loai_giao_dich IN ('thu_nhap', 'income') THEN 'income' ELSE 'expense' END
+         ORDER BY year, month`,
+        [userId]
+      );
+    }
 
     res.json({ success: true, data: { chartData: result.rows } });
   } catch (err) {
@@ -346,12 +451,10 @@ router.get('/suggest-jars', async (req: AuthRequest, res: Response): Promise<voi
     const profileRes = await pool.query('SELECT thu_nhap_hang_thang FROM nguoi_dung WHERE id = $1', [userId]);
     const income = profileRes.rows[0]?.thu_nhap_hang_thang || 0;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `Dựa trên thu nhập ${income} VNĐ/tháng của một sinh viên, hãy gợi ý tỷ lệ chia 5 lọ tài chính (Thiết yếu, Tiết kiệm, Phát triển, Hưởng thụ, Đầu tư). Trả về JSON: {"jars": [{"name": string, "percentage": number}]}. Tổng percentage phải bằng 100.`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const aiResult = await analyzeChatMessage(prompt);
+    const text = aiResult.reply || '';
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     
     res.json({ 

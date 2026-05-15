@@ -54,24 +54,102 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Kiểm tra email đã tồn tại chưa
+    // Kiểm tra email đã tồn tại trong bảng chính chưa
     const existingUser = await pool.query('SELECT id FROM nguoi_dung WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       res.status(409).json({ success: false, message: 'Email đã được sử dụng' });
       return;
     }
 
+    // Tạo mã OTP 6 số ngẫu nhiên
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    // Tạo user mới
+    // Lưu vào bảng tạm otp_xac_thuc (Upsert)
+    await pool.query(
+      `INSERT INTO otp_xac_thuc (email, ho_ten, mat_khau_hash, otp_code, expires_at) 
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (email) 
+       DO UPDATE SET ho_ten = EXCLUDED.ho_ten, mat_khau_hash = EXCLUDED.mat_khau_hash, otp_code = EXCLUDED.otp_code, expires_at = EXCLUDED.expires_at, ngay_tao = NOW()`,
+      [email, full_name, password_hash, otpCode, expiresAt]
+    );
+
+    // Gửi email OTP
+    const mailOptions = {
+      from: '"Nova Finance AI" <levanthang0166@gmail.com>',
+      to: email,
+      subject: 'Mã xác thực Đăng ký tài khoản Nova Finance',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #010828; color: #fff; border-radius: 16px; border: 1px solid #00D1FF;">
+          <h2 style="color: #00D1FF; text-align: center;">XÁC THỰC TÀI KHOẢN</h2>
+          <p style="font-size: 16px;">Chào <strong>${full_name}</strong>,</p>
+          <p style="font-size: 16px;">Cảm ơn bạn đã đăng ký gia nhập Nova Finance. Để hoàn tất, vui lòng nhập mã xác thực gồm 6 chữ số dưới đây:</p>
+          <div style="background-color: rgba(255,255,255,0.1); padding: 16px; text-align: center; border-radius: 8px; margin: 24px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #00D1FF;">${otpCode}</span>
+          </div>
+          <p style="font-size: 14px; color: #a1a1aa;">Mã này có hiệu lực trong vòng 5 phút. Vui lòng không chia sẻ mã này cho bất kỳ ai.</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({
+      success: true,
+      message: 'Mã OTP đã được gửi đến email của bạn!',
+      step: 'otp'
+    });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ khi gửi OTP, vui lòng thử lại' });
+  }
+});
+
+// ============================================================
+// POST /api/auth/register/verify – Xác thực OTP và Tạo User
+// ============================================================
+router.post('/register/verify', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, otp_code } = req.body;
+
+    if (!email || !otp_code) {
+      res.status(400).json({ success: false, message: 'Thiếu thông tin xác thực' });
+      return;
+    }
+
+    // Lấy thông tin từ bảng tạm
+    const otpRecord = await pool.query(
+      'SELECT ho_ten, mat_khau_hash, expires_at FROM otp_xac_thuc WHERE email = $1 AND otp_code = $2',
+      [email, otp_code]
+    );
+
+    if (otpRecord.rows.length === 0) {
+      res.status(400).json({ success: false, message: 'Mã OTP không chính xác' });
+      return;
+    }
+
+    const { ho_ten, mat_khau_hash, expires_at } = otpRecord.rows[0];
+
+    // Kiểm tra hết hạn
+    if (new Date() > new Date(expires_at)) {
+      res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn, vui lòng đăng ký lại' });
+      return;
+    }
+
+    // Đã hợp lệ -> Tạo user chính thức
     const result = await pool.query(
       `INSERT INTO nguoi_dung (ho_ten, email, mat_khau, ngay_tao, ngay_cap_nhat) 
        VALUES ($1, $2, $3, NOW(), NOW()) 
        RETURNING id, ho_ten AS full_name, email, thu_nhap_hang_thang AS monthly_income, hoan_thanh_khao_sat AS onboarding_completed, is_admin, ngay_tao AS created_at`,
-      [full_name, email, password_hash]
+      [ho_ten, email, mat_khau_hash]
     );
+
+    // Xóa record ở bảng tạm
+    await pool.query('DELETE FROM otp_xac_thuc WHERE email = $1', [email]);
 
     const newUser = result.rows[0];
 
@@ -85,7 +163,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 
     res.status(201).json({
       success: true,
-      message: 'Đăng ký thành công!',
+      message: 'Xác thực thành công! Đang chuyển hướng...',
       data: {
         token,
         user: {

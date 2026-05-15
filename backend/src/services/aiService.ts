@@ -1,58 +1,112 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import 'dotenv/config';
 
-// Parse multiple API keys for rotation
-const apiKeys = (process.env.GEMINI_API_KEYS || process.env.GOOGLE_AI_KEY || "").split(',').map(k => k.trim()).filter(Boolean);
-let currentKeyIndex = 0;
+// ============================================================
+// 🔑 GEMINI KEY ROTATION SYSTEM - Xịn xò nhất
+// ============================================================
+const rawKeys = (process.env.GEMINI_API_KEYS || process.env.GOOGLE_AI_KEY || "")
+  .split(',')
+  .map(k => k.trim())
+  .filter(Boolean);
+
+// Loại bỏ key trùng lặp
+const apiKeys = [...new Set(rawKeys)];
 
 if (apiKeys.length === 0) {
-  console.error("⚠️ GEMINI_API_KEYS chưa được cấu hình trong .env!");
+  console.error("⚠️  GEMINI_API_KEYS chưa được cấu hình trong .env!");
 } else {
-  console.log(`📡 AI Service: Loaded ${apiKeys.length} keys. Starting with: ${apiKeys[0].substring(0, 10)}...`);
+  console.log(`🚀 AI Key Rotation Ready: ${apiKeys.length} keys loaded.`);
+  apiKeys.forEach((k, i) => console.log(`   Key #${i + 1}: ${k.substring(0, 14)}...`));
 }
 
-/**
- * Lấy đối tượng GenerativeAI dựa trên key hiện tại
- */
-function getGenAI() {
-  return new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
-}
+// Trạng thái của từng key: cooldown đến khi nào (ms timestamp)
+const keyCooldowns: Map<number, number> = new Map();
+const KEY_COOLDOWN_MS = 60_000; // 60 giây cooldown sau khi bị 429
+let currentKeyIndex = 0;
 
 /**
- * Chuyển sang API Key tiếp theo
+ * Chọn key tốt nhất hiện tại (không trong cooldown)
  */
-function rotateKey() {
-  if (apiKeys.length > 1) {
-    currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-    console.log(`🔄 Switched to Gemini API Key #${currentKeyIndex + 1} (${apiKeys[currentKeyIndex].substring(0, 10)}...)`);
+function getBestKeyIndex(): number {
+  const now = Date.now();
+  // Thử key hiện tại trước
+  if ((keyCooldowns.get(currentKeyIndex) ?? 0) <= now) {
+    return currentKeyIndex;
   }
+  // Tìm key tiếp theo không bị cooldown
+  for (let i = 1; i < apiKeys.length; i++) {
+    const idx = (currentKeyIndex + i) % apiKeys.length;
+    if ((keyCooldowns.get(idx) ?? 0) <= now) {
+      currentKeyIndex = idx;
+      console.log(`🔑 Auto-select Key #${idx + 1} (${apiKeys[idx].substring(0, 14)}...) - others in cooldown`);
+      return idx;
+    }
+  }
+  // Tất cả đang cooldown → dùng key nào hết cooldown sớm nhất
+  let minCooldown = Infinity;
+  let bestIdx = 0;
+  for (let i = 0; i < apiKeys.length; i++) {
+    const cd = keyCooldowns.get(i) ?? 0;
+    if (cd < minCooldown) { minCooldown = cd; bestIdx = i; }
+  }
+  return bestIdx;
 }
 
 /**
- * Wrapper hỗ trợ tự động xoay key khi gặp lỗi Rate Limit (429)
+ * Đánh dấu key hiện tại đang bị rate-limit, chuyển sang key tiếp theo
  */
-async function callWithRetry<T>(fn: (model: any) => Promise<T>, isVision = false): Promise<T> {
-  let attempts = 0;
-  const maxAttempts = apiKeys.length;
+function rotateKey(failedIndex: number) {
+  keyCooldowns.set(failedIndex, Date.now() + KEY_COOLDOWN_MS);
+  const nextIndex = (failedIndex + 1) % apiKeys.length;
+  currentKeyIndex = nextIndex;
+  console.log(`🔄 Key #${failedIndex + 1} → COOLDOWN 60s | Switching to Key #${nextIndex + 1} (${apiKeys[nextIndex].substring(0, 14)}...)`);
+}
 
-  while (attempts < maxAttempts) {
+/**
+ * Tạo đối tượng GenerativeAI từ key đang active
+ */
+function getGenAI(keyIndex: number) {
+  return new GoogleGenerativeAI(apiKeys[keyIndex]);
+}
+
+/**
+ * Wrapper tự động xoay key khi gặp Rate Limit / Quota Error
+ * Thử tất cả keys trước khi báo lỗi
+ */
+async function callWithRetry<T>(fn: (model: any) => Promise<T>): Promise<T> {
+  const maxAttempts = apiKeys.length;
+  let lastError: any;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const keyIdx = getBestKeyIndex();
     try {
-      const genAI = getGenAI();
+      const genAI = getGenAI(keyIdx);
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      return await fn(model);
+      const result = await fn(model);
+      // ✅ Thành công - log nếu cần
+      if (attempt > 0) {
+        console.log(`✅ Request succeeded on Key #${keyIdx + 1} after ${attempt} rotation(s)`);
+      }
+      return result;
     } catch (error: any) {
-      const errorMsg = error?.message || "";
-      const isQuotaExceeded = errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("Rate limit");
-      
-      if (isQuotaExceeded && apiKeys.length > 1 && attempts < maxAttempts - 1) {
-        rotateKey();
-        attempts++;
+      lastError = error;
+      const msg = String(error?.message || error).toLowerCase();
+      const isRateLimit = msg.includes("429") || msg.includes("quota") || msg.includes("rate limit") || msg.includes("resource_exhausted");
+
+      if (isRateLimit && apiKeys.length > 1) {
+        console.warn(`⚠️  Key #${keyIdx + 1} rate-limited. Rotating...`);
+        rotateKey(keyIdx);
+        // Delay nhỏ trước khi retry (tránh spam)
+        await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
         continue;
       }
+      // Lỗi khác (không phải rate limit) → throw ngay
       throw error;
     }
   }
-  throw new Error("Tất cả API Key đều đã hết hạn mức hoặc gặp sự cố.");
+
+  console.error("❌ All API keys exhausted or in cooldown.");
+  throw lastError ?? new Error("Tất cả API Key đều đã hết quota hoặc gặp sự cố.");
 }
 
 export interface AIParsedExpense {
