@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Wifi, Zap, CheckCircle2, ChevronRight, Activity, PieChart as PieChartIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +17,10 @@ export default function OnboardingSurvey() {
   const [step, setStep] = useState(1);
   const navigate = useNavigate();
   const [isFinishing, setIsFinishing] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'cyberpunk');
+  }, []);
 
   const [expenses, setExpenses] = useState<ExpenseItem[]>([
     { id: 'rent', name: 'Nhà ở & Tiện ích', icon: <Home className="w-5 h-5 text-sky-400" />, amount: '', color: 'bg-sky-500' },
@@ -88,7 +92,7 @@ export default function OnboardingSurvey() {
       </AnimatePresence>
       
       {/* LEFT SIDE: Visual Data Representation */}
-      <div className="hidden lg:flex w-[45%] relative flex-col justify-center items-center p-12 border-r border-[var(--theme-subtle-border)] overflow-hidden">
+      <div className="hidden lg:flex w-[40%] relative flex-col justify-center items-center p-8 border-r border-[var(--theme-subtle-border)] overflow-hidden">
         {/* Animated Background */}
         <div className="absolute inset-0">
           <div className="absolute top-[20%] left-[20%] w-96 h-96 bg-primary-600/10 rounded-full blur-[100px] animate-pulse" />
@@ -102,11 +106,11 @@ export default function OnboardingSurvey() {
           transition={{ duration: 1 }}
           className="relative z-10 w-full max-w-sm flex flex-col items-center"
         >
-          <div className="w-20 h-20 rounded-3xl bg-[#1F2937]/50 border border-[var(--theme-subtle-border)] flex items-center justify-center mb-8 shadow-[0_0_50px_rgba(56,189,248,0.2)] backdrop-blur-xl">
-            <PieChartIcon className="w-10 h-10 text-primary-400" />
+          <div className="w-14 h-14 rounded-2xl bg-[#1F2937]/50 border border-[var(--theme-subtle-border)] flex items-center justify-center mb-5 shadow-[0_0_40px_rgba(56,189,248,0.2)] backdrop-blur-xl">
+            <PieChartIcon className="w-7 h-7 text-primary-400" />
           </div>
-          <h2 className="text-3xl font-bold text-theme-text-primary mb-2 tracking-tight">Phân tích Real-time</h2>
-          <p className="text-theme-text-muted text-center mb-12">Hệ thống đang mô phỏng dòng tiền cố định của bạn.</p>
+          <h2 className="text-xl font-bold text-theme-text-primary mb-1.5 tracking-tight">Phân tích Real-time</h2>
+          <p className="text-theme-text-muted text-sm text-center mb-8">Hệ thống đang mô phỏng dòng tiền cố định của bạn.</p>
 
           {/* Dynamic Stacked Bar */}
           <div className="w-full h-8 rounded-full bg-[#111827] border border-[var(--theme-subtle-border)] overflow-hidden flex shadow-inner">
@@ -128,20 +132,20 @@ export default function OnboardingSurvey() {
             </AnimatePresence>
           </div>
 
-          <div className="mt-8 p-6 w-full glass-panel flex flex-col items-center border-[0.5px] border-primary-500/20 shadow-[0_0_30px_rgba(56,189,248,0.1)]">
-            <span className="text-theme-text-muted text-sm uppercase tracking-widest font-semibold mb-2">Tổng khóa ngân sách</span>
-            <span className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tabular-nums tracking-tight">
-              {new Intl.NumberFormat('vi-VN').format(totalFixed)}<span className="text-xl ml-2 text-theme-text-muted">đ</span>
+          <div className="mt-5 p-4 w-full glass-panel flex flex-col items-center border-[0.5px] border-primary-500/20 shadow-[0_0_20px_rgba(56,189,248,0.1)]">
+            <span className="text-theme-text-muted text-xs uppercase tracking-widest font-semibold mb-1">Tổng khóa ngân sách</span>
+            <span className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tabular-nums tracking-tight">
+              {new Intl.NumberFormat('vi-VN').format(totalFixed)}<span className="text-base ml-1.5 text-theme-text-muted">đ</span>
             </span>
           </div>
         </motion.div>
       </div>
 
       {/* RIGHT SIDE: Interactive Form */}
-      <div className="w-full lg:w-[55%] flex flex-col justify-center p-6 sm:p-16 relative">
-        <div className="max-w-xl w-full mx-auto relative z-10">
+      <div className="w-full lg:w-[60%] flex flex-col justify-center p-6 sm:p-10 relative">
+        <div className="max-w-lg w-full mx-auto relative z-10">
           
-          <div className="flex items-center gap-2 mb-12">
+          <div className="flex items-center gap-2 mb-7">
             <div className="h-1.5 w-12 rounded-full bg-primary-500 shadow-[0_0_10px_rgba(56,189,248,0.5)]" />
             <div className={`h-1.5 w-12 rounded-full transition-all duration-500 ${step === 2 ? 'bg-primary-500 shadow-[0_0_10px_rgba(56,189,248,0.5)]' : 'bg-[var(--theme-bg-surface)]'}`} />
             <div className="ml-auto flex items-center gap-2 text-primary-400 font-bold text-sm tracking-widest uppercase bg-primary-500/10 px-4 py-1.5 rounded-full border border-primary-500/20">
@@ -159,14 +163,14 @@ export default function OnboardingSurvey() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.4 }}
               >
-                <h1 className="text-4xl sm:text-5xl font-extrabold text-theme-text-primary mb-4 tracking-tight">
+                <h1 className="text-3xl sm:text-4xl font-extrabold text-theme-text-primary mb-3 tracking-tight">
                   Sinh tồn an toàn.
                 </h1>
-                <p className="text-theme-text-muted text-lg mb-10 leading-relaxed font-medium">
+                <p className="text-theme-text-muted text-sm mb-6 leading-relaxed font-medium">
                   Nhập các khoản chi phí mà bạn <strong>bắt buộc phải trả</strong> mỗi tháng. AI sẽ cách ly số tiền này khỏi quỹ tiêu vặt ngay khi nhận lương.
                 </p>
 
-                <div className="space-y-5 mb-10">
+                <div className="space-y-3 mb-6">
                   {expenses.map((exp, idx) => (
                     <motion.div 
                       key={exp.id}
@@ -175,24 +179,23 @@ export default function OnboardingSurvey() {
                       transition={{ delay: idx * 0.1 }}
                       className="group relative"
                     >
-                      {/* Animated Glow Border on Focus-within */}
-                      <div className="absolute -inset-[1px] bg-gradient-to-r from-transparent via-primary-500/50 to-transparent rounded-[1.5rem] opacity-0 group-focus-within:opacity-100 transition-opacity duration-500 blur-sm" />
+                      <div className="absolute -inset-[1px] bg-gradient-to-r from-transparent via-primary-500/50 to-transparent rounded-[1.2rem] opacity-0 group-focus-within:opacity-100 transition-opacity duration-500 blur-sm" />
                       
-                      <div className="relative p-3 sm:p-4 rounded-[1.5rem] bg-[#111827] border border-[var(--theme-subtle-border)] transition-all duration-300 flex items-center gap-4 hover:bg-[#1F2937]/50 shadow-lg">
-                        <div className={`w-14 h-14 rounded-[1.2rem] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center flex-shrink-0 border border-[var(--theme-subtle-border)] shadow-inner`}>
+                      <div className="relative p-2.5 sm:p-3 rounded-[1.2rem] bg-[#111827] border border-[var(--theme-subtle-border)] transition-all duration-300 flex items-center gap-3 hover:bg-[#1F2937]/50 shadow-lg">
+                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center flex-shrink-0 border border-[var(--theme-subtle-border)] shadow-inner`}>
                           {exp.icon}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <label className="text-xs sm:text-sm text-theme-text-muted font-semibold uppercase tracking-wider block mb-1">{exp.name}</label>
+                          <label className="text-[11px] text-theme-text-muted font-semibold uppercase tracking-wider block mb-0.5">{exp.name}</label>
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
-                              className="bg-transparent text-2xl sm:text-3xl font-bold text-theme-text-primary focus:outline-none w-full placeholder-gray-700 transition-all font-sans"
+                              className="bg-transparent text-xl sm:text-2xl font-bold text-theme-text-primary focus:outline-none w-full placeholder-theme-text-muted/50 transition-all font-sans"
                               placeholder="0"
                               value={exp.amount}
                               onChange={(e) => handleAmountChange(exp.id, e.target.value)}
                             />
-                            <span className="text-theme-text-muted font-medium pr-4">đ</span>
+                            <span className="text-theme-text-muted font-medium pr-3">đ</span>
                           </div>
                         </div>
                       </div>
@@ -204,11 +207,11 @@ export default function OnboardingSurvey() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => { setStep(2); handleFinish(); }}
-                  className="btn-primary w-full flex items-center justify-between px-8 py-5 text-lg shadow-[0_10px_30px_rgba(14,165,233,0.3)] bg-gradient-to-r from-primary-600 to-sky-400"
+                  className="btn-primary w-full flex items-center justify-between px-6 py-3.5 text-base shadow-[0_8px_24px_rgba(14,165,233,0.3)] bg-gradient-to-r from-primary-600 to-sky-400"
                 >
                   <span className="font-bold">Nhập Dữ Liệu & Bắt Đầu Ngay</span>
-                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md">
-                    <ChevronRight className="w-6 h-6 text-theme-text-primary" />
+                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md">
+                    <ChevronRight className="w-5 h-5 text-theme-text-primary" />
                   </div>
                 </motion.button>
               </motion.div>
@@ -221,7 +224,7 @@ export default function OnboardingSurvey() {
                 animate={{ opacity: 1, scale: 1 }}
                 className="flex flex-col items-center text-center py-12"
               >
-                <div className="relative w-40 h-40 mb-12">
+                <div className="relative w-28 h-28 mb-8">
                   <motion.div 
                     animate={{ rotate: 360 }}
                     transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
@@ -233,25 +236,25 @@ export default function OnboardingSurvey() {
                     className="absolute inset-4 rounded-full border-[1.5px] border-accent-400/30"
                   />
                   
-                  <div className="absolute inset-8 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(16,185,129,0.5)]">
+                  <div className="absolute inset-6 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(16,185,129,0.5)]">
                     {isFinishing ? (
                       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring' }}>
-                        <CheckCircle2 className="w-16 h-16 text-theme-text-primary" />
+                        <CheckCircle2 className="w-10 h-10 text-theme-text-primary" />
                       </motion.div>
                     ) : (
                       <motion.div 
                         animate={{ opacity: [0.5, 1, 0.5] }} 
                         transition={{ repeat: Infinity, duration: 2 }}
-                        className="w-12 h-12 border-[3px] border-white border-t-transparent rounded-full animate-spin"
+                        className="w-8 h-8 border-[3px] border-white border-t-transparent rounded-full animate-spin"
                       />
                     )}
                   </div>
                 </div>
                 
-                <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300 mb-6">
+                <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300 mb-4">
                   {isFinishing ? "Thiết lập hoàn tất!" : "AI đang kết nối..."}
                 </h2>
-                <p className="text-theme-text-muted text-lg leading-relaxed max-w-md mx-auto mb-10">
+                <p className="text-theme-text-muted text-sm leading-relaxed max-w-sm mx-auto mb-8">
                   {isFinishing 
                     ? "Ngân sách an toàn của bạn đã được lá chắn AI kích hoạt. Mọi rủi ro cạn tiền giờ đã được lường trước." 
                     : "Hệ thống đang phân tích hành vi chi tiêu và khởi tạo các Lọ tài chính an toàn cho bạn."}

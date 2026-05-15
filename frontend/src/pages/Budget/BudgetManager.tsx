@@ -322,7 +322,7 @@ export default function BudgetManager() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="w-full max-w-sm glass-panel p-8 rounded-[2.5rem] border border-white/10 bg-[#0a0f1d]/95 shadow-2xl relative"
+              className="w-full max-w-sm glass-panel p-8 rounded-[2.5rem] border border-[var(--theme-subtle-border)] bg-[var(--theme-bg-surface)] shadow-2xl relative"
               onClick={e => e.stopPropagation()}
             >
               <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-primary-500 to-transparent" />
@@ -338,7 +338,7 @@ export default function BudgetManager() {
                     type="text" 
                     autoFocus
                     placeholder="VD: Nuôi mèo, Du lịch..."
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-theme-text-primary focus:border-primary-500 outline-none transition-all"
+                    className="w-full bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded-2xl px-4 py-3 text-sm text-theme-text-primary focus:border-primary-500 outline-none transition-all"
                     value={newJarName}
                     onChange={e => setNewJarName(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleAddJar()}
@@ -352,7 +352,7 @@ export default function BudgetManager() {
                       <button 
                         key={e}
                         onClick={() => setNewJarEmoji(e)}
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all ${newJarEmoji === e ? 'bg-primary-500/20 border border-primary-500 shadow-lg scale-110' : 'bg-white/5 border border-transparent hover:border-white/10'}`}
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all ${newJarEmoji === e ? 'bg-primary-500/20 border border-primary-500 shadow-lg scale-110' : 'bg-[var(--theme-subtle-bg)] border border-transparent hover:border-[var(--theme-subtle-border)]'}`}
                       >
                         {e}
                       </button>
@@ -364,7 +364,7 @@ export default function BudgetManager() {
               <div className="flex gap-3 mt-8">
                 <button 
                   onClick={() => setShowAddJarModal(false)}
-                  className="flex-1 py-3 rounded-2xl border border-white/10 text-theme-text-muted font-bold text-xs uppercase tracking-widest hover:bg-white/5 transition-all"
+                  className="flex-1 py-3 rounded-2xl border border-[var(--theme-subtle-border)] text-theme-text-muted font-bold text-xs uppercase tracking-widest hover:bg-[var(--theme-subtle-bg)] transition-all"
                 >
                   Hủy
                 </button>
@@ -410,7 +410,7 @@ export default function BudgetManager() {
             exit={{ opacity: 0, x: 50 }} 
             className="fixed top-6 right-6 z-[250]"
           >
-            <div className={`${toastError ? 'bg-rose-500/90 shadow-rose-500/30' : 'bg-emerald-500/90 shadow-emerald-500/30'} backdrop-blur-xl text-white px-6 py-4 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-3 font-black uppercase tracking-widest text-[10px]`}>
+            <div className={`${toastError ? 'bg-rose-500/90 shadow-rose-500/30' : 'bg-emerald-500/90 shadow-emerald-500/30'} backdrop-blur-xl text-white px-6 py-4 rounded-2xl shadow-2xl border border-[var(--theme-subtle-border)] flex items-center gap-3 font-black uppercase tracking-widest text-[10px]`}>
                <div className="p-1.5 bg-white/20 rounded-lg">
                 {toastError ? <AlertCircle className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
                </div>
@@ -480,7 +480,7 @@ export default function BudgetManager() {
           <h3 className="text-2xl font-black text-rose-400 mb-3">-{fmtVND(totalFixed)}</h3>
           <div className="space-y-1.5 text-[9px] text-theme-text-muted font-bold max-h-16 overflow-y-auto custom-scrollbar">
             {fixedExpenses.length > 0 ? fixedExpenses.map((e, i) => (
-              <div key={i} className="flex justify-between items-center bg-white/5 p-1 rounded-md">
+              <div key={i} className="flex justify-between items-center bg-[var(--theme-subtle-bg)] p-1 rounded-md">
                 <span className="flex items-center gap-1.5">
                   <IconRenderer iconName={e.emoji} className="w-3 h-3" />
                   {e.name}
@@ -520,7 +520,7 @@ export default function BudgetManager() {
                 <span className="text-sky-400">−{fmtVND(lockedEmergency)}</span>
               </div>
             )}
-            <div className="border-t border-white/10 pt-1 flex justify-between">
+            <div className="border-t border-[var(--theme-subtle-border)] pt-1 flex justify-between">
               <span className="text-primary-300 font-black">= Còn khả dụng</span>
               <span className="text-primary-300">{fmtVND(availableToBudget)}</span>
             </div>
@@ -546,7 +546,7 @@ export default function BudgetManager() {
                 </button>
                 <button 
                   onClick={() => setShowAddJarModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-bold text-theme-text-muted hover:text-theme-text-primary transition-all uppercase tracking-wider"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--theme-subtle-bg)] hover:bg-[var(--theme-subtle-border)] border border-[var(--theme-subtle-border)] rounded-lg text-[9px] font-bold text-theme-text-muted hover:text-theme-text-primary transition-all uppercase tracking-wider"
                 >
                   <PlusCircle className="w-3 h-3" /> Thêm lọ
                 </button>

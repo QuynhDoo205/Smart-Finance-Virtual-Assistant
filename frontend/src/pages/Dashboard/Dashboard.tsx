@@ -372,7 +372,7 @@ export default function Dashboard() {
                         : 0}%
                     </span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden flex">
+                  <div className="h-1.5 rounded-full bg-[var(--theme-subtle-bg)] overflow-hidden flex">
                     <motion.div
                       className="h-full bg-gradient-to-r from-amber-500 to-orange-500"
                       initial={{ width: 0 }}
@@ -393,7 +393,7 @@ export default function Dashboard() {
 
           {/* Khi không có fixed expenses - hiển thị breakdown cũ */}
           {(displaySummary.committedFixedExpenses ?? 0) === 0 && (
-            <div className="space-y-2.5 pt-4 border-t border-white/5">
+            <div className="space-y-2.5 pt-4 border-t border-[var(--theme-subtle-border)]">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

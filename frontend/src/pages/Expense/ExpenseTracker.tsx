@@ -131,7 +131,7 @@ function NeonCard({
     <div
       className={`relative overflow-hidden rounded-2xl bg-[var(--theme-bg-panel)] backdrop-blur-2xl border border-[var(--theme-border)] ${className}`}
       style={{
-        boxShadow: `0 0 50px -18px ${accentColor}, inset 0 1px 0 rgba(255,255,255,0.06)`,
+        boxShadow: `0 0 50px -18px ${accentColor}, inset 0 1px 0 var(--theme-subtle-border)`,
         ...style,
       }}
     >
@@ -706,7 +706,7 @@ export default function ExpenseTracker() {
               className={`relative flex items-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-semibold transition-colors duration-200 overflow-hidden ${
                 active
                   ? `bg-gradient-to-r ${gradient} text-theme-text-primary`
-                  : "bg-[#0a1120]/70 border border-white/[0.07] text-theme-text-muted hover:text-theme-text-primary hover:border-white/15"
+                  : "bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] text-theme-text-muted hover:text-theme-text-primary hover:border-[var(--theme-border)]"
               }`}
               style={active ? { boxShadow: `0 0 28px -4px ${neon}` } : {}}
             >
@@ -778,7 +778,7 @@ export default function ExpenseTracker() {
                         }}
                         whileHover={{ borderColor: "rgba(34,211,238,0.55)" }}
                         className="relative flex flex-col items-center justify-center gap-4 h-52 rounded-xl border-2 border-dashed cursor-pointer select-none transition-colors duration-200"
-                        style={{ background: "rgba(6, 20, 40, 0.6)" }}
+                        style={{ background: "var(--theme-subtle-bg)" }}
                       >
                         <motion.div
                           animate={{
@@ -1018,7 +1018,7 @@ export default function ExpenseTracker() {
                     </div>
                     <button 
                       onClick={resetChat}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-black text-theme-text-muted hover:text-sky-400 hover:border-sky-500/30 transition-all uppercase tracking-widest group"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] text-[10px] font-black text-theme-text-muted hover:text-sky-400 hover:border-sky-500/30 transition-all uppercase tracking-widest group"
                     >
                       <RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
                       Làm mới
@@ -1036,7 +1036,7 @@ export default function ExpenseTracker() {
                           className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                         >
                           {msg.role === "typing" ? (
-                            <div className="bg-white/5 p-2.5 rounded-2xl flex gap-1 animate-pulse border border-white/5">
+                            <div className="bg-[var(--theme-subtle-bg)] p-2.5 rounded-2xl flex gap-1 animate-pulse border border-[var(--theme-subtle-border)]">
                               <div className="w-1.5 h-1.5 bg-sky-400 rounded-full" />
                               <div className="w-1.5 h-1.5 bg-sky-400 rounded-full" />
                               <div className="w-1.5 h-1.5 bg-sky-400 rounded-full" />
@@ -1046,7 +1046,7 @@ export default function ExpenseTracker() {
                               className={`max-w-[85%] px-4 py-3 rounded-2xl text-xs font-bold leading-relaxed shadow-xl ${
                                 msg.role === "user"
                                   ? "bg-sky-500 text-white rounded-tr-none"
-                                  : "bg-[#1e2d3d]/50 border border-white/10 text-cyan-50 rounded-tl-none"
+                                  : "bg-[#1e2d3d]/50 border border-[var(--theme-subtle-border)] text-cyan-50 rounded-tl-none"
                               }`}
                             >
                               {msg.text}
@@ -1077,8 +1077,8 @@ export default function ExpenseTracker() {
                         onClick={() => setChatInput(s)}
                         className="px-3 py-1.5 rounded-xl text-theme-text-muted text-[10px] font-black uppercase tracking-widest hover:text-cyan-300 transition-colors whitespace-nowrap flex-shrink-0"
                         style={{
-                          background: "rgba(6,20,40,0.8)",
-                          border: "1px solid rgba(255,255,255,0.07)",
+                          background: "var(--theme-subtle-bg)",
+                          border: "1px solid var(--theme-subtle-border)",
                         }}
                       >
                         {s}
@@ -1101,7 +1101,7 @@ export default function ExpenseTracker() {
                         onChange={(e) => setChatInput(e.target.value)}
                         placeholder="Hỏi Nova về chi tiêu của bạn..."
                         disabled={chatLoading}
-                        className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-theme-text-primary placeholder:text-white/10 outline-none focus:border-sky-500/50 transition-all disabled:opacity-50"
+                        className="flex-1 bg-black/40 border border-[var(--theme-subtle-border)] rounded-xl px-4 py-3 text-sm text-theme-text-primary placeholder:text-white/10 outline-none focus:border-sky-500/50 transition-all disabled:opacity-50"
                       />
                       <motion.button
                         type="submit"
@@ -1162,10 +1162,10 @@ export default function ExpenseTracker() {
                               const val = e.target.value.replace(/\D/g, '');
                               setManualAmount(val === '' ? '' : Number(val));
                             }}
-                            className="w-full pl-11 pr-16 py-4 rounded-xl text-2xl font-extrabold text-theme-text-primary placeholder-gray-700 outline-none transition-all"
+                            className="w-full pl-11 pr-16 py-4 rounded-xl text-2xl font-extrabold text-theme-text-primary placeholder-theme-text-muted outline-none transition-all"
                             style={{
-                              background: "rgba(6,20,40,0.8)",
-                              border: "1px solid rgba(255,255,255,0.08)",
+                              background: "var(--theme-subtle-bg)",
+                              border: "1px solid var(--theme-subtle-border)",
                             }}
                             onFocus={(e) => {
                               setIsManualFocused(true);
@@ -1174,7 +1174,7 @@ export default function ExpenseTracker() {
                             }}
                             onBlur={(e) => {
                               setIsManualFocused(false);
-                              e.target.style.borderColor = "rgba(255,255,255,0.08)";
+                              e.target.style.borderColor = "var(--theme-subtle-border)";
                               e.target.style.boxShadow = "none";
                             }}
                           />
@@ -1212,15 +1212,15 @@ export default function ExpenseTracker() {
                                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-all ${
                                   active
                                     ? `${info.bg} ${info.color}`
-                                    : "text-gray-600 hover:text-theme-text-muted"
+                                    : "text-theme-text-muted hover:text-theme-text-muted"
                                 }`}
                                 style={{
                                   background: active
                                     ? undefined
-                                    : "rgba(6,20,40,0.7)",
+                                    : "var(--theme-subtle-bg)",
                                   border: active
                                     ? undefined
-                                    : "1px solid rgba(255,255,255,0.06)",
+                                    : "1px solid var(--theme-subtle-border)",
                                   boxShadow: active
                                     ? "0 0 14px rgba(232,121,249,0.15)"
                                     : "none",
@@ -1254,8 +1254,8 @@ export default function ExpenseTracker() {
                               onChange={(e) => setManualDate(e.target.value)}
                               className="w-full pl-9 pr-3 py-3 rounded-xl text-theme-text-muted text-sm outline-none transition-all"
                               style={{
-                                background: "rgba(6,20,40,0.8)",
-                                border: "1px solid rgba(255,255,255,0.08)",
+                                background: "var(--theme-subtle-bg)",
+                                border: "1px solid var(--theme-subtle-border)",
                               }}
                               onFocus={(e) => {
                                 e.target.style.borderColor =
@@ -1265,7 +1265,7 @@ export default function ExpenseTracker() {
                               }}
                               onBlur={(e) => {
                                 e.target.style.borderColor =
-                                  "rgba(255,255,255,0.08)";
+                                  "var(--theme-subtle-border)";
                                 e.target.style.boxShadow = "none";
                               }}
                             />
@@ -1282,10 +1282,10 @@ export default function ExpenseTracker() {
                               placeholder="Mô tả ngắn…"
                               value={manualNote}
                               onChange={(e) => setManualNote(e.target.value)}
-                              className="w-full pl-9 pr-3 py-3 rounded-xl text-theme-text-muted text-sm placeholder-gray-700 outline-none transition-all"
+                              className="w-full pl-9 pr-3 py-3 rounded-xl text-theme-text-muted text-sm placeholder-theme-text-muted outline-none transition-all"
                               style={{
-                                background: "rgba(6,20,40,0.8)",
-                                border: "1px solid rgba(255,255,255,0.08)",
+                                background: "var(--theme-subtle-bg)",
+                                border: "1px solid var(--theme-subtle-border)",
                               }}
                               onFocus={(e) => {
                                 e.target.style.borderColor =
@@ -1295,7 +1295,7 @@ export default function ExpenseTracker() {
                               }}
                               onBlur={(e) => {
                                 e.target.style.borderColor =
-                                  "rgba(255,255,255,0.08)";
+                                  "var(--theme-subtle-border)";
                                 e.target.style.boxShadow = "none";
                               }}
                             />
@@ -1361,7 +1361,7 @@ export default function ExpenseTracker() {
           }}
         >
           <NeonCard
-            accentColor="rgba(255,255,255,0.15)"
+            accentColor="var(--theme-subtle-border)"
             className="lg:h-[650px] flex flex-col"
           >
             <div className="p-5 flex flex-col h-full">
@@ -1373,8 +1373,8 @@ export default function ExpenseTracker() {
                 <span
                   className="text-xs text-theme-text-muted px-2.5 py-1 rounded-lg"
                   style={{
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.06)",
+                    background: "var(--theme-subtle-border)",
+                    border: "1px solid var(--theme-subtle-border)",
                   }}
                 >
                   {filteredExpenses.length} khoản
@@ -1442,8 +1442,8 @@ export default function ExpenseTracker() {
               <div
                 className="mb-6 p-4 rounded-xl text-center"
                 style={{
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  background: "var(--theme-subtle-border)",
+                  border: "1px solid var(--theme-subtle-border)",
                 }}
               >
                 <p className="text-xs text-theme-text-muted">Tổng hiển thị</p>
@@ -1467,7 +1467,7 @@ export default function ExpenseTracker() {
                   {filteredExpenses.length === 0 ? (
                     <div className="text-center py-12">
                       <p className="text-4xl mb-3">🧾</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-theme-text-muted">
                         Không tìm thấy giao dịch nào
                       </p>
                     </div>
@@ -1477,11 +1477,11 @@ export default function ExpenseTracker() {
                       .map(([date, items]: [string, ExpenseItem[]]) => (
                         <div key={date} className="space-y-2">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className="h-[1px] flex-1 bg-white/5" />
+                            <div className="h-[1px] flex-1 bg-[var(--theme-subtle-bg)]" />
                             <span className="text-[10px] font-black uppercase tracking-widest text-sky-400/80 px-2.5 py-1 rounded-full border border-sky-500/20 bg-sky-500/5">
                               {formatGroupTitle(date)}
                             </span>
-                            <div className="h-[1px] flex-1 bg-white/5" />
+                            <div className="h-[1px] flex-1 bg-[var(--theme-subtle-bg)]" />
                           </div>
 
                           {items.map((exp: ExpenseItem) => {
@@ -1494,9 +1494,9 @@ export default function ExpenseTracker() {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, scale: 0.92 }}
                                 transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                                className="group relative flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-white/15 hover:bg-white/[0.05] transition-all"
+                                className="group relative flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-[var(--theme-border)] hover:bg-white/[0.05] transition-all"
                               >
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg border shadow-lg flex-shrink-0 ${info.bg} border-white/10`}>
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg border shadow-lg flex-shrink-0 ${info.bg} border-[var(--theme-subtle-border)]`}>
                                   {info.emoji}
                                 </div>
                                 

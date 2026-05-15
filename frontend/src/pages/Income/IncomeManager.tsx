@@ -693,7 +693,7 @@ export default function IncomeManager() {
                       autoFocus
                       value={newIncomeValue}
                       onChange={(e) => setNewIncomeValue(Number(e.target.value))}
-                      className="w-32 px-2 py-1 bg-white/5 border border-white/10 rounded text-sm text-theme-text-primary focus:border-emerald-500 focus:outline-none"
+                      className="w-32 px-2 py-1 bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded text-sm text-theme-text-primary focus:border-emerald-500 focus:outline-none"
                     />
                     <button onClick={handleUpdateGlobalIncome} className="p-1 text-emerald-400 hover:text-emerald-300 transition-colors">
                       <CheckCircle2 className="w-4 h-4" />
@@ -838,7 +838,7 @@ export default function IncomeManager() {
                   onClick={() => setIsSelectOpen(!isSelectOpen)}
                   className={`glass-input w-full py-3 px-4 text-sm font-bold flex items-center justify-between group transition-all duration-300 ${isSelectOpen ? 'border-emerald-500/50 bg-emerald-500/5 ring-1 ring-emerald-500/20' : ''}`}
                 >
-                  <span className={sourceId ? 'text-theme-text-primary' : 'text-white/20'}>
+                  <span className={sourceId ? 'text-theme-text-primary' : 'text-theme-text-muted/40'}>
                     {sourceId ? (sources.find(s => s.id === sourceId)?.name) : '-- Chọn nguồn tiền --'}
                   </span>
                   <ChevronDown className={`w-4 h-4 text-theme-text-muted transition-transform duration-300 ${isSelectOpen ? 'rotate-180 text-emerald-400' : ''}`} />
@@ -852,7 +852,7 @@ export default function IncomeManager() {
                         initial={{ opacity: 0, y: 0, scale: 0.95 }}
                         animate={{ opacity: 1, y: 8, scale: 1 }}
                         exit={{ opacity: 0, y: 0, scale: 0.95 }}
-                        className="absolute top-full left-0 w-full z-20 bg-[#1e293b] border border-white/20 rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] overflow-hidden py-2"
+                        className="absolute top-full left-0 w-full z-20 bg-[var(--theme-bg-panel)] border border-[var(--theme-border)] rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] overflow-hidden py-2"
                       >
                         {sources.filter(s => globalFilter === 'all' || s.sourceType === globalFilter).length === 0 ? (
                           <div className="px-4 py-3 text-xs text-theme-text-muted italic">Chưa có nguồn tiền nào cho mục này</div>
@@ -912,7 +912,7 @@ export default function IncomeManager() {
                   placeholder="0"
                   value={amount}
                   onChange={(e) => handleAmountChange(e, setAmount)}
-                  className="w-full pl-5 pr-10 py-4 bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded-2xl text-2xl font-black text-theme-text-primary outline-none focus:border-emerald-500/30 transition-all placeholder:text-white/10"
+                  className="w-full pl-5 pr-10 py-4 bg-[var(--theme-subtle-bg)] border border-[var(--theme-subtle-border)] rounded-2xl text-2xl font-black text-theme-text-primary outline-none focus:border-emerald-500/30 transition-all placeholder:text-theme-text-muted/30"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-theme-text-muted">đ</span>
               </div>
@@ -1128,7 +1128,7 @@ export default function IncomeManager() {
               Đây là số tiền <b>thực sự đã vào túi</b> bạn. Khi nhận tiền, bạn hãy "Ghi nhận" để số dư ngân sách được cập nhật chính xác.
             </p>
           </div>
-          <div className="space-y-2 md:col-span-2 pt-2 border-t border-white/5">
+          <div className="space-y-2 md:col-span-2 pt-2 border-t border-[var(--theme-subtle-border)]">
             <h4 className="text-purple-400 font-bold text-[10px] uppercase tracking-wider">Tại sao Thực thu có thể cao hơn Dự tính?</h4>
             <p className="text-xs text-theme-text-muted leading-relaxed">
               Khi thực thu (70Tr) cao hơn dự tính (15Tr), phần <b>vượt mức (55Tr)</b> thường đến từ các khoản phát sinh như: Thưởng đột xuất, Bán đồ cũ, hoặc các khoản Trợ cấp không nằm trong kế hoạch. Hệ thống sẽ tự động đưa các khoản này vào mục <b>"Khác (thực tế)"</b> để đảm bảo dòng tiền của bạn luôn khớp với thực tế 100%.
@@ -1360,7 +1360,7 @@ export default function IncomeManager() {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 10 }}
             className="glass-panel w-full max-w-sm p-8 rounded-[32px] relative z-10 border border-[var(--theme-subtle-border)] shadow-2xl overflow-hidden"
-            style={{ background: 'rgba(15, 23, 42, 0.85)' }}
+            style={{ background: 'var(--theme-bg-panel)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500/0 via-rose-500/50 to-rose-500/0" />
